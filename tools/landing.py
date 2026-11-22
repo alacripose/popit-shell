@@ -188,6 +188,11 @@ def numbers(m: dict, p: dict) -> list[tuple[str, str]]:
 
 
 # ----------------------------------------------------------------- family prose tools
+def prose_seal(texts: list[str]) -> str:
+    """The digest of the copy the family tools approved, so `--check` needs no tool on disk."""
+    return hashlib.sha256("\n".join(texts).encode("utf-8")).hexdigest()
+
+
 def prose_check(texts: list[str]) -> None:
     for text in texts:
         words = len(text.split())
@@ -380,6 +385,7 @@ def write() -> None:
     stored = {
         "schema": "popit-shell.landing-copy/1",
         "machine": m["digest"],
+        "prose": prose_seal(list(copy.values())),
         "reading": {key: m[key] for key in READING_FIELDS},
         "copy": copy,
     }
@@ -407,9 +413,13 @@ def check() -> int:
         # The page is the copy rendered against the pins as they stand. A moved pin is drift.
         if not stored.get("machine"):
             problems.append("landing-copy-unsealed: the stored reading digest is missing")
-        prose_check(list(copy.values()))
         if copy != compose(m, p):
             problems.append("landing-copy-stale: the copy no longer matches the reading or the pins")
+        seal = stored.get("prose", "")
+        if not seal:
+            problems.append("landing-prose-unsealed: the copy was never prose checked")
+        elif seal != prose_seal(list(copy.values())):
+            problems.append("landing-prose-changed: the copy is not the text that was checked")
         target = (DOCS / "index.html").read_text(encoding="utf-8") if (DOCS / "index.html").exists() else ""
         if not target:
             problems.append("docs/index.html is missing")

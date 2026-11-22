@@ -1,6 +1,7 @@
 {
   "schema": "popit-shell.landing-copy/1",
   "machine": "040294620a875e06993e89124853d7b3569226332384dd747a7392ccd248208c",
+  "prose": "bf2373478fac74c082f9abe9399892add2fbb0033eedac095339e2546dde7946",
   "reading": {
     "host": "Debian 13",
     "version": "CUA v2.7.3",
