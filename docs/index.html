@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>popit-shell on Debian 13</title>
 <meta name="description" content="This machine scores the repository 10 in band red">
-<meta name="openlock-build" content="0d5cf347bb">
+<meta name="openlock-build" content="c720d9ba3a">
 <style>
   :root {
     --paper: #d9c9a6;
@@ -147,7 +147,7 @@ python shell.py</pre>
 <script type="module">
   // The assets are named by their own bytes, so a page and the module it asks for cannot be from
   // two different builds: a fresh page never pairs with a module an old visit left in the cache.
-  import { loadContour, fillContours } from "./contour.js?v=9196ebb15e";
+  import { loadContour, fillContours } from "./contour.js?v=395d41fe2b";
   await loadContour("./contour.json?v=b6d678b1c3");
   fillContours(document);
   // Every surface is measured again when its box changes, exactly as the shell does it.

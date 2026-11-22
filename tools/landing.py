@@ -232,7 +232,9 @@ def prose_check(texts: list[str]) -> None:
 
 # ----------------------------------------------------------------- the page
 def digest(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()[:10]
+    # The name is the hash of the bytes the server sends, not of this checkout's line endings, so
+    # two checkouts of the same content publish the same asset name.
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()[:10]
 
 
 def versions() -> dict[str, str]:
