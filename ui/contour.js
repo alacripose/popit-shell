@@ -30,7 +30,11 @@ let shape = null;
 let seq = 0;
 
 export async function loadContour() {
-  shape = await (await fetch("/contour.json")).json();
+  // The drawing is served beside this module, not at the server root: a project Pages site lives
+  // under /<repo>/, and an absolute path there asked the domain root for contour.json (404), so the
+  // published page drew rectangles with no contour at all.
+  const shapeUrl = new URL("contour.json", import.meta.url);
+  shape = await (await fetch(shapeUrl)).json();
   return shape;
 }
 
