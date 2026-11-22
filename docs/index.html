@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>popit-shell on Debian 13</title>
 <meta name="description" content="This machine scores the repository 10 in band red">
+<meta name="openlock-build" content="0d5cf347bb">
 <style>
   :root {
     --paper: #d9c9a6;
@@ -144,13 +145,21 @@ python shell.py</pre>
   <footer>Debian 13 wrote this page from its own readings <a href="family-look.md">The look in prose</a></footer>
 </main>
 <script type="module">
-  import { loadContour, fillContours } from "./contour.js";
-  await loadContour();
+  // The assets are named by their own bytes, so a page and the module it asks for cannot be from
+  // two different builds: a fresh page never pairs with a module an old visit left in the cache.
+  import { loadContour, fillContours } from "./contour.js?v=9196ebb15e";
+  await loadContour("./contour.json?v=b6d678b1c3");
   fillContours(document);
   // Every surface is measured again when its box changes, exactly as the shell does it.
   const again = () => fillContours(document);
   new ResizeObserver(again).observe(document.body);
   window.addEventListener("resize", again);
+  // Pages serves every file with a ten minute cache, so a returning visitor can be handed the page
+  // it already had. The worker takes over the document and the module and always asks the server
+  // first, which is what makes this page converge on the deployment rather than on a memory of it.
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
+    navigator.serviceWorker.register("./sw.js", { updateViaCache: "none", scope: "./" }).catch(() => {});
+  }
 </script>
 </body>
 </html>

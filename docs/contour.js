@@ -29,12 +29,15 @@ export const CORNER_PX = (CORNER_UNITS * BAR_HEIGHT) / UNITS_H;
 let shape = null;
 let seq = 0;
 
-export async function loadContour() {
+export async function loadContour(url) {
   // The drawing is served beside this module, not at the server root: a project Pages site lives
   // under /<repo>/, and an absolute path there asked the domain root for contour.json (404), so the
-  // published page drew rectangles with no contour at all.
-  const shapeUrl = new URL("contour.json", import.meta.url);
-  shape = await (await fetch(shapeUrl)).json();
+  // published page drew rectangles with no contour at all. The page may pass its own cache-busted
+  // URL; the module still resolves one beside itself when it does not.
+  const shapeUrl = url ? new URL(url, import.meta.url) : new URL("contour.json", import.meta.url);
+  // A published drawing must not come from a browser cache: `reload` revalidates with the server, so
+  // a returning visitor reads the shape this deployment serves rather than the one it remembered.
+  shape = await (await fetch(shapeUrl, { cache: "reload" })).json();
   return shape;
 }
 

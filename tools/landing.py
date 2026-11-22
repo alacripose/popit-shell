@@ -42,6 +42,7 @@ ENGINE = ROOT / "ui" / "contour.js"
 GATE = ROOT / "tools" / "gate.py"
 REQUIREMENTS = ROOT / "requirements.txt"
 COPY = DOCS / "landing-copy.json"
+SERVICE_WORKER = ROOT / "ui" / "sw.js"
 
 MACHINE = os.environ.get("FAMILY_AXIS", "http://127.0.0.1:8787")
 WSL_DISTRO = os.environ.get("FAMILY_AXIS_DISTRO", "Debian")
@@ -230,7 +231,35 @@ def prose_check(texts: list[str]) -> None:
 
 
 # ----------------------------------------------------------------- the page
-def page(copy: dict[str, str], p: dict, m: dict) -> str:
+def digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:10]
+
+
+def versions() -> dict[str, str]:
+    """The published assets are named by their own bytes."""
+    return {"js": digest(ENGINE), "json": digest(CONTOUR)}
+
+
+def sw(build: str) -> str:
+    return SERVICE_WORKER.read_text(encoding="utf-8").replace("__BUILD__", build)
+
+
+def build_id(copy: dict[str, str], p: dict, m: dict) -> str:
+    """One build name for the page and its worker, from the page's own bytes.
+
+    The page is rendered with a placeholder first, so the name is a function of the content rather
+    than of the clock; a build that changes nothing keeps its name, and a build that changes
+    anything gets a new one.
+    """
+    v = versions()
+    seed = page(copy, p, m, v, "0000000000") + v["js"] + v["json"]
+    return hashlib.sha256(seed.encode("utf-8")).hexdigest()[:10]
+
+
+def page(copy: dict[str, str], p: dict, m: dict, v: dict[str, str] | None = None,
+         build: str = "") -> str:
+    v = v or versions()
+    build = build or "0000000000"
     rows = "\n".join(f"        <tr><td>{name}</td><td>{value}</td></tr>" for name, value in numbers(m, p))
     cards = "\n".join(
         f"""      <article class="card surface" data-contour="card">
@@ -247,6 +276,7 @@ def page(copy: dict[str, str], p: dict, m: dict) -> str:
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{copy['title']}</title>
 <meta name="description" content="{copy['lede']}">
+<meta name="openlock-build" content="{build}">
 <style>
   :root {{
     --paper: #d9c9a6;
@@ -364,17 +394,51 @@ def page(copy: dict[str, str], p: dict, m: dict) -> str:
   <footer>{copy['footer']} <a href="family-look.md">The look in prose</a></footer>
 </main>
 <script type="module">
-  import {{ loadContour, fillContours }} from "./contour.js";
-  await loadContour();
+  // The assets are named by their own bytes, so a page and the module it asks for cannot be from
+  // two different builds: a fresh page never pairs with a module an old visit left in the cache.
+  import {{ loadContour, fillContours }} from "./contour.js?v={v['js']}";
+  await loadContour("./contour.json?v={v['json']}");
   fillContours(document);
   // Every surface is measured again when its box changes, exactly as the shell does it.
   const again = () => fillContours(document);
   new ResizeObserver(again).observe(document.body);
   window.addEventListener("resize", again);
+  // Pages serves every file with a ten minute cache, so a returning visitor can be handed the page
+  // it already had. The worker takes over the document and the module and always asks the server
+  // first, which is what makes this page converge on the deployment rather than on a memory of it.
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {{
+    navigator.serviceWorker.register("./sw.js", {{ updateViaCache: "none", scope: "./" }}).catch(() => {{}});
+  }}
 </script>
 </body>
 </html>
 """
+
+
+def publish(copy: dict[str, str], p: dict, m: dict) -> str:
+    """Write the published build from the copy and the pins, and nothing else.
+
+    The published files are a function of the sources: the page, the module, the drawing and the
+    worker are all rendered here, so `docs/` can be rebuilt on any machine without the readings.
+    """
+    DOCS.mkdir(parents=True, exist_ok=True)
+    v = versions()
+    build = build_id(copy, p, m)
+    (DOCS / "index.html").write_text(page(copy, p, m, v, build), encoding="utf-8")
+    shutil.copyfile(ENGINE, DOCS / "contour.js")
+    shutil.copyfile(CONTOUR, DOCS / "contour.json")
+    (DOCS / "sw.js").write_text(sw(build), encoding="utf-8")
+    return build
+
+
+def rebuild() -> None:
+    """Rebuild the published build from the stored copy; no machine is needed."""
+    stored = json.loads(COPY.read_text(encoding="utf-8"))
+    reading = stored.get("reading", {})
+    m = {key: reading.get(key, "") for key in READING_FIELDS}
+    m["digest"] = stored.get("machine", "")
+    build = publish(stored["copy"], pins(), m)
+    print(f"rebuilt docs/ from the stored copy, build {build}")
 
 
 def write() -> None:
@@ -391,10 +455,8 @@ def write() -> None:
     }
     DOCS.mkdir(parents=True, exist_ok=True)
     COPY.write_text(json.dumps(stored, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    (DOCS / "index.html").write_text(page(copy, p, m), encoding="utf-8")
-    shutil.copyfile(ENGINE, DOCS / "contour.js")
-    shutil.copyfile(CONTOUR, DOCS / "contour.json")
-    print(f"wrote docs/index.html from {m['host']} {m['version']} reading {m['digest'][:12]}")
+    build = publish(copy, p, m)
+    print(f"wrote docs/ from {m['host']} {m['version']} reading {m['digest'][:12]}, build {build}")
 
 
 def check() -> int:
@@ -423,7 +485,7 @@ def check() -> int:
         target = (DOCS / "index.html").read_text(encoding="utf-8") if (DOCS / "index.html").exists() else ""
         if not target:
             problems.append("docs/index.html is missing")
-        elif target != page(copy, p, m):
+        elif target != page(copy, p, m, versions(), build_id(copy, p, m)):
             problems.append("docs/index.html is stale against its copy, run python tools/landing.py")
         if "border-radius" in target:
             problems.append("landing-rounded-rectangle: a rounded rectangle is not the contour")
@@ -432,6 +494,21 @@ def check() -> int:
         for name in ("contour.js", "contour.json"):
             if not (DOCS / name).exists():
                 problems.append(f"docs/{name} is missing, run python tools/landing.py")
+        # The published build is the source build, byte for byte: a copied module that drifted, an
+        # unversioned asset name or a worker of another build is the stale page a visitor also gets.
+        for source, published in ((ENGINE, DOCS / "contour.js"), (CONTOUR, DOCS / "contour.json")):
+            if published.exists() and published.read_bytes() != source.read_bytes():
+                problems.append(f"docs/{published.name} is not the source {source.name}")
+        worker = DOCS / "sw.js"
+        if not worker.exists():
+            problems.append("docs/sw.js is missing, run python tools/landing.py")
+        elif worker.read_text(encoding="utf-8") != sw(build_id(copy, p, m)):
+            problems.append("docs/sw.js is not this build's worker")
+        v = versions()
+        if f'from "./contour.js?v={v["js"]}"' not in target:
+            problems.append("landing-assets-unversioned: the module URL is not the module's own bytes")
+        if f'loadContour("./contour.json?v={v["json"]}")' not in target:
+            problems.append("landing-drawing-unversioned: the drawing URL is not the drawing's own bytes")
     for problem in problems:
         print(f"[FAIL] {problem}")
     if problems:
@@ -444,6 +521,9 @@ def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
     if "--check" in args:
         return check()
+    if "--rebuild" in args:
+        rebuild()
+        return 0
     write()
     return 0
 
