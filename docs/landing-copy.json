@@ -1,0 +1,35 @@
+{
+  "schema": "popit-shell.landing-copy/1",
+  "machine": "040294620a875e06993e89124853d7b3569226332384dd747a7392ccd248208c",
+  "reading": {
+    "host": "Debian 13",
+    "version": "CUA v2.7.3",
+    "platform": "linux",
+    "score": 10,
+    "band": "red",
+    "star_count": 6,
+    "axis_count": 9,
+    "first_star": "presence",
+    "last_star": "continuity"
+  },
+  "copy": {
+    "title": "popit-shell on Debian 13",
+    "eyebrow": "Debian 13 reading",
+    "headline": "CUA v2.7.3 holds 6 stars over 9 axes",
+    "lede": "This machine scores the repository 10 in band red",
+    "caption": "The pin is 7.67 by 11.00 px on 4 surfaces",
+    "cta_release": "Download the release",
+    "cta_source": "Source and gate",
+    "card1_title": "The machine",
+    "card1_body": "Debian 13 runs CUA v2.7.3 on linux",
+    "card2_title": "The stars",
+    "card2_body": "6 stars run from presence to continuity",
+    "card3_title": "The gate",
+    "card3_body": "The gate runs 15 checks, first is family-look-pinned",
+    "numbers_title": "Pinned numbers",
+    "numbers_note": "The reading is 040294620a87 over three routes",
+    "run_title": "Run it",
+    "run_note": "Windows 10 or 11 with Python 3.13",
+    "footer": "Debian 13 wrote this page from its own readings"
+  }
+}

@@ -67,3 +67,21 @@ refuses a pin that no longer matches what the surfaces draw.
 
 CI runs the gate on every push and packages `dist/popit-shell.zip`. A `v*` tag runs the
 same gate and attaches that archive to the release.
+
+## The family client shell
+
+`popit-shell` is the family's client shell for forward porting. A project that moves into it keeps
+one contour: `ui/contour.js` is the shape authority and `window.py` mirrors it for the Qt mask, so a
+taskbar button, a window frame and a landing-page card share the same crown and the same clip pads.
+
+Its landing page is not written by hand. `tools/landing.py` reads the Debian machine's axis routes
+(`/api/axis/system`, `/api/axis/civilians`, `/api/axis/stars`) for what the family says about itself,
+reads `tools/family_look.json`, `contour.json`, the gate's check names and `requirements.txt` for what
+this repository holds, and writes `docs/index.html` from both. The reading is sealed in
+`docs/landing-copy.json`, and the family prose tools refuse a sentence over budget or off register.
+The gate's `landing-generated` check refuses a page that no longer matches its copy.
+
+```
+python tools/landing.py          # on the machine, or with FAMILY_AXIS pointing at it
+python tools/landing.py --check  # offline check of the page against its saved copy
+```

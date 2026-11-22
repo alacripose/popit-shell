@@ -175,6 +175,29 @@ def family_look_pin() -> None:
     )
 
 
+def landing_pin() -> None:
+    """The landing page is generated from these records, so a hand edit is refused.
+
+    `tools/landing.py` writes `docs/index.html` from the pin, the gate's own refusal names and
+    `contour.json`, and refuses a rounded rectangle. A page that no longer matches the
+    generator is stale, and a stale page is the same drift as a stale pin.
+    """
+    import subprocess
+
+    run = subprocess.run(
+        [sys.executable, str(ROOT / "tools" / "landing.py"), "--check"],
+        cwd=ROOT, capture_output=True, text=True, check=False,
+    )
+    detail = (run.stdout + run.stderr).strip().replace("\n", " | ")[:220]
+    check(
+        "landing-generated",
+        "the landing page is generated from the pinned look",
+        run.returncode == 0,
+        "docs/index.html",
+        detail or "the landing generator refused the page",
+    )
+
+
 def bar_pin() -> dict:
     """The taskbar's outline, pinned: the numbers and the cells the strip is drawn with."""
     numbers = authority_numbers()
@@ -447,6 +470,7 @@ def main(argv: list[str]) -> int:
     clip_padding_refusals(sources)
 
     family_look_pin()
+    landing_pin()
 
     authority = sources.get("ui/contour.js", "")
     check(
