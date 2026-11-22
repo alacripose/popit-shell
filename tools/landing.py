@@ -49,7 +49,7 @@ WSL_DISTRO = os.environ.get("FAMILY_AXIS_DISTRO", "Debian")
 READINGS = ("/api/axis/system", "/api/axis/civilians", "/api/axis/stars")
 
 PROSE_TOOLS = (
-    Path("<home>/Documents/deadlock-model-forge/tools/ui_prose.py"),
+    Path(os.path.expanduser("~/Documents/deadlock-model-forge/tools/ui_prose.py")),
     Path("F:/Documents/portal-shell/tools/ui_prose.py"),
 )
 PROSE_MJS = Path("F:/Documents/brass-meridian/tools/prose.mjs")
