@@ -1,0 +1,225 @@
+"""Serve the Popit shell's view over loopback, with the archive application's own shape.
+
+The session archive window (agent_god_files/tools/archive_window.py) is the pattern:
+a loopback ThreadingHTTPServer over a folder, no framework, one JSON API. This server
+adds the three things a shell needs: the installed applications, the running windows,
+and the actions that start, raise or close them.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+import threading
+from datetime import datetime, timezone
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import urlparse
+
+import desktop
+
+ROOT = Path(__file__).resolve().parent
+UI = ROOT / "ui"
+REFUSALS = ROOT / "logs" / "authority" / "2026-11-22-contour-refusals.jsonl"
+PORT = int(os.environ.get("POPIT_PORT", "5199"))
+TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+}
+
+START_MENUS = [
+    Path(os.environ.get("APPDATA", "")) / "Microsoft/Windows/Start Menu/Programs",
+    Path(os.environ.get("PROGRAMDATA", "")) / "Microsoft/Windows/Start Menu/Programs",
+]
+
+
+def installed_apps() -> list[dict]:
+    """Every Start Menu shortcut, which is the list Windows itself offers."""
+    rows: list[dict] = []
+    for root in START_MENUS:
+        if not root or not root.is_dir():
+            continue
+        for path in sorted(root.rglob("*.lnk")):
+            folder = path.parent.relative_to(root).as_posix()
+            rows.append(
+                {
+                    "label": path.stem,
+                    "detail": "" if folder == "." else folder,
+                    "target": str(path),
+                    "kind": "Installed app",
+                }
+            )
+    rows.sort(key=lambda row: (row["label"].lower(), row["detail"].lower()))
+    return rows
+
+
+def tools() -> list[dict]:
+    """The shell's own rows, kept above the applications the way the launcher does."""
+    return [
+        {"label": "Reload applications", "detail": "Reads the Start Menu again", "target": "reload", "kind": "Portal tool"},
+        {"label": "Close the shell", "detail": "Ends this process", "target": "quit", "kind": "Portal tool"},
+    ]
+
+
+def state() -> dict:
+    apps = installed_apps()
+    return {"tools": tools(), "apps": apps, "count": len(apps)}
+
+
+# The launcher's request queue: the view asks, the Qt process acts. One flag is enough
+# because the launcher has one state, open or closed.
+PENDING = {"launcher": 0, "quit": False, "move": [0, 0]}
+PENDING_LOCK = threading.Lock()
+
+
+def take_launcher_request() -> int:
+    """Return how many launcher toggles were asked for, and clear them."""
+    with PENDING_LOCK:
+        count = PENDING["launcher"]
+        PENDING["launcher"] = 0
+        return count
+
+
+def take_move() -> tuple[int, int]:
+    """Return the drag the view has asked for since the last frame, and clear it."""
+    with PENDING_LOCK:
+        dx, dy = PENDING["move"]
+        PENDING["move"] = [0, 0]
+        return int(dx), int(dy)
+
+
+def quit_requested() -> bool:
+    with PENDING_LOCK:
+        return bool(PENDING["quit"])
+
+
+def start(target: str) -> str:
+    if target == "quit":
+        with PENDING_LOCK:
+            PENDING["quit"] = True
+        return "quit"
+    if target == "launcher":
+        with PENDING_LOCK:
+            PENDING["launcher"] += 1
+        return "launcher"
+    if target == "reload":
+        return "reload"
+    if not os.path.exists(target):
+        raise FileNotFoundError(target)
+    os.startfile(target)  # noqa: S606 - the owner asked for this row to start its app
+    return "started"
+
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = "popit-shell/1"
+
+    def log_message(self, fmt: str, *args) -> None:  # the shell's log is its own file
+        sys.stderr.write("shell: " + fmt % args + "\n")
+
+    def send_body(self, body: bytes, kind: str, code: int = 200) -> None:
+        self.send_response(code)
+        self.send_header("Content-Type", kind)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self) -> None:  # noqa: N802 - BaseHTTPRequestHandler's name
+        path = urlparse(self.path).path
+        if path == "/api/state":
+            self.send_body(json.dumps(state()).encode("utf-8"), TYPES[".json"])
+            return
+        if path == "/api/windows":
+            self.send_body(json.dumps({"windows": desktop.windows()}).encode("utf-8"), TYPES[".json"])
+            return
+        if path == "/contour.json":
+            self.send_body((ROOT / "contour.json").read_bytes(), TYPES[".json"])
+            return
+        if path == "/":
+            path = "/index.html"
+        file = (UI / path.lstrip("/")).resolve()
+        if not file.is_file() or UI not in file.parents:
+            self.send_body(b"not found", "text/plain; charset=utf-8", 404)
+            return
+        self.send_body(file.read_bytes(), TYPES.get(file.suffix, "application/octet-stream"))
+
+    def do_POST(self) -> None:  # noqa: N802
+        path = urlparse(self.path).path
+        if path == "/api/open":
+            self.action(lambda request: start(str(request.get("target", ""))))
+            return
+        if path == "/api/activate":
+            self.action(lambda request: "raised" if desktop.activate(int(request.get("hwnd", 0))) else "refused")
+            return
+        if path == "/api/minimize":
+            desktop.minimize(int(self.read_json().get("hwnd", 0)))
+            self.send_body(json.dumps({"ok": True, "result": "minimized"}).encode("utf-8"), TYPES[".json"])
+            return
+        if path == "/api/close":
+            desktop.close(int(self.read_json().get("hwnd", 0)))
+            self.send_body(json.dumps({"ok": True, "result": "closed"}).encode("utf-8"), TYPES[".json"])
+            return
+        if path == "/api/move":
+            # A drag is a delta, not a position: the window may be off the view's own idea
+            # of where it is, and a delta cannot jump it across the screen.
+            request = self.read_json()
+            with PENDING_LOCK:
+                PENDING["move"][0] += int(request.get("dx", 0))
+                PENDING["move"][1] += int(request.get("dy", 0))
+            self.send_body(json.dumps({"ok": True}).encode("utf-8"), TYPES[".json"])
+            return
+        if path == "/api/refuse":
+            # A surface that is not a nine-slice of the contour is refused by name, and the
+            # refusal is recorded, so a rounded rectangle cannot pass as the contour.
+            request = self.read_json()
+            code = str(request.get("code", "surface-not-nine-slice"))
+            row = {
+                "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                "kind": "refusal",
+                "code": code,
+                "surface": str(request.get("surface", "")),
+                "observed": "a painted surface was drawn without the contour nine-slice, so it was removed instead of shown",
+            }
+            REFUSALS.parent.mkdir(parents=True, exist_ok=True)
+            with REFUSALS.open("a", encoding="utf-8") as log:
+                log.write(json.dumps(row) + "\n")
+            answer = {"ok": False, "refused": code}
+            self.send_body(json.dumps(answer).encode("utf-8"), TYPES[".json"], 409)
+            return
+        self.send_body(b"not found", "text/plain; charset=utf-8", 404)
+
+    def read_json(self) -> dict:
+        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            return json.loads(self.rfile.read(length) or b"{}")
+        except json.JSONDecodeError:
+            return {}
+
+    def action(self, run) -> None:
+        try:
+            result = run(self.read_json())
+        except (FileNotFoundError, OSError, ValueError) as error:
+            message = json.dumps({"ok": False, "refused": str(error)}).encode("utf-8")
+            self.send_body(message, TYPES[".json"], 409)
+            return
+        self.send_body(json.dumps({"ok": True, "result": result}).encode("utf-8"), TYPES[".json"])
+
+
+def main() -> int:
+    port = PORT
+    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    print(f"popit-shell serving http://127.0.0.1:{server.server_port}/", flush=True)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.shutdown()
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

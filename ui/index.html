@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Popit shell</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<section class="shell" data-contour="window">
+  <header class="plate" data-contour>
+    <h1>Popit</h1>
+    <div class="totals" id="totals"></div>
+    <label class="find">
+      <span>Find</span>
+      <input id="q" type="search" placeholder="an application, a folder, a tool" autocomplete="off" data-contour />
+    </label>
+  </header>
+  <main>
+    <section class="root" aria-label="Applications">
+      <ol id="rows"></ol>
+    </section>
+    <aside class="facts" aria-label="Selection">
+      <h2 id="facts-head">Selection</h2>
+      <div id="facts"></div>
+    </aside>
+  </main>
+</section>
+<svg class="clips" aria-hidden="true" width="0" height="0"><defs id="clips"></defs></svg>
+<script type="module" src="/app.js"></script>
+</body>
+</html>

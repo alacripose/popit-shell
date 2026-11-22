@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Popit shell — one contour, every surface</title>
+<style>
+  :root {
+    --paper: #d9c9a6;
+    --brass: #b08d57;
+    --brass-lit: #e2c188;
+    --ink: #0b0906;
+    --panel: #14100b;
+    --line: rgba(176, 141, 87, 0.32);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: radial-gradient(1200px 600px at 20% -10%, #1d1710 0%, var(--ink) 60%);
+    color: var(--paper);
+    font: 16px/1.6 "Georgia", "Times New Roman", serif;
+  }
+  main { max-width: 1060px; margin: 0 auto; padding: 64px 28px 96px; }
+  header p.eyebrow {
+    margin: 0 0 12px;
+    font: 600 12px/1.4 "Segoe UI", system-ui, sans-serif;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--brass);
+  }
+  h1 { margin: 0 0 18px; font-size: clamp(30px, 4.4vw, 52px); line-height: 1.1; font-weight: 400; }
+  h1 em { font-style: normal; color: var(--brass-lit); }
+  p.lede { margin: 0 0 34px; max-width: 62ch; font-size: 18px; color: #cbb894; }
+  .frame {
+    border: 1px solid var(--line);
+    border-radius: 11px 11px 11px 11px;
+    background: var(--panel);
+    padding: 10px;
+  }
+  .frame img { display: block; width: 100%; height: auto; border-radius: 8px; }
+  .caption {
+    margin: 10px 2px 0;
+    font: 12px/1.5 "Segoe UI", system-ui, sans-serif;
+    color: #9c8a6b;
+  }
+  section { margin-top: 56px; }
+  h2 {
+    margin: 0 0 12px;
+    font: 600 12px/1.4 "Segoe UI", system-ui, sans-serif;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--brass);
+  }
+  p { max-width: 68ch; color: #cbb894; }
+  .grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+  .card {
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    background: linear-gradient(180deg, rgba(176, 141, 87, 0.09), rgba(176, 141, 87, 0.02) 70%, transparent), var(--panel);
+    padding: 18px 20px 20px;
+  }
+  .card h3 { margin: 0 0 6px; font-size: 18px; font-weight: 400; color: var(--brass-lit); }
+  .card p { margin: 0; font-size: 15px; }
+  table { width: 100%; border-collapse: collapse; font: 14px/1.5 "Consolas", ui-monospace, monospace; }
+  td { padding: 9px 4px; border-bottom: 1px solid rgba(176, 141, 87, 0.16); color: #cbb894; }
+  td:first-child { color: var(--paper); }
+  td:last-child { text-align: right; color: var(--brass-lit); }
+  pre {
+    margin: 0;
+    padding: 18px 20px;
+    border: 1px solid var(--line);
+    border-radius: 11px;
+    background: #0e0b07;
+    overflow-x: auto;
+    font: 14px/1.7 "Consolas", ui-monospace, monospace;
+    color: #d6c3a0;
+  }
+  .links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+  a.button {
+    display: inline-block;
+    padding: 11px 20px;
+    border-radius: 11px;
+    border: 1px solid var(--brass);
+    color: #12100c;
+    background: var(--brass-lit);
+    font: 600 14px/1 "Segoe UI", system-ui, sans-serif;
+    text-decoration: none;
+  }
+  a.button.ghost { background: none; color: var(--brass-lit); }
+  footer { margin-top: 64px; font: 12px/1.6 "Segoe UI", system-ui, sans-serif; color: #857257; }
+  a { color: var(--brass-lit); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="eyebrow">Family look · pinned example</p>
+    <h1>One contour owns every edge: <em>the bar, the cards, the window.</em></h1>
+    <p class="lede">
+      A Windows shell whose taskbar and windows are framed by a single measured profile.
+      The corner is 7.67 by 11.00 px everywhere. Only the rails change length.
+    </p>
+    <div class="frame">
+      <img src="hero.png" alt="The Popit launcher above the taskbar, both framed by the contour">
+      <p class="caption">The launcher above the strip. The window corner and the button corner are the same drawing.</p>
+    </div>
+    <div class="links">
+      <a class="button" href="https://github.com/alacripose/popit-shell/releases">Download the release</a>
+      <a class="button ghost" href="https://github.com/alacripose/popit-shell">Source and gate</a>
+    </div>
+  </header>
+
+  <section>
+    <h2>The rule</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>One corner</h3>
+        <p>A cell, a card, a field and a window frame take the same 11 px crown. It never grows with the box.</p>
+      </div>
+      <div class="card">
+        <h3>Rails lengthen</h3>
+        <p>The profile is a nine-slice. The corners keep their numbers and the straight runs take the span.</p>
+      </div>
+      <div class="card">
+        <h3>Nothing is cut</h3>
+        <p>The fill is clipped at 0.5 px and the frame is stroked at 1.5, so both halves of the outline are drawn.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Pinned numbers</h2>
+    <table>
+      <tr><td>Corner, every surface</td><td>7.67 × 11.00 px</td></tr>
+      <tr><td>Clip pad</td><td>0.5 px</td></tr>
+      <tr><td>Frame pad</td><td>1.5 px</td></tr>
+      <tr><td>Stroke</td><td>1 px</td></tr>
+      <tr><td>Strip height</td><td>48 px</td></tr>
+      <tr><td>Profile</td><td>8 cubics, page 9 units</td></tr>
+    </table>
+    <p class="caption">The same record is in <a href="https://github.com/alacripose/popit-shell/blob/main/tools/family_look.json">tools/family_look.json</a>, and the gate refuses a pin that drifts from the drawing.</p>
+  </section>
+
+  <section>
+    <h2>Run it</h2>
+    <pre>pip install -r requirements.txt
+python shell.py</pre>
+    <p class="caption">Windows 10 or 11, Python 3.13. The shell hides Explorer's bar, reserves the bottom 48 px, and hands the strip back when you close it.</p>
+  </section>
+
+  <footer>
+    Popit shell · the pinned look for family applications · <a href="family-look.md">the look in prose</a>
+  </footer>
+</main>
+</body>
+</html>

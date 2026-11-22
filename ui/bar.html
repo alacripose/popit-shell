@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Popit bar</title>
+<link rel="stylesheet" href="/bar.css" />
+</head>
+<body>
+<nav class="bar" data-contour>
+  <button class="cell start" id="start" title="Open the launcher" data-contour>Start</button>
+  <div class="cells" id="cells" aria-label="Running windows"></div>
+  <div class="cell clock" id="clock" data-contour>--:--</div>
+</nav>
+<svg class="clips" aria-hidden="true" width="0" height="0"><defs id="clips"></defs></svg>
+<script type="module" src="/bar.js"></script>
+</body>
+</html>

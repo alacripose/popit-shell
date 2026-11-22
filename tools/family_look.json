@@ -1,0 +1,64 @@
+{
+  "name": "family-look",
+  "version": 1,
+  "pinned_at": "2026-11-22",
+  "authority": "contour.json, the page 9 profile, used as one nine-slice on every surface",
+  "constants": {
+    "corner_units": 27.8,
+    "units_height": 121.348,
+    "bar_height": 48,
+    "corner_band_x": 16.38,
+    "corner_band_y": 23.48,
+    "clip_pad": 0.5,
+    "frame_pad": 1.5,
+    "stroke_width": 1
+  },
+  "corner_px": {
+    "width": 7.67,
+    "height": 11.0,
+    "rule": "one corner for every surface, never scaled to the surface's own size"
+  },
+  "surfaces": [
+    {
+      "name": "bar cell",
+      "size": [140, 40],
+      "corner_px": [7.67, 11.0],
+      "drawn_by": "ui/contour.js contourPath(w, h, FRAME_PAD)",
+      "mask": false
+    },
+    {
+      "name": "card and field",
+      "size": [560, 120],
+      "corner_px": [7.67, 11.0],
+      "drawn_by": "ui/contour.js contourPath(w, h, FRAME_PAD)",
+      "mask": false
+    },
+    {
+      "name": "plate",
+      "size": [620, 120],
+      "corner_px": [7.67, 11.0],
+      "drawn_by": "ui/contour.js contourPath(w, h, FRAME_PAD)",
+      "mask": false
+    },
+    {
+      "name": "window frame",
+      "size": [620, 660],
+      "corner_px": [7.67, 11.0],
+      "drawn_by": "ui/contour.js contourWindowPath(w, h) which delegates to contourPath(w, h, pad)",
+      "mask": "window.py contour_region at pad 0.0, outside the drawn outline"
+    }
+  ],
+  "layers": [
+    "the body paints through a path clip at 0.5, so the fill edge is the contour",
+    "the frame is the same contour stroked at 1 px, inset 1.5, drawn whole",
+    "the window mask never cuts the outline; it sits at the window box"
+  ],
+  "refusals": [
+    "contour-not-stretched",
+    "contour-crown-inside-frame",
+    "contour-crown-outside-frame",
+    "window-frame-is-the-profile",
+    "frame-not-clipped",
+    "taskbar-pinned"
+  ]
+}

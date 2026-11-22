@@ -1,0 +1,212 @@
+:root {
+  --ink: #0f1113;
+  --body: #1c2125;
+  --paper: #e6dbc2;
+  --brass: #b08d57;
+  --brass-lit: #d9b779;
+  --dim: #8b8778;
+  /* --u is one contour unit in pixels, set from the window's own contour. Every size
+     below is a multiple of it, so the frame decides how large the content is drawn. */
+  --u: 5.4px;
+  --ink-x: 40px;
+  font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+
+/* While the header is held, the page must not select text or show a text cursor. */
+body.dragging { cursor: move; user-select: none; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  color: var(--paper);
+  overflow: hidden;
+}
+
+.shell {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  /* --cap-x is the crown's own width at this window size: the frame is the profile, so the
+     ink starts after the crowns instead of being cut by them. */
+  padding: calc(var(--u) * 2) max(calc(var(--u) * 4), var(--cap-x, 0px)) calc(var(--u) * 2);
+  /* The window's body is painted through its own contour, exactly as a button's is: a
+     background on the element itself would fill the rectangle and make the frame look
+     like a rounded rectangle drawn inside a square. */
+  background: none;
+}
+
+.shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+.shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  clip-path: var(--clip, none);
+  background:
+    radial-gradient(700px 420px at 8% -12%, #2a2418 0%, transparent 62%),
+    radial-gradient(620px 380px at 100% 0%, #1d2620 0%, transparent 58%),
+    var(--ink);
+}
+
+.plate {
+  /* The header is the window's handle: dragging it must never select its text. */
+  user-select: none;
+  padding: calc(var(--u) * 0.7) calc(var(--ink-x) * 0.9) calc(var(--u) * 1.6);
+  border-bottom: 1px solid rgba(176, 141, 87, 0.32);
+  background: linear-gradient(180deg, rgba(176, 141, 87, 0.14), rgba(176, 141, 87, 0.02) 70%, transparent);
+}
+
+.plate h1 {
+  margin: 0;
+  font-size: calc(var(--u) * 3.6);
+  letter-spacing: calc(var(--u) * 1.1);
+  text-transform: uppercase;
+  color: var(--brass-lit);
+  text-shadow: 0 1px 0 #000, 0 0 18px rgba(217, 183, 121, 0.22);
+}
+
+.totals {
+  display: flex;
+  gap: calc(var(--u) * 2.6);
+  flex-wrap: wrap;
+  margin-top: calc(var(--u) * 0.3);
+  font-size: calc(var(--u) * 2.1);
+  color: var(--dim);
+}
+.totals b { color: var(--brass-lit); font-weight: 600; }
+
+.find { display: flex; align-items: center; gap: calc(var(--u) * 1.6); margin-top: calc(var(--u) * 1.6); }
+.find span {
+  font-size: calc(var(--u) * 1.8);
+  letter-spacing: calc(var(--u) * 0.35);
+  text-transform: uppercase;
+  color: var(--brass);
+}
+.find input {
+  flex: 1;
+  min-width: 0;
+  padding: calc(var(--u) * 1.1) calc(var(--u) * 1.6);
+  font: inherit;
+  font-size: calc(var(--u) * 2.3);
+  color: var(--paper);
+  background: rgba(0, 0, 0, 0.42);
+  outline: none;
+}
+
+main {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  /* The facts column is a share of the window, not a fixed run of contour units: at the
+     contour's own width the fixed column took the list's room and cut every label. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 38%);
+  gap: calc(var(--u) * 1.4);
+  padding-top: calc(var(--u) * 1.4);
+}
+
+.root, .facts {
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* The archive themes its scrollbars; this is the same rail in brass, in contour units. */
+.root::-webkit-scrollbar, .facts::-webkit-scrollbar { width: calc(var(--u) * 1.6); }
+.root::-webkit-scrollbar-track, .facts::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.35); }
+.root::-webkit-scrollbar-thumb, .facts::-webkit-scrollbar-thumb {
+  background: var(--brass);
+  border: 2px solid rgba(0, 0, 0, 0.6);
+}
+.root::-webkit-scrollbar-thumb:hover, .facts::-webkit-scrollbar-thumb:hover { background: var(--brass-lit); }
+
+ol { list-style: none; margin: 0; padding: 0; }
+
+/* A card is its own contour surface: its padding is the ink that surface's size
+   implies, set per card by the contour module. */
+.card {
+  position: relative;
+  display: grid;
+  grid-template-columns: calc(var(--u) * 3) 1fr auto;
+  grid-template-rows: auto auto;
+  align-items: baseline;
+  column-gap: calc(var(--u) * 1.2);
+  min-height: calc(var(--u) * 8);
+  padding: var(--ink-y) var(--ink-x);
+  margin-bottom: calc(var(--u) * 1.1);
+  cursor: pointer;
+  --paint: linear-gradient(180deg, rgba(230, 219, 194, 0.055), rgba(230, 219, 194, 0.02));
+}
+/* A surface paints through its own clipped layer, so the outline it draws inside itself
+   is never cut by its shape. */
+.card::before, .cell::before, .facts .field::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--paint, none);
+  clip-path: var(--clip, none);
+}
+.card.on {
+  --paint: rgba(176, 141, 87, 0.14);
+}
+.card .glyph { grid-row: 1 / span 2; color: var(--brass-lit); font-size: calc(var(--u) * 2); }
+.card .name { font-size: calc(var(--u) * 2.5); line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card .detail {
+  font-size: calc(var(--u) * 2.1);
+  color: var(--dim);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: calc(var(--u) * 34);
+}
+.card .meta {
+  grid-column: 2 / span 2;
+  font-size: calc(var(--u) * 1.9);
+  letter-spacing: calc(var(--u) * 0.08);
+  color: var(--brass);
+  text-transform: uppercase;
+}
+
+.facts { padding-right: calc(var(--u) * 1.2); padding-bottom: calc(var(--u) * 6); }
+.facts h2 {
+  margin: calc(var(--u) * 0.4) 0 calc(var(--u) * 1.5);
+  font-size: calc(var(--u) * 2);
+  letter-spacing: calc(var(--u) * 0.35);
+  text-transform: uppercase;
+  color: var(--brass);
+  font-weight: 600;
+}
+.facts .field { --paint: none; position: relative; margin-bottom: calc(var(--u) * 1.5); padding: var(--ink-y) var(--ink-x); }
+.facts .field .key { font-size: calc(var(--u) * 1.8); letter-spacing: calc(var(--u) * 0.3); text-transform: uppercase; color: var(--dim); }
+.facts .field .value { font-size: calc(var(--u) * 2.3); color: var(--paper); word-break: break-all; }
+.facts .empty { font-size: calc(var(--u) * 2.3); color: var(--dim); }
+
+.root { padding-bottom: calc(var(--u) * 6); }
+
+
+/* Every drawn surface is stroked with its own contour, so the outline is the profile
+   and not a rectangle the clip cuts off at the ends. */
+.contour-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.contour-frame path { stroke: rgba(176, 141, 87, 0.42); }
+.card:hover .contour-frame path, .cell:hover .contour-frame path { stroke: rgba(217, 183, 121, 0.8); }
+.card.on .contour-frame path, .cell.on .contour-frame path, .facts .field .contour-frame path {
+  stroke: var(--brass-lit);
+}

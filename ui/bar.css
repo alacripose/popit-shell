@@ -1,0 +1,108 @@
+:root {
+  --ink: #0f1113;
+  --paper: #e6dbc2;
+  --brass: #b08d57;
+  --brass-lit: #d9b779;
+  --dim: #8b8778;
+  /* The strip is all crown, so its unit is the crown's own width: --cap. */
+  --cap: 32px;
+  --ink-x: 16px;
+  --ink-y: 3px;
+  font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: transparent;
+  color: var(--paper);
+  overflow: hidden;
+  user-select: none;
+}
+
+.bar {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: stretch;
+  gap: calc(var(--cap) * 0.18);
+  padding: calc(var(--cap) * 0.16) calc(var(--cap) * 0.55);
+  background:
+    linear-gradient(180deg, rgba(176, 141, 87, 0.12), rgba(0, 0, 0, 0) 55%),
+    var(--ink);
+}
+
+.cell {
+  display: flex;
+  align-items: center;
+  padding: var(--ink-y) var(--ink-x);
+  font: inherit;
+  font-size: calc(var(--cap) * 0.42);
+  color: var(--paper);
+  --paint: linear-gradient(180deg, rgba(230, 219, 194, 0.06), rgba(230, 219, 194, 0.02));
+  cursor: pointer;
+  position: relative;
+  background: none;
+  border: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cell.on {
+  --paint: rgba(176, 141, 87, 0.16);
+  color: var(--brass-lit);
+}
+
+.start {
+  min-width: calc(var(--cap) * 2.9);
+  justify-content: center;
+  letter-spacing: calc(var(--cap) * 0.03);
+  color: var(--brass-lit);
+}
+
+.cells {
+  display: flex;
+  align-items: stretch;
+  gap: calc(var(--cap) * 0.18);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.cells .cell {
+  flex: 1 1 0;
+  min-width: calc(var(--cap) * 2);
+  max-width: calc(var(--cap) * 7);
+}
+.cells .cell.min { color: var(--dim); }
+.cells .cell.min::after { content: "▁ "; color: var(--brass); }
+
+.clock {
+  min-width: calc(var(--cap) * 3.4);
+  justify-content: center;
+  color: var(--dim);
+  cursor: default;
+}
+
+.cell { position: relative; }
+.cell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: var(--paint, none);
+  clip-path: var(--clip, none);
+}
+.contour-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.contour-frame path { stroke: rgba(176, 141, 87, 0.45); }
+.cell:hover .contour-frame path { stroke: rgba(217, 183, 121, 0.85); }
+.cell.on .contour-frame path, .start .contour-frame path { stroke: var(--brass-lit); }
+.cell.min .contour-frame path, .clock .contour-frame path { stroke: rgba(176, 141, 87, 0.3); }
