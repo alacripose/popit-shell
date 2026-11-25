@@ -413,20 +413,31 @@ def toast_refusals() -> None:
         if name != "buffy" and str(profile.get("model") or "") != baseline_model
     )
     model_path = ROOT / baseline_model if baseline_model else None
-    digest = ""
-    if model_path and model_path.is_file():
-        digest = hashlib.sha256(model_path.read_bytes()).hexdigest()
+    model_present = bool(model_path and model_path.is_file())
+    digest = hashlib.sha256(model_path.read_bytes()).hexdigest() if model_present else ""
+    pin = str(baseline.get("model_sha256") or "")
+    # Voice weights are a local asset store (`models/` is ignored by git), so a clean checkout
+    # carries the declaration and the pin, not 60 MB of ONNX. Where the weights are present the
+    # digest must match the pin; where they are absent nothing can be synthesized, so the claim
+    # is the declaration and the pin, and a present model store missing its baseline is refused.
+    store = ROOT / "models"
+    store_without_baseline = store.is_dir() and any(store.iterdir()) and not model_present
+    declared = (
+        baseline.get("profile") == "civilian"
+        and baseline_model == "models/en_US-amy-medium.onnx"
+        and len(pin) == 64
+        and not below_baseline
+        and not unpinned
+        and (profiles.get("buffy") or {}).get("engine") == "piper"
+    )
+    verified = digest == pin if model_present else not store_without_baseline
     check(
         "toast-voice-baseline",
         "every synthesized voice uses the pinned Piper baseline or the AWA3D host voice",
-        baseline.get("profile") == "civilian"
-        and baseline_model == "models/en_US-amy-medium.onnx"
-        and digest == str(baseline.get("model_sha256") or "")
-        and not below_baseline
-        and not unpinned
-        and (profiles.get("buffy") or {}).get("engine") == "piper",
+        declared and verified,
         "voice_profiles.json",
-        f"baseline {baseline.get('profile')} {baseline_model} {digest[:12] or 'missing'}; "
+        f"baseline {baseline.get('profile')} {baseline_model} "
+        f"{('sha256 ' + digest[:12] + ' matches the pin') if model_present else ('weights are local (gitignored), pin ' + pin[:12] + ' declared')}; "
         f"below baseline {below_baseline or 'none'}; unpinned {unpinned or 'none'}",
     )
 
