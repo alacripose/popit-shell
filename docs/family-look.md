@@ -18,6 +18,51 @@ The body paints through a path clip at 0.5 px. The frame is the same contour str
 1 px from 1.5 px, so the stroke is drawn whole and never cut. A window's mask sits at the
 window box, never inside the outline.
 
+## The contour carries material and motion
+
+The contour is not only the corner profile. Every surface that takes the nine-slice
+carries one clipped material layer inside the same path, below the content and above
+the surface colour. The material vocabulary is the Popit Goodies Bag's own seven
+entries, read from `openlock/docs/UI-PASS.md` and
+`openlock/clientaddon/panorama/scripts/openlock_popit.js` (`MATERIALS` and
+`paintPopitCell`):
+
+| Profile | Family wash | Evidence |
+|---|---|---|
+| Paper | `panel` | Goodies Bag material row |
+| Card | `title` | Goodies Bag material row |
+| Glass | `meta` | Goodies Bag material row |
+| Tint | player colour | Goodies Bag material row |
+| Ink | `ink` | Goodies Bag material row |
+| Accent | `accent` | Goodies Bag material row |
+| Bare | no wash | Goodies Bag restore row |
+
+The earlier `family`, `metal`, `gloss`, `flat`, `translucent` and `parchment`
+names were a handrolled layer with no family source; they are retired rather than
+kept as a second vocabulary. Each of the seven names above is sourced from that
+ship, not chosen here, and `LEGACY_MATERIAL_IDS` in `ui/toast.js` maps the retired
+ids onto them so a palette stored under an old name still paints. The generation descriptions remain evidence for how a
+scheme reads, not extra profile ids: LBP1 is glossy, LBP2 flat and LBP3 translucent
+(`POPIT-AUDIT.md` §3–§4, §7).
+
+The original optical documentation in `shploingus-clean/docs/MATERIALS.md` and
+`APPEARANCE.md` is the family's material-physics reference: appearance is derived
+from material truth and optics, and a missing value is not replaced by an invented
+constant. That is the reason these profiles use the shell's role colours rather
+than handpicked `rgba` sheens. Those documents describe the voxel world's materials,
+not the Popit Goodies Bag names; `openlock` is the authority for the seven names and
+for the paint roles above.
+
+The four family frames are the forms openlock actually ships:
+`openlock/shell/alpha-shell/forms/{popit,ios,material,touchwiz}.form`. They inherit
+the one measured contour and carry identity and colour rules only; no form declares
+a second silhouette. The settings panel reads the frame, material and motion beside
+the corner dimensions so the bridge is visible in use.
+
+The same contour carries the motion vocabulary: `reveal`, `pop`, `fold`, `snap` and
+`sweep`.
+
+
 ## What a refusal looks like
 
 Each of these is refused by name in `tools/gate.py` rather than drawn:

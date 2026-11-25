@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>popit-shell on Debian 13</title>
 <meta name="description" content="This machine scores the repository 10 in band red">
-<meta name="openlock-build" content="c720d9ba3a">
+<meta name="openlock-build" content="bc2609970d">
 <style>
   :root {
     --paper: #d9c9a6;
@@ -70,6 +70,16 @@
   .run { padding: 18px 22px; }
   .run pre { margin: 0; font: 14px/1.8 Consolas, ui-monospace, monospace; color: #d6c3a0; overflow-x: auto; }
 
+  /* The shell entry carries no address of its own: this page is public, the address is the
+     visitor's, and it never leaves the browser it was typed in. */
+  .shell-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; margin: 14px 0 0; }
+  .shell-form label { flex: 1 1 100%; font: 600 11px/1.4 "Segoe UI", system-ui, sans-serif; letter-spacing: 0.18em; text-transform: uppercase; color: var(--brass); }
+  .shell-form input { flex: 1 1 260px; min-width: 0; padding: 11px 12px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.35); color: var(--paper); font: 14px/1 Consolas, ui-monospace, monospace; }
+  .shell-form input:focus { outline: 1px solid var(--brass-lit); border-color: var(--brass-lit); }
+  .shell-form button { padding: 12px 18px; border: 1px solid var(--line); background: rgba(176, 141, 87, 0.10); color: var(--brass-lit); font: 600 13px/1 "Segoe UI", system-ui, sans-serif; letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; }
+  .shell-form button:hover { background: rgba(176, 141, 87, 0.20); color: #f2d9a8; }
+  #shell-note[data-bad="true"] { color: #e0a9a1; }
+
   .links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
   .links a { display: inline-block; padding: 12px 22px; text-decoration: none; }
   .links a span { font: 600 14px/1 "Segoe UI", system-ui, sans-serif; color: var(--brass-lit); }
@@ -108,7 +118,7 @@
       </article>
       <article class="card surface" data-contour="card">
         <h3>The gate</h3>
-        <p>The gate runs 15 checks, first is family-look-pinned</p>
+        <p>The gate runs 35 checks, first is family-look-pinned</p>
       </article>
     </div>
   </section>
@@ -125,11 +135,11 @@
         <tr><td>Profile</td><td>8 cubics</td></tr>
         <tr><td>Surfaces</td><td>4 draw the one corner</td></tr>
         <tr><td>Machine</td><td>Debian 13 CUA v2.7.3</td></tr>
-        <tr><td>Gate checks</td><td>15 named</td></tr>
+        <tr><td>Gate checks</td><td>35 named</td></tr>
         <tr><td>Stars and axes</td><td>6 over 9</td></tr>
         <tr><td>Machine score</td><td>10 in band red</td></tr>
       </table>
-      <p class="caption">The reading is 040294620a87 over three routes</p>
+      <p class="caption">The reading is fe1a378c467e over three routes</p>
     </div>
   </section>
 
@@ -137,9 +147,30 @@
     <h2>Run it</h2>
     <div class="surface run" data-contour="card">
       <pre>PySide6>=6.8
+Pillow>=10
+pywin32>=306
 python shell.py</pre>
     </div>
     <p class="caption">Windows 10 or 11 with Python 3.13</p>
+  </section>
+
+  <section id="shell">
+    <h2>Your shell, on your phone</h2>
+    <div class="surface panel" data-contour="card">
+      <p class="caption">This page is public and stays that way: it publishes no address, key or name.
+        The shell answers to its own network name on your LAN, and the address you keep here is stored
+        in this browser alone — never in this page, never in the repository.</p>
+      <form class="shell-form" id="shell-form" novalidate>
+        <label for="shell-address">Shell address</label>
+        <input id="shell-address" name="shell-address" type="url" inputmode="url" autocomplete="off"
+               spellcheck="false" placeholder="https://popit.local:5210/">
+        <button type="submit"><span>Open the shell</span></button>
+        <button type="button" id="shell-forget"><span>Forget</span></button>
+      </form>
+      <p class="caption" id="shell-note">The shell issues its own certificate for <code>popit.local</code> and the
+        machine's LAN address. A phone on that network accepts it once, then adds the SpringBoard to its home
+        screen; agents reach the same shell through a one-time invite and a signed registration.</p>
+    </div>
   </section>
 
   <footer>Debian 13 wrote this page from its own readings <a href="family-look.md">The look in prose</a></footer>
@@ -147,13 +178,46 @@ python shell.py</pre>
 <script type="module">
   // The assets are named by their own bytes, so a page and the module it asks for cannot be from
   // two different builds: a fresh page never pairs with a module an old visit left in the cache.
-  import { loadContour, fillContours } from "./contour.js?v=395d41fe2b";
+  import { loadContour, fillContours } from "./contour.js?v=343b9a8699";
   await loadContour("./contour.json?v=b6d678b1c3");
   fillContours(document);
   // Every surface is measured again when its box changes, exactly as the shell does it.
   const again = () => fillContours(document);
   new ResizeObserver(again).observe(document.body);
-  window.addEventListener("resize", again);
+  window.addEventListener("resize", () => { again(); });
+  // The shell entry: a public page that carries no one's address. A valid http(s) origin is kept in
+  // this browser's storage; anything with credentials, a path or another scheme is refused there.
+  const SHELL_KEY = "popit.shell";
+  const shellField = document.getElementById("shell-address");
+  const shellNote = document.getElementById("shell-note");
+  const shellForm = document.getElementById("shell-form");
+  const originOf = (value) => {
+    try {
+      const url = new URL(String(value || "").trim());
+      if (url.protocol !== "https:" && url.protocol !== "http:") return "";
+      if (url.username || url.password) return "";
+      return url.origin + "/";
+    } catch (_) { return ""; }
+  };
+  const stored = (() => { try { return localStorage.getItem(SHELL_KEY) || ""; } catch (_) { return ""; } })();
+  if (stored && shellField) shellField.value = stored;
+  shellForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const origin = originOf(shellField.value);
+    if (!origin) {
+      shellNote.dataset.bad = "true";
+      shellNote.textContent = "That is not an http(s) address. Use the shell's own name or its LAN address, without a path.";
+      return;
+    }
+    try { localStorage.setItem(SHELL_KEY, origin); } catch (_) {}
+    window.location.assign(origin);
+  });
+  document.getElementById("shell-forget")?.addEventListener("click", () => {
+    try { localStorage.removeItem(SHELL_KEY); } catch (_) {}
+    if (shellField) { shellField.value = ""; shellField.focus(); }
+    delete shellNote.dataset.bad;
+    shellNote.textContent = "Forgotten. This browser no longer holds a shell address.";
+  });
   // Pages serves every file with a ten minute cache, so a returning visitor can be handed the page
   // it already had. The worker takes over the document and the module and always asks the server
   // first, which is what makes this page converge on the deployment rather than on a memory of it.

@@ -1,7 +1,7 @@
 {
   "schema": "popit-shell.landing-copy/1",
-  "machine": "040294620a875e06993e89124853d7b3569226332384dd747a7392ccd248208c",
-  "prose": "bf2373478fac74c082f9abe9399892add2fbb0033eedac095339e2546dde7946",
+  "machine": "fe1a378c467eb36daa7e0c3a7688480f9527b24daa7637725486ae0b1e3970e5",
+  "prose": "5f78ff5fc95e0c5e33917db29961fe65e6d46d031a6c61b3bfa3d17c8abed4bf",
   "reading": {
     "host": "Debian 13",
     "version": "CUA v2.7.3",
@@ -26,9 +26,9 @@
     "card2_title": "The stars",
     "card2_body": "6 stars run from presence to continuity",
     "card3_title": "The gate",
-    "card3_body": "The gate runs 15 checks, first is family-look-pinned",
+    "card3_body": "The gate runs 35 checks, first is family-look-pinned",
     "numbers_title": "Pinned numbers",
-    "numbers_note": "The reading is 040294620a87 over three routes",
+    "numbers_note": "The reading is fe1a378c467e over three routes",
     "run_title": "Run it",
     "run_note": "Windows 10 or 11 with Python 3.13",
     "footer": "Debian 13 wrote this page from its own readings"

@@ -18,6 +18,10 @@ jobs:
           python-version: "3.13"
       - name: Install the host
         run: python -m pip install --disable-pip-version-check -r requirements.txt
+      - name: Landing page
+        # The published page is built from the copy and the pins, never edited by hand: this
+        # step proves a push can regenerate docs/ exactly, and the gate refuses a stale page.
+        run: python tools/landing.py
       - name: Gate
         run: python tools/gate.py
       - name: Selftest
