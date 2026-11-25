@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Popit tray</title>
+<link rel="stylesheet" href="/tray.css" />
+</head>
+<body>
+<section class="panel" data-contour="window">
+  <header class="head">
+    <h1 id="title">Quick settings</h1>
+    <button class="cell close" id="close" title="Hide" data-contour>Close</button>
+  </header>
+
+  <section class="view" data-view="volume" hidden>
+    <div class="row">
+      <span class="label">Volume</span>
+      <span class="value" id="volume-value">--</span>
+    </div>
+    <div class="controls">
+      <button class="cell step" id="down" title="Quieter" data-contour>&minus;</button>
+      <button class="cell step" id="mute" title="Mute" data-contour>Mute</button>
+      <button class="cell step" id="up" title="Louder" data-contour>+</button>
+    </div>
+    <div class="meter" id="meter" aria-hidden="true"></div>
+    <div class="controls">
+      <button class="cell step" id="sound-settings" title="Sound settings" data-contour>Sound settings</button>
+    </div>
+  </section>
+
+  <section class="view" data-view="network" hidden>
+    <div class="row">
+      <span class="label">Network</span>
+      <span class="value" id="network-value">--</span>
+    </div>
+    <div class="controls">
+      <button class="cell step" id="network-settings" title="Network and internet" data-contour>Network &amp; internet</button>
+    </div>
+  </section>
+
+  <section class="view" data-view="power" hidden>
+    <div class="row">
+      <span class="label">Battery</span>
+      <span class="value" id="battery-value">--</span>
+    </div>
+    <div class="controls">
+      <button class="cell step" id="power-settings" title="Power and battery" data-contour>Power &amp; battery</button>
+    </div>
+  </section>
+
+  <section class="view" data-view="clock" hidden>
+    <div class="row">
+      <span class="label">Time</span>
+      <span class="value" id="view-time">--:--</span>
+    </div>
+    <div class="row">
+      <span class="label">Date</span>
+      <span class="value" id="view-date">---</span>
+    </div>
+    <div class="controls">
+      <button class="cell step" id="time-settings" title="Date and time" data-contour>Date &amp; time</button>
+    </div>
+  </section>
+
+  <section class="view" data-view="all">
+    <div class="row">
+      <span class="label">Volume</span>
+      <span class="value" id="volume-summary">--</span>
+    </div>
+    <div class="row">
+      <span class="label">Network</span>
+      <span class="value" id="network-summary">--</span>
+    </div>
+    <div class="row">
+      <span class="label">Battery</span>
+      <span class="value" id="battery-summary">--</span>
+    </div>
+    <div class="controls">
+      <button class="cell step" id="task" title="Task view" data-contour>Task view</button>
+      <button class="cell step" id="show" title="Show desktop" data-contour>Show desktop</button>
+    </div>
+  </section>
+</section>
+<script type="module" src="/tray.js"></script>
+</body>
+</html>

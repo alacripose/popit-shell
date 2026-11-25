@@ -1,0 +1,36 @@
+.mark {
+  width: 38px; height: 38px; display: grid; place-items: center;
+  color: var(--gold-bright); border: 1px solid rgba(217,168,95,0.35);
+  font-family: Georgia, serif; font-size: 20px;
+}
+
+.agent-panel {
+  position: relative; padding: 18px 15px 15px; margin: 10px 0;
+  background: rgba(15,36,36,0.72); border: 1px solid var(--line);
+}
+.agent-panel > * { position: relative; z-index: 1; }
+.agent-panel h1 {
+  margin: 0; font-family: Georgia, "Times New Roman", serif; font-weight: 500;
+  font-size: clamp(30px, 8vw, 46px); line-height: 1.03; letter-spacing: -0.03em;
+}
+.agent-panel label {
+  display: block; margin: 13px 0 0; color: var(--gold);
+  font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+}
+.agent-panel input {
+  display: block; width: 100%; box-sizing: border-box; margin-top: 5px;
+  padding: 10px 9px; background: rgba(4,16,17,0.82); color: var(--paper);
+  border: 1px solid var(--line); outline: none; font: 13px/1.4 Consolas, monospace;
+}
+.agent-panel input:focus { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(217,168,95,0.12); }
+.agent-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 16px; }
+.agent-panel #agent-status { color: var(--muted); font-size: 12px; line-height: 1.5; min-height: 20px; }
+.agent-panel #agent-status.ok { color: var(--teal); }
+.agent-panel #agent-status.bad { color: var(--warn); }
+.agent-contact { color: var(--gold-bright); font: 10px/1.45 Consolas, monospace; overflow-wrap: anywhere; }
+.agent-panel audio { width: 100%; margin-top: 8px; }
+.agent-log {
+  min-height: 92px; max-height: 240px; overflow: auto; margin: 10px 0 0;
+  padding: 10px; background: rgba(4,16,17,0.82); border: 1px solid var(--line);
+  color: var(--muted); font: 9px/1.45 Consolas, monospace; white-space: pre-wrap;
+}

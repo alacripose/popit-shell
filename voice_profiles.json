@@ -1,0 +1,165 @@
+{
+  "schema": "popit.voice/1",
+  "component": "popit-voice",
+  "revision": 1,
+  "engine": {
+    "name": "piper",
+    "why": "The Debian CUA host is headless and has no playback device; speech is generated locally on the Windows client by Piper and served as an artifact.",
+    "offline": true
+  },
+  "baseline": {
+    "profile": "civilian",
+    "line": "The lane is clear. Please walk. I will tell you when to stop.",
+    "engine": "piper",
+    "model": "models/en_US-amy-medium.onnx",
+    "model_sha256": "cf9ccdec59f05adee47173f6fb4d89e8b0c5f30c178748d2572fe4efd1d2724c",
+    "minimum": "Every synthesized civilian profile uses this Piper model; Buffy's AWA3D natural profile is the host voice above it."
+  },
+  "limits": {
+    "line_chars": 300,
+    "max_queue": 48,
+    "one_line_per_breath": true
+  },
+  "profiles": {
+    "cua-chat": {
+      "label": "Cua Chat",
+      "driver": "cua-chat",
+      "engine": "piper",
+      "model": "models/en_US-amy-medium.onnx",
+      "voice": "zira",
+      "rate": 0,
+      "pitch": 1,
+      "min_gap_ms": 900,
+      "sentence_pause_ms": 180
+    },
+    "cua-2": {
+      "label": "Cua Two",
+      "driver": "cua-2",
+      "engine": "piper",
+      "model": "models/en_US-amy-medium.onnx",
+      "voice": "david",
+      "rate": 1,
+      "pitch": -2,
+      "min_gap_ms": 900,
+      "sentence_pause_ms": 180
+    },
+    "cua-3": {
+      "label": "Cua Three",
+      "driver": "cua-3",
+      "engine": "piper",
+      "model": "models/en_US-amy-medium.onnx",
+      "voice": "zira",
+      "rate": -1,
+      "pitch": -5,
+      "min_gap_ms": 1100,
+      "sentence_pause_ms": 220
+    },
+    "cua-4": {
+      "label": "Cua Four",
+      "driver": "cua-4",
+      "engine": "piper",
+      "model": "models/en_US-amy-medium.onnx",
+      "voice": "david",
+      "rate": 2,
+      "pitch": 4,
+      "min_gap_ms": 900,
+      "sentence_pause_ms": 160
+    },
+    "assistant": {
+      "label": "Buffy",
+      "driver": "",
+      "engine": "piper",
+      "model": "models/en_US-amy-medium.onnx",
+      "voice": "zira",
+      "rate": -2,
+      "pitch": 7,
+      "min_gap_ms": 1300,
+      "sentence_pause_ms": 300
+    },
+    "alacrity": {
+      "label": "Alacrity",
+      "driver": "",
+      "engine": "piper",
+      "model": "models/en_US-amy-medium.onnx",
+      "voice": "david",
+      "rate": 0,
+      "pitch": -2,
+      "min_gap_ms": 1200,
+      "sentence_pause_ms": 220
+    },
+    "buffy": {
+      "label": "Buffy",
+      "driver": "",
+      "engine": "piper",
+      "model": "../AWA3D/assets/voice/en_US-amy-medium.onnx",
+      "length_scale": 1.0,
+      "voice": "zira",
+      "rate": -1,
+      "pitch": 7,
+      "min_gap_ms": 1100,
+      "sentence_pause_ms": 260
+    },
+    "qwen": {
+      "label": "Qwen",
+      "driver": "",
+      "engine": "piper",
+      "model": "models/en_US-amy-medium.onnx",
+      "voice": "zira",
+      "rate": 1,
+      "pitch": -5,
+      "min_gap_ms": 900,
+      "sentence_pause_ms": 180
+    },
+    "whisper": {
+      "label": "Whisper",
+      "driver": "",
+      "channel": "whisper",
+      "engine": "piper",
+      "model": "models/en_US-amy-medium.onnx",
+      "voice": "zira",
+      "rate": 2,
+      "pitch": -2,
+      "min_gap_ms": 1000,
+      "sentence_pause_ms": 200
+    },
+    "ash": {
+      "label": "Ash",
+      "driver": "",
+      "engine": "piper",
+      "model": "models/en_US-amy-medium.onnx",
+      "voice": "david",
+      "rate": -2,
+      "pitch": 3,
+      "min_gap_ms": 1400,
+      "sentence_pause_ms": 300
+    },
+    "bram": {
+      "label": "Bram",
+      "driver": "",
+      "engine": "piper",
+      "model": "models/en_US-amy-medium.onnx",
+      "voice": "david",
+      "rate": 2,
+      "pitch": -7,
+      "min_gap_ms": 900,
+      "sentence_pause_ms": 160
+    },
+    "civilian": {
+      "label": "Civilian address",
+      "driver": "",
+      "engine": "piper",
+      "model": "models/en_US-amy-medium.onnx",
+      "voice": "david",
+      "rate": -4,
+      "pitch": -6,
+      "min_gap_ms": 2200,
+      "sentence_pause_ms": 450
+    }
+  },
+  "lines": {
+    "probe": "cua-chat",
+    "task": "cua-2",
+    "assistant": "assistant",
+    "civilian": "civilian"
+  }
+}

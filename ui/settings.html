@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Popit settings package</title>
+<link rel="stylesheet" href="/settings.css" />
+</head>
+<body>
+<main class="sheet" data-popit="settings-package" data-schema="popit.settings/1">
+  <header class="head">
+    <div class="mark" aria-hidden="true"><span></span></div>
+    <div class="titles">
+      <h1>Settings package</h1>
+      <p id="package-state" class="state" data-state="starting">reading</p>
+    </div>
+    <div class="actions">
+      <button id="publish" type="button">Publish</button>
+      <a id="open-panel" href="/toast.html" title="The settings app: frames, materials, motion, palettes, DPI">Settings app</a>
+    </div>
+  </header>
+
+  <section class="identity" aria-label="Package identity">
+    <div class="row"><span>identity</span><code id="package-identity">—</code></div>
+    <div class="row"><span>digest</span><code id="package-digest">—</code></div>
+    <div class="row"><span>app</span><code id="app-identity" data-verified="false">—</code></div>
+    <div class="row"><span>payload</span><code id="package-payload">—</code></div>
+    <div class="row"><span>publisher</span><code id="package-publisher">—</code></div>
+    <div class="row"><span>signature</span><code id="package-signature" title="">—</code></div>
+    <p class="note" id="package-note">The panel is the authoring surface; this document is what other Popit windows subscribe to.</p>
+  </section>
+
+  <div class="columns">
+    <section class="block" aria-label="Settings the package carries">
+      <h2>Carried settings</h2>
+      <table class="data">
+        <tbody id="settings-rows"></tbody>
+      </table>
+      <p class="note" id="palette-note">palettes —</p>
+    </section>
+
+    <section class="block" aria-label="Device report">
+      <h2>Device report <span class="tag">N024</span></h2>
+      <table class="data">
+        <tbody id="device-rows"></tbody>
+      </table>
+      <p class="note">Measured on the publishing machine. A value the platform will not answer stays empty.</p>
+    </section>
+  </div>
+
+  <section class="block" aria-label="Subscribers">
+    <h2>Subscribers <span id="subscriber-count" class="count">0</span></h2>
+    <div id="subscriber-list" class="subscribers"></div>
+    <p class="note">A window subscribes with its own Ed25519 key in the family trust registry, one nonce per delivery. An unsigned or replayed request is refused by name.</p>
+  </section>
+
+  <footer class="foot">
+    <span id="refusal" role="status" aria-live="polite"></span>
+    <span id="checked">—</span>
+  </footer>
+</main>
+<script type="module" src="/ui-audit.js"></script>
+<script type="module" src="/settings.js"></script>
+</body>
+</html>

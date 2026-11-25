@@ -150,6 +150,9 @@ export function contourFits(path, width, height, pad) {
 // implies, and repeats when the element changes size.
 export function clipToContour(element) {
   if (!shape || !element) return;
+  // A poll re-renders the toast around four times a second. Bind an element once; its
+  // own ResizeObserver keeps the path current for every later layout change.
+  if (element.dataset.contourBound === "true") return;
   seq += 1;
   const apply = () => {
     const rect = element.getBoundingClientRect();
@@ -174,6 +177,16 @@ export function clipToContour(element) {
       return;
     }
     element.style.setProperty("--clip", `path('${clip}')`);
+    // The material layer is clipped by the same path the frame traces. It carries the
+    // raster wash, gloss, seam and glass/metal cues, so a theme's material and motion
+    // are painted inside the contour rather than in a second rounded box beside it.
+    let material = element.querySelector(":scope > .contour-material");
+    if (!material) {
+      material = document.createElement("div");
+      material.className = "contour-material";
+      material.setAttribute("aria-hidden", "true");
+      element.append(material);
+    }
     // The frame is the contour itself, stroked, and it is a child of the surface. The
     // surface is no longer clipped, so the stroke is drawn whole at every edge.
     let frame = element.querySelector(":scope > .contour-frame");
@@ -200,9 +213,12 @@ export function clipToContour(element) {
     const ink = contourInk(w, h);
     element.style.setProperty("--ink-x", `${ink.x.toFixed(1)}px`);
     element.style.setProperty("--ink-y", `${ink.y}px`);
+    element.dataset.contourBound = "true";
   };
   apply();
-  new ResizeObserver(apply).observe(element);
+  if (element.dataset.contourBound === "true") {
+    new ResizeObserver(apply).observe(element);
+  }
 }
 
 // fillContours clips every element that asks for it, which is every cell and card.

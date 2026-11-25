@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#071113" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Popit" />
+  <title>Popit Springboard</title>
+  <link rel="manifest" href="/phone-manifest.webmanifest" />
+  <link rel="icon" href="/popit-icon-512.png" type="image/png" />
+  <link rel="apple-touch-icon" href="/popit-icon-512.png" />
+  <link rel="stylesheet" href="/contour-theme.css" />
+  <link rel="stylesheet" href="/phone.css" />
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <button class="home-key" id="home-key" type="button" aria-label="Home" data-contour="card">
+        <span class="diamond" aria-hidden="true"></span>
+      </button>
+      <div class="brand">
+        <span class="brand-kicker">POPIT</span>
+        <strong>SPRINGBOARD</strong>
+      </div>
+      <span class="secure-pill" id="secure-pill" data-contour="card">checking</span>
+    </header>
+
+    <main id="stage">
+      <section class="screen home" id="home-screen" aria-labelledby="home-title">
+        <div class="hero">
+          <p class="eyebrow">SIGNED APP PACKAGES</p>
+          <h1 id="home-title">A room that answers.</h1>
+          <p class="hero-copy">Tap a signed app. Every tile carries its package identity and the family contour, and a refused package stays closed.</p>
+          <div class="live-row"><span class="pulse-dot"></span><span id="home-status">connecting to the live archive</span></div>
+        </div>
+        <div class="tiles" id="tiles" aria-label="Popit apps"></div>
+        <div class="page-dots" aria-hidden="true"><i class="on"></i><i></i></div>
+        <p class="hint">DialIn is the phone calling surface. Settings carries the family contour, material and size.</p>
+      </section>
+
+      <section class="screen view" id="chat-screen" aria-labelledby="chat-title" hidden>
+        <div class="view-head">
+          <button class="back-key" type="button" data-home data-contour="card">← HOME</button>
+          <div>
+            <p class="eyebrow" id="chat-eyebrow">COMMONS</p>
+            <h2 id="chat-title">Shared room</h2>
+          </div>
+          <span class="live-pill" data-contour="card"><span class="pulse-dot"></span>LIVE</span>
+        </div>
+        <div class="chat-meta" id="chat-meta"></div>
+        <div class="messages" id="messages" aria-live="polite"></div>
+        <div class="composer">
+          <form id="owner-form">
+            <label class="sr-only" for="owner-text">Speak to the room by typing</label>
+            <input id="owner-text" type="text" autocomplete="off" placeholder="Type into the commons" />
+            <button type="submit" id="owner-say" data-contour="card">SEND</button>
+          </form>
+          <p class="composer-note" id="composer-note">The phone sends through the same archive as the desktop.</p>
+        </div>
+      </section>
+
+      <section class="screen view" id="voice-screen" aria-labelledby="voice-title" hidden>
+        <div class="view-head">
+          <button class="back-key" type="button" data-home data-contour="card">← HOME</button>
+          <div>
+            <p class="eyebrow">PHONE VOICE</p>
+            <h2 id="voice-title">Talk to the room</h2>
+          </div>
+          <span class="secure-pill" id="voice-secure" data-contour="card">secure</span>
+        </div>
+        <div class="voice-stage">
+          <div class="voice-orb" id="voice-orb" data-contour="card"><span></span><span></span><span></span></div>
+          <p id="voice-status">Press start, then speak normally. The clip is transcribed on this machine and placed in the archive.</p>
+          <div class="voice-actions">
+            <button class="voice-button" type="button" id="voice-start" data-contour="card">START VOICE</button>
+            <button class="voice-button quiet" type="button" id="voice-stop" data-contour="card" disabled>STOP &amp; SEND</button>
+          </div>
+          <p class="voice-timer" id="voice-timer">00:00</p>
+          <div class="transcript" id="transcript" aria-live="polite" data-contour="card"></div>
+          <p class="hint">Mic capture needs the HTTPS certificate. <a href="/popit-cert.cer">Install popit-cert.cer</a> first. Plain HTTP is read-only.</p>
+        </div>
+      </section>
+
+      <section class="screen view" id="agents-screen" aria-labelledby="agents-title" hidden>
+        <div class="view-head">
+          <button class="back-key" type="button" data-home data-contour="card">← HOME</button>
+          <div>
+            <p class="eyebrow">EXTERNAL LINES</p>
+            <h2 id="agents-title">Verified agents</h2>
+          </div>
+          <span class="secure-pill" id="agents-secure" data-contour="card">secure</span>
+        </div>
+        <p class="hint" id="agents-note">Owner-issued codes enroll an agent once. A verified contact gets a Popit line, not a carrier number.</p>
+        <div class="agent-tools">
+          <button class="agent-button primary" id="agent-invite" type="button" data-contour="card">INVITE AGENT</button>
+          <button class="agent-button" id="agent-refresh" type="button" data-contour="card">REFRESH</button>
+        </div>
+        <div class="enrollment" id="enrollment" hidden data-contour="window">
+          <p class="eyebrow">ONE-TIME CODE · TEN MINUTES</p>
+          <pre id="enrollment-code"></pre>
+          <p id="enrollment-expiry"></p>
+          <button class="agent-button" id="enrollment-dismiss" type="button" data-contour="card">DONE</button>
+        </div>
+        <div class="agent-list" id="agent-list" aria-live="polite"></div>
+        <p class="hint" id="agent-list-note">No verified external lines yet.</p>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <span>THE FAMILY SURFACE · <span id="clock">--:--</span></span>
+      <span id="package-identity" class="package-identity" data-verified="false">app · unverified</span>
+      <span id="foot-mode">LAN</span>
+    </footer>
+  </div>
+
+  <section class="call-sheet" id="call-sheet" hidden data-contour="window" aria-live="assertive" aria-labelledby="call-name">
+    <p class="eyebrow" id="call-eyebrow">INCOMING EXTERNAL LINE</p>
+    <h2 id="call-name">Agent</h2>
+    <p id="call-line">POPIT-0000-0</p>
+    <p id="call-number">no declared number</p>
+    <p id="call-request" hidden></p>
+    <p id="call-status">A verified agent is ringing this phone.</p>
+    <div class="call-actions">
+      <button class="agent-button primary" id="call-share" type="button" data-contour="card" hidden>SHARE &amp; ANSWER</button>
+      <button class="agent-button primary" id="call-accept" type="button" data-contour="card">ACCEPT</button>
+      <button class="agent-button danger" id="call-decline" type="button" data-contour="card">DECLINE</button>
+      <button class="agent-button danger" id="call-hangup" type="button" data-contour="card" hidden>HANG UP</button>
+    </div>
+    <audio id="call-audio" autoplay playsinline></audio>
+  </section>
+  <noscript>Popit needs JavaScript for the live room.</noscript>
+  <script type="module" src="/ui-audit.js"></script>
+  <script type="module" src="/phone.js"></script>
+  <script type="module" src="/phone-calls.js"></script>
+</body>
+</html>

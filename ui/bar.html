@@ -9,8 +9,24 @@
 <body>
 <nav class="bar" data-contour>
   <button class="cell start" id="start" title="Open the launcher" data-contour>Start</button>
-  <div class="cells" id="cells" aria-label="Running windows"></div>
-  <div class="cell clock" id="clock" data-contour>--:--</div>
+  <button class="cell tool" id="search" title="Search applications" data-contour>Find</button>
+  <button class="cell tool" id="task" title="Task view" data-contour>Tasks</button>
+  <div class="cells" id="cells" aria-label="Pinned shortcuts"></div>
+  <div class="pages" id="pages" aria-label="Running window buttons">
+    <div class="pager" id="pager"></div>
+  </div>
+  <button class="cell pagecell idle" id="pagecell" title="Window page" data-contour>1/1</button>
+  <div class="tray" id="tray" aria-label="Notification area">
+    <button class="cell traycell" id="volume" title="Volume" data-contour>vol</button>
+    <button class="cell traycell" id="net" title="Network" data-contour>net</button>
+    <button class="cell traycell" id="battery" title="Battery" data-contour hidden>--</button>
+    <button class="cell traycell chevron" id="settings" title="Quick settings" data-contour>^</button>
+  </div>
+  <div class="cell clock" id="clock" data-contour>
+    <b id="clock-time">--:--</b>
+    <span id="clock-date">---</span>
+  </div>
+  <button class="cell show" id="show" title="Show desktop" data-contour>&#9633;</button>
 </nav>
 <svg class="clips" aria-hidden="true" width="0" height="0"><defs id="clips"></defs></svg>
 <script type="module" src="/bar.js"></script>

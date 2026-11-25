@@ -66,10 +66,45 @@ html, body {
   display: flex;
   align-items: stretch;
   gap: calc(var(--cap) * 0.18);
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
 }
+
+/* A page is a fixed row of slots: a window's location never moves unless the owner
+   moves it, so the strip turns pages instead of reflowing the buttons it already drew. */
+.pages {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: stretch;
+}
+.pager {
+  display: flex;
+  align-items: stretch;
+  gap: calc(var(--cap) * 0.18);
+  width: 100%;
+  min-width: 0;
+}
+.pager .cell, .pager .slot {
+  flex: 0 0 var(--slot-w, calc(var(--cap) * 4));
+  min-width: 0;
+  max-width: none;
+}
+.pager .slot { visibility: hidden; }
+.pagecell {
+  flex: 0 0 auto;
+  min-width: calc(var(--cap) * 2.6);
+  justify-content: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--brass);
+  letter-spacing: calc(var(--cap) * 0.02);
+}
+.pagecell:hover { color: var(--brass-lit); }
+/* The badge keeps its width when the strip has no windows; hiding it with display would
+   re-measure the pages row and change every slot's width. */
+.pagecell.idle { visibility: hidden; }
 .cells .cell {
   flex: 1 1 0;
   min-width: calc(var(--cap) * 2);
@@ -82,7 +117,7 @@ html, body {
   min-width: calc(var(--cap) * 3.4);
   justify-content: center;
   color: var(--dim);
-  cursor: default;
+  cursor: pointer;
 }
 
 .cell { position: relative; }
@@ -106,3 +141,98 @@ html, body {
 .cell:hover .contour-frame path { stroke: rgba(217, 183, 121, 0.85); }
 .cell.on .contour-frame path, .start .contour-frame path { stroke: var(--brass-lit); }
 .cell.min .contour-frame path, .clock .contour-frame path { stroke: rgba(176, 141, 87, 0.3); }
+
+/* A flex cell cannot ellipsise its own text: the run of text becomes an anonymous flex
+   item of its own, which overflows the box and is cut mid glyph. The label is therefore
+   its own block, allowed to shrink, so the cut is always an ellipsis at the cell's ink. */
+.cell .fit {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The floor stays, so a cell never collapses to a lone ellipsis; only the label shrinks. */
+.cells .cell.pin { min-width: calc(var(--cap) * 2.2); }
+
+/* Search and task view sit beside Start, at the same crown as the rest of the strip. */
+.tool {
+  min-width: calc(var(--cap) * 2.1);
+  justify-content: center;
+  color: var(--dim);
+  letter-spacing: calc(var(--cap) * 0.02);
+}
+.tool:hover { color: var(--paper); }
+
+/* A pinned shortcut is not a window: it has no running state, only the brass name. */
+.cells .cell.pin { color: var(--brass); flex: 0 1 auto; }
+.cells .cell.pin:hover { color: var(--brass-lit); }
+
+/* The program's picture arrives as a streamed frame, sized to the strip and lifted on
+   hover the way a taskbar button answers the pointer. */
+.cell .appicon {
+  width: calc(var(--cap) * 0.72);
+  height: calc(var(--cap) * 0.72);
+  flex: 0 0 auto;
+  margin-right: calc(var(--cap) * 0.18);
+  transition: transform 120ms ease, opacity 120ms ease;
+  pointer-events: none;
+}
+.cell:hover .appicon { transform: translateY(-1px) scale(1.06); }
+.cell.min .appicon { opacity: 0.55; }
+
+.tray {
+  display: flex;
+  align-items: stretch;
+  gap: calc(var(--cap) * 0.14);
+  flex: 0 0 auto;
+}
+.traycell {
+  justify-content: center;
+  min-width: calc(var(--cap) * 1.55);
+  font-size: calc(var(--cap) * 0.34);
+  letter-spacing: calc(var(--cap) * 0.02);
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+}
+.traycell.off { color: var(--brass); }
+.chevron { min-width: calc(var(--cap) * 1.05); color: var(--brass-lit); }
+
+/* A tray mark is stroked in the cell's own ink, so it dims with the cell and lights on hover. */
+.traycell .glyph {
+  width: calc(var(--cap) * 0.62);
+  height: calc(var(--cap) * 0.62);
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.traycell .glyph .fill { fill: currentColor; stroke: none; }
+.chevron .glyph { width: calc(var(--cap) * 0.5); height: calc(var(--cap) * 0.5); }
+.cell[hidden] { display: none; }
+
+/* The clock carries the day under the time, so both fit in the 48 px strip. */
+.clock {
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: calc(var(--cap) * 0.03);
+  line-height: 1.12;
+}
+.clock b {
+  font-weight: 500;
+  font-size: calc(var(--cap) * 0.40);
+  letter-spacing: calc(var(--cap) * 0.03);
+  color: var(--paper);
+}
+.clock span { font-size: calc(var(--cap) * 0.26); color: var(--dim); }
+
+.show {
+  min-width: calc(var(--cap) * 1.1);
+  justify-content: center;
+  color: var(--dim);
+}
+.show:hover { color: var(--brass-lit); }

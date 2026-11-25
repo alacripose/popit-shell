@@ -1,0 +1,25 @@
+{
+  "name": "Popit Agent",
+  "short_name": "Popit",
+  "description": "Popit live agent call desk: commons lane, Whisper, civilian lanes, and the shared working document.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#071113",
+  "theme_color": "#071113",
+  "icons": [
+    {
+      "src": "/popit-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/popit-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Civilian architecture audit</title>
+<style>
+  :root {
+    --ground: #0c0e11; --panel: #11161a; --line: rgba(240,196,84,.22);
+    --gold: #f0c454; --paper: #e8e0cf; --dim: #8d9b9e; --green: #7fd6c2; --rose: #e08a76;
+    font-family: Archivo, "Segoe UI", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--ground); color: var(--paper); }
+  header { padding: 22px 28px 16px; border-bottom: 1px solid var(--line); display: flex; gap: 16px; align-items: end; }
+  .mark { color: var(--gold); font-size: 20px; }
+  h1 { margin: 0; font-size: 13px; letter-spacing: .28em; text-transform: uppercase; font-weight: 600; }
+  .sub { color: var(--dim); font: 11px/1.5 "IBM Plex Mono", Consolas, monospace; margin-left: auto; text-align: right; }
+  main { padding: 20px 28px 34px; max-width: 1180px; margin: 0 auto; }
+  .summary { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 8px; }
+  .stat { border: 1px solid var(--line); background: var(--panel); padding: 10px 12px; min-width: 0; }
+  .stat b { display: block; color: var(--gold); font: 20px/1.1 "IBM Plex Mono", Consolas, monospace; }
+  .stat span { color: var(--dim); font-size: 9px; letter-spacing: .16em; text-transform: uppercase; }
+  section { margin-top: 20px; }
+  h2 { font-size: 10px; letter-spacing: .22em; text-transform: uppercase; color: var(--gold); margin: 0 0 9px; }
+  .lanes, .projects { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px; }
+  .lane, .project { border-left: 2px solid var(--gold); background: var(--panel); padding: 9px 11px; min-width: 0; }
+  .lane b, .project b { display: block; font: 12px "IBM Plex Mono", Consolas, monospace; color: var(--paper); }
+  .lane span, .project span { color: var(--dim); font: 10px/1.45 "IBM Plex Mono", Consolas, monospace; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,.06); font: 10px/1.35 "IBM Plex Mono", Consolas, monospace; vertical-align: top; }
+  th { color: var(--dim); text-transform: uppercase; letter-spacing: .12em; font-size: 8px; }
+  td.path { color: var(--paper); max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  td.snip { color: #aeb5ad; }
+  .terms { display: flex; flex-wrap: wrap; gap: 5px; }
+  .term { border: 1px solid var(--line); padding: 4px 7px; color: var(--dim); font: 10px "IBM Plex Mono", Consolas, monospace; }
+  .term b { color: var(--gold); font-weight: 400; }
+  .empty { color: var(--dim); border: 1px dashed var(--line); padding: 16px; font: 11px "IBM Plex Mono", Consolas, monospace; }
+  .error { color: var(--rose); }
+  @media (max-width: 760px) { .summary { grid-template-columns: repeat(2,1fr); } .lanes, .projects { grid-template-columns: 1fr 1fr; } }
+</style>
+</head>
+<body data-popit="civilian-audit">
+<header>
+  <span class="mark">◆</span>
+  <h1>Civilian architecture · family audit</h1>
+  <div class="sub" id="stamp">reading index</div>
+</header>
+<main>
+  <section class="summary" id="audit-summary">
+    <div class="stat"><b id="files">—</b><span>files indexed</span></div>
+    <div class="stat"><b id="code">—</b><span>code</span></div>
+    <div class="stat"><b id="docs">—</b><span>docs</span></div>
+    <div class="stat"><b id="pdfs">—</b><span>PDFs</span></div>
+    <div class="stat"><b id="matching">—</b><span>matching</span></div>
+    <div class="stat"><b id="seconds">—</b><span>scan seconds</span></div>
+  </section>
+
+  <section>
+    <h2>Working lanes</h2>
+    <div class="lanes" id="audit-lanes"></div>
+  </section>
+
+  <section>
+    <h2>Term coverage</h2>
+    <div class="terms" id="audit-terms"></div>
+  </section>
+
+  <section>
+    <h2>Projects</h2>
+    <div class="projects" id="audit-projects"></div>
+  </section>
+
+  <section>
+    <h2>Highest-signal files</h2>
+    <div id="audit-findings"></div>
+  </section>
+</main>
+<script>
+const $ = (s) => document.querySelector(s);
+const text = (s, v) => { const n = $(s); if (n) n.textContent = v; };
+function lane(name, work) {
+  const node = document.createElement("div"); node.className = "lane";
+  const b = document.createElement("b"); b.textContent = name;
+  const s = document.createElement("span"); s.textContent = work;
+  node.append(b, s); return node;
+}
+function finding(row) {
+  const table = document.createElement("table");
+  const head = document.createElement("thead");
+  head.innerHTML = "<tr><th>file</th><th>kind</th><th>hits</th><th>first evidence</th></tr>";
+  const body = document.createElement("tbody");
+  const tr = document.createElement("tr");
+  const path = document.createElement("td"); path.className = "path"; path.textContent = row.path; path.title = row.path;
+  const kind = document.createElement("td"); kind.textContent = row.kind;
+  const hits = document.createElement("td"); hits.textContent = String(row.matches);
+  const snip = document.createElement("td"); snip.className = "snip";
+  snip.textContent = (row.snippets && row.snippets[0]) ? `${row.snippets[0].term}: ${row.snippets[0].text}` : "";
+  tr.append(path, kind, hits, snip); body.append(tr);
+  table.append(head, body); return table;
+}
+async function load() {
+  const reply = await fetch("/report.json", { cache: "no-store" });
+  const data = await reply.json();
+  const totals = data.totals || {};
+  text("#files", totals.files ?? "0");
+  text("#code", totals.code ?? "0");
+  text("#docs", totals.docs ?? "0");
+  text("#pdfs", totals.pdfs ?? "0");
+  text("#matching", totals.matching_files ?? "0");
+  text("#seconds", totals.seconds ?? "—");
+  text("#stamp", data.scanned_at ? `scanned ${data.scanned_at}` : "no scan yet");
+  const lanes = $("#audit-lanes"); lanes.replaceChildren();
+  for (const row of data.lanes || []) lanes.append(lane(row.name, row.work));
+  const terms = $("#audit-terms"); terms.replaceChildren();
+  for (const [term, count] of Object.entries(data.terms || {})) {
+    const node = document.createElement("span"); node.className = "term";
+    node.innerHTML = `${term} <b>${count}</b>`; terms.append(node);
+  }
+  const projects = $("#audit-projects"); projects.replaceChildren();
+  for (const row of data.projects || []) {
+    const node = document.createElement("div"); node.className = "project";
+    const b = document.createElement("b"); b.textContent = row.root;
+    const s = document.createElement("span"); s.textContent = `${row.files} files · ${row.matches} hits`;
+    node.append(b, s); projects.append(node);
+  }
+  const findings = $("#audit-findings"); findings.replaceChildren();
+  if (!(data.findings || []).length) {
+    const empty = document.createElement("div"); empty.className = "empty";
+    empty.textContent = "No scan has populated the index yet. Run `python tools/civilian_audit.py scan`.";
+    findings.append(empty);
+  } else {
+    for (const row of data.findings.slice(0, 24)) findings.append(finding(row));
+  }
+  const errors = data.errors || [];
+  if (errors.length) {
+    const note = document.createElement("p"); note.className = "error";
+    note.textContent = `${errors.length} extraction errors kept in report.json`;
+    findings.append(note);
+  }
+}
+load();
+</script>
+</body>
+</html>

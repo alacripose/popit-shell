@@ -1,0 +1,232 @@
+/* The settings package window. Family web-dark: ground, one gold attention colour,
+   square data surfaces, mono for identities. No radius: the family contour is the only
+   shape, and a package view is a document rather than a crown. */
+
+:root {
+  --ground: #0b0d10;
+  --panel: #12161a;
+  --raised: #171c21;
+  --line: #2a3238;
+  --ink: #e8e2d4;
+  --muted: #8b8778;
+  --gold: #f0c454;
+  --brass: #b08d57;
+  --danger: #d98a6a;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--ground);
+  color: var(--ink);
+  font: 14px/1.5 "Archivo", "Segoe UI", system-ui, sans-serif;
+}
+
+code, .data th, .tag, .count {
+  font-family: "IBM Plex Mono", "Cascadia Mono", ui-monospace, monospace;
+}
+
+.sheet {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 28px 24px 40px;
+  display: grid;
+  gap: 20px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 16px;
+}
+
+.mark {
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--brass);
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.mark span {
+  width: 14px;
+  height: 14px;
+  background: var(--gold);
+  display: block;
+}
+
+.titles h1 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.titles .state {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.titles .state[data-state="held"] { color: var(--gold); }
+.titles .state[data-state="unpublished"] { color: var(--danger); }
+
+.actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+button, .actions a {
+  appearance: none;
+  border: 1px solid var(--brass);
+  background: var(--raised);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-decoration: none;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+button:hover, .actions a:hover { border-color: var(--gold); color: var(--gold); }
+button:disabled { opacity: 0.5; cursor: default; }
+button:focus-visible, .actions a:focus-visible { outline: 1px solid var(--gold); outline-offset: 2px; }
+
+.identity, .block {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  padding: 16px 18px;
+}
+
+.identity .row {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 12px;
+  padding: 5px 0;
+  border-bottom: 1px dashed rgba(139, 135, 120, 0.22);
+}
+
+.identity .row:last-of-type { border-bottom: 0; }
+
+.identity .row span {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.identity code {
+  font-size: 12px;
+  color: var(--gold);
+  overflow-wrap: anywhere;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.block h2 {
+  margin: 0 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tag {
+  border: 1px solid var(--brass);
+  color: var(--gold);
+  font-size: 10px;
+  padding: 1px 5px;
+  letter-spacing: 0.08em;
+}
+
+.count {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.data {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data th {
+  text-align: left;
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  padding: 6px 8px 6px 0;
+  width: 40%;
+  border-bottom: 1px solid var(--line);
+}
+
+.data td {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+.data tr:last-child th, .data tr:last-child td { border-bottom: 0; }
+
+.subscribers {
+  display: grid;
+  gap: 8px;
+}
+
+.subscriber {
+  border: 1px solid var(--line);
+  background: var(--raised);
+  padding: 10px 12px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.subscriber b { font-weight: 600; }
+
+.subscriber small {
+  margin-left: auto;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+}
+
+.empty, .note {
+  color: var(--muted);
+  font-size: 12px;
+  margin: 10px 0 0;
+}
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 11px;
+}
+
+#refusal:not(:empty) { color: var(--gold); }

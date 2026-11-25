@@ -3,3 +3,8 @@ __pycache__/
 runlogs/
 dist/
 .venv/
+# Local model weights stay on the machine; the repository records how they are used.
+models/
+# The call desk is its own published checkout (alacripose/popit-call); it is copied here
+# for the companion run, not vendored into this history.
+call-client/

@@ -1,0 +1,25 @@
+{
+  "name": "Popit Springboard",
+  "short_name": "Popit",
+  "description": "The Popit commons, agent lanes, and secure phone voice call.",
+  "start_url": "/phone.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#071113",
+  "theme_color": "#071113",
+  "icons": [
+    {
+      "src": "/popit-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/popit-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

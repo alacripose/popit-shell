@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Popit · call client gate</title>
+<style>
+:root { --ink:#071113; --panel:#0d2122; --line:rgba(217,168,95,.28); --gold:#d9a85f; --paper:#e9e1d2; --muted:#93aaa5; --teal:#36d6c0; --rose:#e87958; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--ink); color:var(--paper); font-family:"Segoe UI",system-ui,sans-serif; }
+header { display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid var(--line); }
+.mark { color:var(--gold); font-size:20px; }
+h1 { margin:0; font:500 18px Georgia,serif; }
+#gate-summary { margin-left:auto; color:var(--teal); font:600 9px Consolas,monospace; letter-spacing:.12em; }
+main { padding:20px; max-width:1100px; margin:0 auto; }
+section { border:1px solid var(--line); padding:14px; margin-bottom:12px; background:var(--panel); }
+h2 { margin:0 0 10px; color:var(--gold); font:600 9px Consolas,monospace; letter-spacing:.14em; text-transform:uppercase; }
+#gate-checks, #gate-prose, #gate-envelope { margin:0; padding:0; list-style:none; display:grid; gap:6px; }
+li { padding:7px 9px; border-left:2px solid var(--line); background:rgba(255,255,255,.025); font:11px/1.45 Consolas,monospace; overflow-wrap:anywhere; }
+li[data-ok="false"] { border-left-color:var(--rose); color:#f0b3a4; }
+li[data-ok="true"] { border-left-color:var(--teal); }
+pre { margin:0; white-space:pre-wrap; color:var(--muted); font:10px/1.5 Consolas,monospace; }
+footer { padding:12px 20px; color:var(--muted); font:8px Consolas,monospace; letter-spacing:.1em; }
+</style>
+</head>
+<body data-popit="call-client-gate">
+<header><span class="mark">◆</span><h1>Call client gate</h1><span id="gate-summary">loading</span></header>
+<main>
+  <section><h2>Checks</h2><ul id="gate-checks"></ul></section>
+  <section><h2>Prose</h2><ul id="gate-prose"></ul></section>
+  <section><h2>Envelope</h2><ul id="gate-envelope"></ul></section>
+  <section><h2>Report</h2><pre id="gate-report">waiting</pre></section>
+</main>
+<footer>POPIT CALL · SIGNED ENVELOPE V1 · LOCAL REPORT</footer>
+<script>
+async function load() {
+  const report = await (await fetch("/report.json", { cache: "no-store" })).json();
+  const summary = document.getElementById("gate-summary");
+  summary.textContent = `${report.passed}/${report.total} pass · ${report.refused} refused`;
+  summary.style.color = report.refused ? "#e87958" : "#36d6c0";
+  const fill = (id, rows) => {
+    const list = document.getElementById(id);
+    list.innerHTML = rows.length ? rows.map((row) => `<li data-ok="${row.ok}">${row.ok ? "ok" : "refused"} · ${row.name} · ${row.detail || ""}</li>`).join("") : "<li data-ok=\"false\">no rows</li>";
+  };
+  fill("gate-checks", report.checks || []);
+  fill("gate-prose", report.prose || []);
+  fill("gate-envelope", report.envelope || []);
+  document.getElementById("gate-report").textContent = JSON.stringify({ schema: report.schema, total: report.total, passed: report.passed, refused: report.refused }, null, 2);
+}
+load().catch((error) => {
+  document.getElementById("gate-summary").textContent = "report refused";
+  document.getElementById("gate-report").textContent = String(error);
+});
+</script>
+</body>
+</html>

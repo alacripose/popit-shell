@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#071113" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Popit" />
+<title>Popit toast</title>
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="icon" href="/popit-icon-512.png" type="image/png" />
+<link rel="apple-touch-icon" href="/popit-icon-512.png" />
+<link rel="stylesheet" href="/contour-theme.css" />
+<link rel="stylesheet" href="/toast.css" />
+</head>
+<body>
+<section class="toast" data-contour="window" data-motion="full" aria-label="Popit agent toast">
+  <header class="bar" data-contour>
+    <span class="mark" aria-hidden="true">◆</span>
+    <h1>Agent</h1>
+    <span id="status" class="status" data-contour="card" data-state="waiting">waiting</span>
+    <button id="settings" class="icon" type="button" data-contour="card" title="Popit settings · family theme, motion and size" aria-label="Settings">⚙</button>
+    <button id="pin" class="icon" type="button" data-contour="card" title="Pin above other windows" aria-label="Pin">⌖</button>
+    <button id="close" class="icon" type="button" data-contour="card" title="Close" aria-label="Close">×</button>
+  </header>
+
+  <section id="settings-panel" class="settings" data-contour="card" role="dialog" aria-label="Popit settings" hidden>
+    <div class="settings-head">
+      <span>Settings</span>
+      <span class="settings-register">roles</span>
+      <button id="settings-package" type="button" data-contour="card" title="Settings package · the signed document this app serves to other windows">Package</button>
+      <button id="settings-close" type="button" data-contour="card" aria-label="Close settings">×</button>
+    </div>
+    <div class="settings-tabs" role="tablist" aria-label="Settings section">
+      <button type="button" role="tab" data-settings-tab-choice="surface" data-contour="card" aria-selected="true" aria-controls="settings-surface">Contour &amp; motion</button>
+      <button type="button" role="tab" data-settings-tab-choice="palettes" data-contour="card" aria-selected="false" aria-controls="settings-palettes">Palette planetoids</button>
+    </div>
+
+    <section id="settings-surface" class="settings-pane" data-settings-pane="surface" role="tabpanel" aria-label="Contour and motion types">
+      <div class="settings-section-head"><span>Surface types</span><span id="style-name">Popit Family</span></div>
+      <div class="style-columns">
+        <section class="style-column" aria-label="Contour frame and material">
+          <div class="style-column-head"><span>Family frame</span><b id="contour-frame-current">popit</b></div>
+          <div id="contour-frames" class="style-options" role="group" aria-label="Family contour frames"></div>
+          <div class="style-subhead"><span>Material profile</span><b id="contour-type-current">paper</b></div>
+          <div id="contour-types" class="style-options" role="group" aria-label="Material profiles"></div>
+        </section>
+        <section class="style-column" aria-label="Motion types">
+          <div class="style-column-head"><span>Motion type</span><b id="motion-type-current">reveal</b></div>
+          <div id="motion-types" class="style-options" role="group" aria-label="Motion types"></div>
+        </section>
+      </div>
+      <div class="settings-material">One measured nine-slice · <b id="frame-value">popit</b> · <b id="material-value">paper</b> · motion <b id="motion-profile">reveal</b></div>
+      <p class="settings-note">Material profiles are the Popit Goodies Bag values: paper, card, glass, tint, ink, accent and bare. Geometry stays the measured nine-slice.</p>
+      <p class="settings-note">Frames · Popit, iOS 6, Material and TouchWiz inherit this contour; no second silhouette.</p>
+      <p class="settings-note settings-forms">Sources · openlock_popit.js MATERIALS · forms/{popit,ios,material,touchwiz}.form</p>
+      <p class="settings-note settings-origin" id="theme-origin">Popit shell · docs/family-look.md</p>
+      <p class="settings-note" id="theme-note">Family roster + 37 player colours · portal-shell roster</p>
+    </section>
+
+    <section id="settings-palettes" class="settings-pane settings-palettes" data-settings-pane="palettes" role="tabpanel" aria-label="Palette planetoids" hidden>
+      <div class="settings-section-head"><span>Palette planetoids</span><span id="planet-count">17 family</span></div>
+      <div class="planet-filter" role="group" aria-label="Palette source">
+        <button type="button" data-planet-source-choice="family" data-contour="card" aria-pressed="true">Family · 17</button>
+        <button type="button" data-planet-source-choice="player" data-contour="card" aria-pressed="false">Player · 37</button>
+        <button type="button" data-planet-source-choice="custom" data-contour="card" aria-pressed="false">Mine</button>
+      </div>
+      <div id="planet-stage" class="planet-stage" data-contour="card" data-popit="palette-planetoids">
+        <div class="planet-core" aria-hidden="true"><span>Popit</span></div>
+        <div id="planet-field" class="planet-canvas"></div>
+      </div>
+      <div class="planet-readout">
+        <div class="planet-readout-copy"><b id="planet-name">Popit Family</b><small id="planet-meta">family · family / reveal</small></div>
+        <button id="planet-edit" type="button" data-contour="card">Edit</button>
+      </div>
+      <div id="palette-editor" class="palette-editor" hidden>
+        <div class="palette-editor-head">
+          <span id="palette-editor-title">Custom palette</span>
+          <button id="palette-back" type="button" data-contour="card" aria-label="Back to planetoids" title="Back to planetoids">← Back</button>
+        </div>
+        <label class="palette-name" for="palette-name">Name
+          <input id="palette-name" type="text" maxlength="48" autocomplete="off" spellcheck="false" data-contour="card" />
+        </label>
+        <div class="palette-colors" role="group" aria-label="Palette roles">
+          <label class="palette-color" for="palette-primary"><input id="palette-primary" type="color" data-palette-role="primary" /><span>Highlight</span><output id="palette-primary-value"></output></label>
+          <label class="palette-color" for="palette-secondary"><input id="palette-secondary" type="color" data-palette-role="secondary" /><span>Surface</span><output id="palette-secondary-value"></output></label>
+          <label class="palette-color" for="palette-tertiary"><input id="palette-tertiary" type="color" data-palette-role="tertiary" /><span>Accent</span><output id="palette-tertiary-value"></output></label>
+          <label class="palette-color" for="palette-emphasis"><input id="palette-emphasis" type="color" data-palette-role="emphasis" /><span>Emphasis</span><output id="palette-emphasis-value"></output></label>
+        </div>
+        <div class="palette-meta"><span>Frame <b id="palette-frame">popit</b> · <b id="palette-material">paper</b></span><span>Motion <b id="palette-motion">reveal</b></span></div>
+        <div class="palette-library-row">
+          <label for="palette-library">Saved</label>
+          <select id="palette-library" data-contour="card"><option value="">— load a saved palette —</option></select>
+          <button id="palette-load" type="button" data-contour="card">Load</button>
+        </div>
+        <div class="palette-actions">
+          <button id="palette-save" type="button" data-contour="card">Save</button>
+          <button id="palette-undo" type="button" data-contour="card">Undo</button>
+          <button id="palette-redo" type="button" data-contour="card">Redo</button>
+          <button id="palette-new" type="button" data-contour="card">New</button>
+        </div>
+        <div class="palette-community">
+          <button id="palette-import" type="button" data-contour="card">Import JSON</button>
+          <button id="palette-export" type="button" data-contour="card">Export JSON</button>
+          <input id="palette-import-file" type="file" accept="application/json,.json" hidden />
+        </div>
+        <p class="settings-note" id="palette-status">Pick a planetoid to edit. Saving writes a community palette on this machine.</p>
+      </div>
+    </section>
+    <div class="settings-rule" aria-hidden="true"></div>
+    <label class="setting-label" for="dpi-range">DPI scale <output id="dpi-value">100%</output></label>
+    <input id="dpi-range" class="dpi-range" type="range" min="60" max="180" step="5" value="100" />
+    <div class="settings-row">
+      <button id="dpi-down" type="button" data-contour="card">−</button>
+      <button id="dpi-up" type="button" data-contour="card">+</button>
+      <button id="dpi-reset" type="button" data-contour="card">Reset</button>
+    </div>
+    <div class="settings-rule" aria-hidden="true"></div>
+    <div class="setting-label">Motion <output id="motion-value">full</output></div>
+    <div class="settings-row" role="group" aria-label="Motion">
+      <button id="motion-full" type="button" data-motion-choice="full" data-contour="card" aria-pressed="true">Full</button>
+      <button id="motion-reduced" type="button" data-motion-choice="reduced" data-contour="card" aria-pressed="false">Reduced</button>
+    </div>
+    <p class="settings-note">Drag any edge or corner to resize.</p>
+    <div id="harness-regions" class="settings-note">regions —</div>
+  </section>
+
+  <nav class="tabs" data-contour aria-label="Toast surfaces">
+    <button id="tab-local" type="button" data-tab="local" data-contour="card" class="active">Local</button>
+    <button id="tab-mind" type="button" data-tab="mind" data-contour="card">Mind</button>
+    <span id="debian-chip" class="chip" data-state="starting">desktop</span>
+  </nav>
+
+  <section class="live" data-contour aria-label="Live agent windows">
+    <div class="live-grid">
+      <figure class="shot freebuff-shot" data-contour>
+        <img id="shot" alt="Live capture of the Freebuff chat window" />
+        <figcaption><span>Freebuff</span><span id="shot-size"></span></figcaption>
+      </figure>
+      <figure class="shot debian-shot" data-contour>
+        <img id="debian-shot" alt="Live Debian LXDE desktop" />
+        <figcaption><span>Debian · :0</span><span id="debian-size">—</span></figcaption>
+      </figure>
+    </div>
+    <div class="live-meta">
+      <span id="shot-window">no window probed</span>
+      <span id="debian-state" data-state="starting">starting</span>
+      <span id="debian-at">—</span>
+    </div>
+  </section>
+
+  <section id="springboard" class="springboard" aria-label="SpringBoard" hidden>
+    <!-- The home is the phone's own SpringBoard, loaded from the same origin. It is not a
+         second launcher: the phone page is the surface, and its tiles are its apps. -->
+    <iframe id="springboard-frame" class="springboard-frame" data-src="/phone.html" title="SpringBoard"></iframe>
+  </section>
+
+  <div class="body">
+    <section id="local-pane" class="tab-pane" data-pane="local" hidden>
+      <details class="agent-drawer">
+      <summary>Probe &amp; drivers</summary>
+      <div class="drawer-actions">
+        <button id="probe" class="action primary" type="button">Probe now</button>
+        <button id="debian-capture" class="action" type="button">Refresh Debian</button>
+        <button id="delegate" class="action" type="button">Delegate capture</button>
+      </div>
+      <p class="drawer-note">Freebuff and Debian live side by side above.</p>
+
+      <div class="facts" data-contour="card">
+        <div class="fact"><span>Probe</span><b id="probe-age">—</b></div>
+        <div class="fact"><span>Driver</span><b>cua-chat</b></div>
+        <div class="fact"><span>Capture</span><b id="probe-digest">—</b></div>
+        <div class="fact"><span>Tasks</span><b id="task-count">0</b></div>
+      </div>
+
+      <section class="pane">
+        <h2>Cua drivers</h2>
+        <ol id="drivers"></ol>
+      </section>
+
+      <section class="pane log">
+        <h2>Probe log</h2>
+        <ol id="lines"></ol>
+      </section>
+      </details>
+    </section>
+
+    <section id="mind-pane" class="tab-pane" data-pane="mind" hidden>
+      <div class="mind-head">
+        <span>Debian mind · qwen3:4b</span>
+        <span id="mind-state">idle</span>
+      </div>
+      <pre id="mind-log" data-contour="card">—</pre>
+      <div id="mind-tools" class="mind-tools">no tools</div>
+    </section>
+
+    <section class="voice" data-contour="card" aria-label="Shared call document">
+      <div class="voice-head">
+        <h2>Call desk</h2>
+        <span id="call-mode">voice</span>
+        <span id="workspace-state" class="working-state" data-on="false"><i class="spinner"></i><span id="workspace-label">workspace idle</span></span>
+        <span id="voice-state">listening</span>
+      </div>
+      <div class="voice-chips" id="voice-chips">
+        <div id="participants" class="participants" aria-label="Participants"></div>
+        <button id="contacts-toggle" type="button" data-contour="card" aria-expanded="false" aria-controls="contact-book">Contacts</button>
+        <button id="mic" type="button" data-contour="card" aria-pressed="true">Mic on</button>
+        <button id="live" type="button" data-contour="card" aria-pressed="true">Live</button>
+      </div>
+      <div class="lane-bar" id="lane-bar" aria-label="Lane selectors" data-contour="card">
+        <span class="lane-bar-title" data-contour="card">Lanes</span>
+        <div id="lane-chips" class="lane-chips"></div>
+        <button id="commons-lane" class="commons-lane" type="button" data-contour="card" aria-pressed="true" title="The constant commons lane cannot be closed">Commons · all lanes</button>
+      </div>
+      <form id="owner-say" class="owner-say" autocomplete="off">
+        <label for="owner-text">Owner</label>
+        <input id="owner-text" type="text" data-contour="card" placeholder="Message the family" maxlength="2000">
+        <button id="owner-send" type="submit" data-contour="card">Say</button>
+      </form>
+      <div id="contact-book" class="contact-book" data-contour="card" hidden>
+        <div class="contact-book-head"><span>Contact book</span><span id="contact-count">0 civilians</span></div>
+        <input id="contact-search" type="search" data-contour="card" placeholder="Search a name, number or culture" autocomplete="off">
+        <div id="contact-list" class="contact-list" aria-live="polite"></div>
+      </div>
+      <div class="doc-wrap" data-contour="card">
+        <div class="doc-head"><span>Shared working document</span><span id="wish-clock">no call</span></div>
+        <div id="wish-line" class="wish-line">no call</div>
+        <div id="workdoc" class="workdoc" data-contour="card" role="log" aria-live="polite" aria-label="Shared call document">
+          <div id="workdoc-body" class="workdoc-body"></div>
+        </div>
+        <div class="doc-foot"><span id="doc-cursor">caret · idle</span><span id="doc-count">0 lines</span></div>
+      </div>
+      <div class="voice-heard axis"><span>Axis</span><b id="axis-line">connecting</b></div>
+      <div class="voice-heard harness"><span>Harness</span><b id="harness-state" data-state="waiting">unprobed</b><span id="harness-age"></span></div>
+    </section>
+
+    <section class="windows" data-contour="card" aria-label="Windows">
+      <div class="windows-head"><span>Windows</span><span>live surfaces</span></div>
+      <div id="window-list" class="window-list"></div>
+    </section>
+  </div>
+
+  <div class="grip grip-n" data-resize="top" title="Resize"></div>
+  <div class="grip grip-s" data-resize="bottom" title="Resize"></div>
+  <div class="grip grip-w" data-resize="left" title="Resize"></div>
+  <div class="grip grip-e" data-resize="right" title="Resize"></div>
+  <div class="grip grip-nw" data-resize="topleft" title="Resize"></div>
+  <div class="grip grip-ne" data-resize="topright" title="Resize"></div>
+  <div class="grip grip-sw" data-resize="bottomleft" title="Resize"></div>
+  <div class="grip grip-se" data-resize="bottomright" title="Resize"></div>
+
+  <footer class="foot" data-contour="card">
+    <button id="hide" class="action" type="button">Hide</button>
+    <span id="refusal" class="refusal" role="status"></span>
+    <span id="package-identity" class="package-identity" data-verified="false">dialin · unverified</span>
+  </footer>
+</section>
+<svg class="clips" aria-hidden="true" width="0" height="0"><defs id="clips"></defs></svg>
+<script type="module" src="/ui-audit.js"></script>
+<script type="module" src="/toast.js"></script>
+</body>
+</html>

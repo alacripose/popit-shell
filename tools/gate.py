@@ -17,8 +17,10 @@ Exit status is 0 only when every surface on disk is the nine-slice and the mappi
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -246,10 +248,332 @@ def read_sources() -> dict[str, str]:
     }
 
 
+def toast_refusals() -> None:
+    """The toast is a window, not a scrolling page: its frame and voice controls are pinned."""
+    css = (UI / "toast.css").read_text(encoding="utf-8")
+    html = (UI / "toast.html").read_text(encoding="utf-8")
+    spinner_blocks = [
+        block for selector, block in re.findall(r"(?s)([^{}]+)\{([^{}]*)\}", css)
+        if "spinner" in selector.lower() and "border:" in block
+    ]
+    check(
+        "toast-spinner-round",
+        "spinning loaders keep round geometry instead of becoming squares",
+        bool(spinner_blocks)
+        and all("border-radius: 50%" in block for block in spinner_blocks),
+        "ui/toast.css",
+        f"{len(spinner_blocks)} spinner rule(s); all must carry border-radius: 50%",
+    )
+    frame = css.find(".toast > .contour-frame")
+    flex = css.find(".toast > *")
+    check(
+        "toast-contour-frame",
+        "the toast frame is outside the flex column",
+        frame > flex >= 0 and "position: absolute" in css[frame:frame + 180],
+        "ui/toast.css",
+        "a relative contour SVG takes the body's height and pushes the readings off screen",
+    )
+    # Scrolling inside a list is not the window scrolling. The pinned window is the
+    # html/body/.toast block; a >150px document list still needs its own scrollbar.
+    window_blocks = re.findall(
+        r"(?m)^\s*(?:html\s*,\s*body|\.toast)\s*\{[^}]*\}", css, re.S
+    )
+    window_scroll = any(
+        re.search(r"overflow\s*:\s*(?:auto|scroll)", block) for block in window_blocks
+    )
+    check(
+        "toast-no-scroll",
+        "the toast clips instead of scrolling",
+        not window_scroll,
+        "ui/toast.css",
+        "the window is a pinned surface, not a scroll container",
+    )
+    check(
+        "toast-no-invented-controls",
+        "the call desk carries only controls that act on the live call",
+        not any(f'data-say="{name}"' in html for name in ("assistant", "cua-chat", "civilian"))
+        and "civilians.html" not in html,
+        "ui/toast.html",
+        "the retired assistant, driver and civilian buttons were a miscount of how civilians work",
+    )
+    board_html = (ROOT / "ui" / "toast.html").read_text(encoding="utf-8")
+    board_js = (ROOT / "ui" / "toast.js").read_text(encoding="utf-8")
+    board_css = (ROOT / "ui" / "toast.css").read_text(encoding="utf-8")
+    phone_js = (ROOT / "ui" / "phone.js").read_text(encoding="utf-8")
+    client_pages = {
+        "ui/toast.js": (ROOT / "ui" / "toast.js").read_text(encoding="utf-8"),
+        "ui/phone.js": (ROOT / "ui" / "phone.js").read_text(encoding="utf-8"),
+        "ui/settings.js": (ROOT / "ui" / "settings.js").read_text(encoding="utf-8"),
+    }
+    theme_sheet_path = ROOT / "ui" / "contour-theme.css"
+    theme_sheet = theme_sheet_path.read_text(encoding="utf-8") if theme_sheet_path.exists() else ""
+    phone_html = (ROOT / "ui" / "phone.html").read_text(encoding="utf-8")
+    package_js = (ROOT / "ui" / "package.js").read_text(encoding="utf-8")
+    check(
+        "shared-surface-theme",
+        "contour, material and motion are one family sheet both apps load",
+        'href="/contour-theme.css"' in board_html
+        and 'href="/contour-theme.css"' in phone_html
+        and 'html[data-material="paper"]' in theme_sheet
+        and 'html[data-material="paper"]' not in board_css
+        and "motion-fold" in theme_sheet,
+        "ui/contour-theme.css",
+        "a surface with its own copy of the theme drifts from the family",
+    )
+    check(
+        "settings-dpi-scales",
+        "the published DPI and roles scale every app that reads the package",
+        "style.zoom" in package_js and "theme.colors" in package_js
+        and "document.documentElement.style.zoom" in board_js,
+        "ui/package.js",
+        "a DPI that only writes a variable leaves the desk at 100%",
+    )
+    check(
+        "app-packages-use-the-family-signature",
+        "every app surface reads the signed package and the settings theme",
+        all('from "/package.js"' in source for source in client_pages.values())
+        and 'id="package-identity"' in board_html
+        and 'id="package-identity"' in (ROOT / "ui" / "phone.html").read_text(encoding="utf-8"),
+        "ui/package.js",
+        "an app that does not read its signed identity is not a family package",
+    )
+    try:
+        app_probe = subprocess.run(
+            [sys.executable, str(ROOT / "tools" / "app_package_probe.py")],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=120, cwd=str(ROOT),
+        )
+        app_ok = app_probe.returncode == 0
+        app_detail = (app_probe.stdout or app_probe.stderr or "").strip().splitlines()[-1:] or [""]
+    except (OSError, subprocess.TimeoutExpired) as error:
+        app_ok = False
+        app_detail = [str(error)[:160]]
+    check(
+        "app-package-probe",
+        "signing, tamper, trust and unknown-name refusals are measured, not assumed",
+        app_ok,
+        "tools/app_package_probe.py",
+        " ".join(app_detail),
+    )
+    audit_js = (ROOT / "ui" / "ui-audit.js").read_text(encoding="utf-8")
+    package_source = (ROOT / "app_package.py").read_text(encoding="utf-8")
+    toast_source = (ROOT / "toast.py").read_text(encoding="utf-8")
+    check(
+        "surface-audit-gates-packages",
+        "a package is signed only after its surface measures clean",
+        "app-ui-audit" in package_source
+        and "/api/toast/ui-audit" in toast_source
+        and "ui-overlap" in audit_js and "ui-x-overflow" in audit_js
+        and 'path == "/"' in toast_source,
+        "ui/ui-audit.js",
+        "an unchecked surface is signed as if it could be drawn",
+    )
+    check(
+        "springboard-is-the-phone-home",
+        "the SpringBoard frame loads the existing phone home, and its apps hand back",
+        'id="springboard"' in board_html
+        and 'data-src="/phone.html"' in board_html
+        and 'id="app-grid"' not in board_html
+        and "function setSurface" in board_js
+        and 'data.source !== "popit-springboard"' in board_js
+        and '/api/toast/apps' in phone_js
+        and 'data-package-identity' in phone_js
+        and 'label: "Commons"' not in phone_js
+        and 'label: "Voice Call"' not in phone_js
+        and 'label: "Agent lines"' not in phone_js
+        and 'source: "popit-springboard"' in phone_js
+        and '.toast[data-surface="springboard"]' in board_css,
+        "ui/toast.html",
+        "the home is the phone page the family already serves, not a second launcher",
+    )
+    try:
+        table = json.loads((ROOT / "voice_profiles.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        refuse("toast-voice-gate", "voice_profiles.json", str(error))
+        return
+    civilian = table.get("profiles", {}).get("civilian", {})
+    check(
+        "toast-voice-gate",
+        "a civilian address has a slower floor than a driver line",
+        civilian.get("min_gap_ms", 0) >= 2000
+        and len(table.get("profiles", {})) >= 6,
+        "voice_profiles.json",
+        f"civilian gap {civilian.get('min_gap_ms')} ms across {len(table.get('profiles', {}))} profiles",
+    )
+    baseline = table.get("baseline") or {}
+    profiles = table.get("profiles") or {}
+    default_engine = str((table.get("engine") or {}).get("name") or "")
+    below_baseline = sorted(
+        name for name, profile in profiles.items()
+        if str(profile.get("engine") or default_engine) != "piper"
+    )
+    baseline_model = str(baseline.get("model") or "")
+    unpinned = sorted(
+        name for name, profile in profiles.items()
+        if name != "buffy" and str(profile.get("model") or "") != baseline_model
+    )
+    model_path = ROOT / baseline_model if baseline_model else None
+    digest = ""
+    if model_path and model_path.is_file():
+        digest = hashlib.sha256(model_path.read_bytes()).hexdigest()
+    check(
+        "toast-voice-baseline",
+        "every synthesized voice uses the pinned Piper baseline or the AWA3D host voice",
+        baseline.get("profile") == "civilian"
+        and baseline_model == "models/en_US-amy-medium.onnx"
+        and digest == str(baseline.get("model_sha256") or "")
+        and not below_baseline
+        and not unpinned
+        and (profiles.get("buffy") or {}).get("engine") == "piper",
+        "voice_profiles.json",
+        f"baseline {baseline.get('profile')} {baseline_model} {digest[:12] or 'missing'}; "
+        f"below baseline {below_baseline or 'none'}; unpinned {unpinned or 'none'}",
+    )
+
+
+def settings_package_checks() -> None:
+    """The settings document is a real package, signed, and only served to admitted windows."""
+    import secrets
+    import tempfile
+
+    sys.path.insert(0, str(ROOT))
+    import envelope
+    import settings_package
+
+    with tempfile.TemporaryDirectory(prefix="popit-settings-gate-") as temp:
+        root = Path(temp) / "settings"
+        trust = Path(temp) / "trust.json"
+        package = settings_package.SettingsPackage(root, trust_path=trust)
+        published = package.publish({
+            "theme": "popit", "frame": "ios", "material": "glass", "motion": "pop",
+            "motionPreference": "reduced", "dpi": 125, "palettes": [],
+        })
+        target = Path(published["package"])
+        held = package.verify(target)
+        expected = f"{settings_package.NAME}@{held['revision']}+{held['digest']}"
+        check(
+            "settings-package-identity",
+            "the settings document is a canonical BLAKE3 package",
+            held["identity"] == expected
+            and (target / "identity.txt").read_text(encoding="utf-8").strip() == expected
+            and held["digest"].startswith("blake3:") and len(held["digest"]) == 71,
+            "settings_package.py", held["identity"],
+        )
+        record = json.loads((target / "signature.json").read_text(encoding="utf-8"))
+        unsigned_record = {key: value for key, value in record.items() if key != "signature"}
+        check(
+            "settings-package-signed",
+            "the publisher signs the identity and the payload digest",
+            envelope.verify_payload(unsigned_record, record["signature"], record["public_key"])
+            and held["payload_digest"].startswith("blake3:")
+            and held["payload_digest"] != held["digest"],
+            "settings_package.py", f"{record['public_key'][:24]}…",
+        )
+        payload_path = target / "payload.bin"
+        original = payload_path.read_bytes()
+        payload_path.write_bytes(original + b"\n")
+        try:
+            package.verify(target)
+            tampered = ""
+        except Exception as error:  # noqa: BLE001 - the refusal code is the assertion
+            tampered = getattr(error, "code", "")
+        finally:
+            payload_path.write_bytes(original)
+        check(
+            "settings-package-tamper-refused",
+            "a payload that no longer matches its signature is refused",
+            tampered in ("settings-signature", "length"),
+            "settings_package.py", tampered or "accepted a tampered payload",
+        )
+        keys = Path(temp) / "window"
+        envelope.keygen(keys / "window.key", keys / "window.pem")
+        window_key = (keys / "window.pem").read_text(encoding="utf-8").strip()
+        package.trust(window_key, "Probe settings window")
+        request = {
+            "schema": settings_package.SUBSCRIPTION_SCHEMA, "window": "Probe settings window",
+            "issued_at": envelope.iso(), "nonce": secrets.token_hex(16),
+            "public_key": window_key,
+        }
+        request["signature"] = envelope.sign_payload(request, keys / "window.key")
+        delivery = package.subscribe(request)["delivery"]
+        check(
+            "settings-subscription-admitted",
+            "a trusted window receives the signed package",
+            delivery["identity"] == held["identity"]
+            and delivery["payload_digest"] == held["payload_digest"]
+            and delivery["settings"]["frame"] == "ios",
+            "settings_package.py", delivery["identity"],
+        )
+        replay = ""
+        try:
+            package.subscribe(request)
+        except settings_package.Refused as error:
+            replay = error.code
+        check(
+            "settings-subscription-replay-refused",
+            "a nonce is spent once, so a captured request cannot be replayed",
+            replay == "settings-replay", "settings_package.py", replay or "replayed",
+        )
+        stranger = Path(temp) / "stranger"
+        envelope.keygen(stranger / "window.key", stranger / "window.pem")
+        untrusted_key = (stranger / "window.pem").read_text(encoding="utf-8").strip()
+        untrusted = {
+            "schema": settings_package.SUBSCRIPTION_SCHEMA, "window": "Untrusted window",
+            "issued_at": envelope.iso(), "nonce": secrets.token_hex(16),
+            "public_key": untrusted_key,
+        }
+        untrusted["signature"] = envelope.sign_payload(untrusted, stranger / "window.key")
+        refused = ""
+        try:
+            package.subscribe(untrusted)
+        except settings_package.Refused as error:
+            refused = error.code
+        unsigned = {key: value for key, value in request.items() if key != "signature"}
+        unsigned["nonce"] = secrets.token_hex(16)
+        stripped = ""
+        try:
+            package.subscribe(unsigned)
+        except settings_package.Refused as error:
+            stripped = error.code
+        check(
+            "settings-subscription-refusals",
+            "an untrusted signer and an unsigned request are refused by name",
+            refused == "settings-untrusted" and stripped == "settings-signature",
+            "settings_package.py",
+            f"untrusted={refused or 'accepted'} unsigned={stripped or 'accepted'}",
+        )
+        device = published.get("device") or {}
+        check(
+            "settings-device-report",
+            "the package owns an honestly measured device report",
+            bool(device.get("reported_at"))
+            and (device.get("screen") is None or len(device["screen"]) == 2)
+            and device.get("platform") in (None, "Windows", "Linux", "Darwin"),
+            "settings_package.py", f"{device.get('platform')} {device.get('screen')}",
+        )
+    html = (UI / "toast.html").read_text(encoding="utf-8")
+    kept = ("contour-frames", "contour-types", "motion-types", "planet-stage",
+            "palette-save", "dpi-range", "motion-full")
+    check(
+        "settings-panel-preserved",
+        "the settings app keeps its frames, materials, motion, palettes and DPI",
+        all(f'id="{name}"' in html for name in kept),
+        "ui/toast.html",
+        "a package window is not a replacement for the settings the owner already had",
+    )
+
+
 def shape_refusals(sources: dict[str, str]) -> None:
     for name, text in sources.items():
-        for match in re.finditer(r"border-radius\s*:\s*[^;]+", text):
-            refuse("rounded-rectangle", name, match.group(0).strip())
+        # A loader is geometry, not a surface: a 50% radius on a spinner is the only
+        # rounded shape allowed, and it must not be used to smuggle in a rounded panel.
+        for rule in re.finditer(r"(?s)([^{}]+)\{([^{}]*)\}", text):
+            selector, block = rule.group(1).lower(), rule.group(2)
+            for match in re.finditer(r"border-radius\s*:\s*([^;]+)", block):
+                value = match.group(1).strip()
+                if value == "50%" and ("spinner" in selector or "loader" in selector):
+                    continue
+                refuse("rounded-rectangle", name, match.group(0).strip())
         for match in re.finditer(r"clip-path\s*:\s*([^;]+)", text):
             value = match.group(1).strip()
             if name.endswith("contour.js") and value.startswith("path"):
@@ -450,6 +774,19 @@ def selftest() -> int:
         if not REFUSALS:
             failures += 1
         REFUSALS.clear()
+    REFUSALS.clear()
+    shape_refusals({"ui/planted-spinner.css": ".spinner { border-radius: 50%; }"})
+    round_ok = not REFUSALS
+    print("planted spinner radius:", "allowed" if round_ok else "refused")
+    if not round_ok:
+        failures += 1
+    REFUSALS.clear()
+    shape_refusals({"ui/planted-spinner.css": ".spinner { border-radius: 6px; }"})
+    square_ok = bool(REFUSALS)
+    print("planted spinner square:", "refused" if square_ok else "NOT REFUSED")
+    if not square_ok:
+        failures += 1
+    REFUSALS.clear()
     print("selftest", "pass" if failures == 0 else f"fail ({failures} planted shapes were drawn)")
     return 0 if failures == 0 else 1
 
@@ -471,6 +808,8 @@ def main(argv: list[str]) -> int:
 
     family_look_pin()
     landing_pin()
+    toast_refusals()
+    settings_package_checks()
 
     authority = sources.get("ui/contour.js", "")
     check(
