@@ -12,7 +12,9 @@ from __future__ import annotations
 import argparse
 import base64
 import datetime
+import hashlib
 import json
+import os
 import pathlib
 import re
 import secrets
@@ -23,6 +25,7 @@ import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import urllib.request
 from urllib.parse import parse_qs, urlsplit
 
 ROOT = pathlib.Path(__file__).resolve().parent
@@ -75,6 +78,7 @@ LANES = {
 sys.path.insert(0, str(ROOT))
 import archive as archive_mod  # noqa: E402
 import axis_bridge  # noqa: E402
+import bridge as bridge_mod  # noqa: E402
 import calls as calls_mod  # noqa: E402
 import civilian_features  # noqa: E402
 import civilian_scope  # noqa: E402
@@ -85,6 +89,7 @@ import dialin  # noqa: E402
 import envelope  # noqa: E402
 import external_agents  # noqa: E402
 import hosts  # noqa: E402
+import ide as ide_mod  # noqa: E402
 import mind_bridge  # noqa: E402
 import settings_package  # noqa: E402
 import app_package  # noqa: E402
@@ -93,6 +98,50 @@ import voice  # noqa: E402
 
 def iso() -> str:
     return datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat()
+
+
+# -- the bridge ---------------------------------------------------------------
+# The client's tools side lives on the family Debian box. This window reads it, and can run one
+# bounded command there; both answers name a refusal instead of painting an empty page.
+
+BRIDGE_HOME = pathlib.Path(os.environ.get("MC3_BRIDGE_HOME", r"F:\Documents\mc3-client13"))
+BRIDGE_STATE_URL = "http://127.0.0.1:8797/state.json"
+
+
+def bridge_state() -> dict:
+    """The live bridge reading, else the receipt it last wrote, else a named refusal."""
+    try:
+        with urllib.request.urlopen(BRIDGE_STATE_URL, timeout=2) as reply:
+            body = json.loads(reply.read().decode("utf-8") or "{}")
+        return {"ok": True, "source": "live", **body}
+    except (OSError, ValueError):
+        pass
+    receipt = BRIDGE_HOME / "artifacts" / "receipts" / "bridge-status.json"
+    try:
+        body = json.loads(receipt.read_text(encoding="utf-8"))
+        return {"ok": True, "source": "receipt", **body}
+    except (OSError, ValueError):
+        return {"ok": False, "refused": "bridge-offline", "source": "none", "checks": []}
+
+
+def bridge_run(command: str, timeout: float = 120.0) -> dict:
+    """Run one command on the box through the bridge tool, bounded by its own timeout."""
+    command = (command or "").strip()
+    if not command:
+        return {"ok": False, "refused": "bridge-run-empty"}
+    tool = BRIDGE_HOME / "tools" / "bridge.py"
+    if not tool.is_file():
+        return {"ok": False, "refused": "bridge-tool-absent"}
+    try:
+        completed = subprocess.run(
+            [sys.executable, str(tool), "run", "--timeout", str(int(timeout)), "--", command],
+            capture_output=True, text=True, timeout=timeout + 15, errors="replace",
+        )
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "refused": "bridge-run-timeout"}
+    return {"ok": completed.returncode == 0, "code": completed.returncode,
+            "stdout": completed.stdout, "stderr": completed.stderr,
+            "refused": "" if completed.returncode == 0 else "bridge-run-failed"}
 
 
 class Toast:
@@ -117,13 +166,28 @@ class Toast:
         # One publisher, one registry: every app surface is signed with the settings key
         # and verified against the trust file the phone already reads.
         self.apps = app_package.AppPackages(
-            ROOT / "runlogs" / "toast" / "apps", ROOT / "ui", settings=self.settings)
+            ROOT / "runlogs" / "toast" / "apps", ROOT / "ui", settings=self.settings,
+            drivers=self.fleet)
         # A surface is signed before it is served, whether this process is the shell or a
         # probe reading the same routes.
         self.apps.ensure_all()
         self.calls = calls_mod.CallLedger(ROOT / "runlogs" / "toast" / "calls.json", self.dialin)
         self.civilians = civilian_features.CivilianDesk(
             ROOT / "runlogs" / "toast" / "civilians.json")
+        self.bridge_ledger = bridge_mod.BridgeLedger(
+            ROOT / "runlogs" / "toast" / "bridge-ledger.json")
+        # The bridge has its own forward, not the archive kiosk's: a bridge flap must not
+        # move the window the owner is reading, and a kiosk restart must not reset a
+        # measured heartbeat. Both point at the same token-gated listener.
+        self.bridge = bridge_mod.TunnelSupervisor(
+            self.window_token, target_host=hosts.lan_host(), target_port=5208,
+            target_file=ROOT / "runlogs" / "toast" / "bridge-target.json",
+        )
+        self.ide = ide_mod.IdeDesk(
+            ROOT / "runlogs" / "toast", mind=self.mind, fleet=self.fleet,
+            calls=self.calls, archive=self.archive, bridge=self.bridge,
+            ledger=self.bridge_ledger, view=self.debian,
+        )
         self.live = True
         self.call = "natural-language"
         self.working = 0
@@ -143,6 +207,7 @@ class Toast:
         self._heard_at = 0.0
         self._heard_text = ""
         self.revision = 0
+        self.port = 0
         self.lines: list[dict] = []
         self.capture_path: pathlib.Path | None = None
         self.capture_ts = 0
@@ -173,6 +238,7 @@ class Toast:
         self.axis.start()
         self.debian.start()
         self.window.start()
+        self.bridge.start()
         for row in self.dialin.bootstrap():
             self.archive.add(
                 "event", f"{row['name']} dialed in · {row['number']}",
@@ -187,6 +253,7 @@ class Toast:
         self.mic.stop()
         self.axis.stop()
         self.debian.stop()
+        self.bridge.stop()
         self.window.stop()
         self.voice.stop()
 
@@ -944,6 +1011,9 @@ class Toast:
                 "external": self.external.state(),
                 "civilians": self.civilians.state(),
                 "calls": self.calls.state(),
+                "ide": self.ide.state(),
+                "bridge": self.bridge.state(),
+                "bridge_ledger": self.bridge_ledger.state()["counters"],
                 "lanes": self.lane_state(),
                 "call": self.call,
                 "working": self.working > 0,
@@ -954,10 +1024,110 @@ class Toast:
                 "pending": dict(self.pending),
             }
 
+    def bridge_health(self) -> dict:
+        """The heartbeat the tunnel supervisor reads back through Debian.
+
+        A change in the bridge's state is written to the archive here: a bridge that went
+        down is a failure with a code and a time, not a panel that quietly stopped.
+        """
+        state = self.bridge.state()
+        seen = getattr(self, "_bridge_seen", "")
+        if state.get("state") != seen:
+            self._bridge_seen = state.get("state")
+            self.archive.add(
+                "event", f"bridge {state.get('state')} · {state.get('detail') or 'no detail'}"[:300],
+                role="bridge", state=state.get("state"), port=state.get("port"),
+                restarts=state.get("restarts"),
+            )
+        return {"ok": True, "schema": bridge_mod.SCHEMA,
+                "bridge": self.bridge.state(),
+                "ledger": self.bridge_ledger.state(),
+                "toast": {"at": iso(), "revision": self.revision},
+                "drivers": self.fleet.state()["drivers"],
+                "ide": (self.ide.state().get("active") or {}).get("id", "")}
+
+    def bridge_receipt(self, task_id: str) -> dict:
+        try:
+            task = self.task(task_id)
+        except cua.Refused as error:
+            row = self.bridge_ledger.by_task(task_id)
+            if row and row.get("receipt"):
+                return {"ok": True, "task": row["receipt"], "source": "ledger",
+                        "counters": self.bridge_ledger.state()["counters"]}
+            return {"ok": False, "refused": error.as_dict()}
+        return {"ok": True, "task": task, "source": "fleet",
+                "counters": self.bridge_ledger.state()["counters"]}
+
+    def bridge_cua(self, body: dict) -> dict:
+        """One idempotent act from the Debian side: key, sequence, then a real receipt.
+
+        The key is checked before the fleet is touched, so a retry after a tunnel flap
+        returns the first receipt. A new key must carry a sequence above this client's
+        last one, so a spooled replay cannot reorder acts.
+        """
+        key = str(body.get("key") or "")
+        actions = body.get("actions")
+        if not isinstance(actions, list) or not actions:
+            raise bridge_mod.Refused("bridge-actions", "actions must be a non-empty list")
+        seq = body.get("seq")
+        try:
+            seq = int(seq) if seq is not None else None
+        except (TypeError, ValueError):
+            raise bridge_mod.Refused("bridge-seq", str(seq)[:40]) from None
+        client = str(body.get("client") or "debian")[:60]
+        driver = str(body.get("driver") or "")
+        digest = hashlib.sha256(
+            json.dumps(actions, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+        held = self.bridge_ledger.accept(key, "/api/bridge/cua", digest,
+                                         seq=seq, client=client)
+        if held:
+            # The receipt survives a toast restart in the ledger, so a replay after one
+            # still answers with what the driver did instead of `task-not-found`.
+            try:
+                task = self.task(str(held.get("task") or ""))
+                source = "fleet"
+            except cua.Refused:
+                task = dict(held.get("receipt") or {
+                    "id": held.get("task") or "", "status": held.get("status") or "done"})
+                source = "ledger"
+            return {"ok": True, "replayed": True, "key": key, "task": task,
+                    "source": source}
+        task = self.fleet.submit(actions, driver, announce=bool(body.get("announce")),
+                                 key=key)
+        self.bridge_ledger.record(key, "/api/bridge/cua", digest, task=task,
+                                  seq=seq, client=client)
+        try:
+            wait = float(body.get("wait") or 12.0)
+        except (TypeError, ValueError):
+            wait = 12.0
+        try:
+            receipt = self.fleet.wait(task["id"], timeout=min(30.0, max(0.5, wait)))
+        except cua.Refused:
+            receipt = task  # still running; the receipt route answers it later by id
+        self.bridge_ledger.settle(key, receipt)
+        self.archive.add("tool", f"bridge act {key} {receipt.get('status')}", role="bridge",
+                         task=task["id"], key=key, client=client,
+                         refused=receipt.get("refusal") or None)
+        return {"ok": True, "replayed": bool(task.get("replayed")), "key": key,
+                "task": receipt, "bridge": self.bridge.state()}
+
     def delegate(self, body: dict) -> dict:
         actions = body.get("actions")
         driver = str(body.get("driver") or "")
-        return self.fleet.submit(actions, driver, announce=bool(body.get("announce")))
+        task = self.fleet.submit(actions, driver, announce=bool(body.get("announce")),
+                                 key=str(body.get("key") or ""))
+        try:
+            wait = float(body.get("wait") or 0)
+        except (TypeError, ValueError):
+            wait = 0.0
+        if wait > 0:
+            # The caller asked for the receipt, not the id. A task still running after the
+            # wait returns as `running` rather than being reported as done.
+            try:
+                return self.fleet.wait(task["id"], timeout=min(30.0, wait))
+            except cua.Refused:
+                return task
+        return task
 
     def task(self, task_id: str) -> dict:
         with self.fleet.lock:
@@ -1069,6 +1239,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.file("phone-manifest.webmanifest", "application/manifest+json; charset=utf-8")
         if path == "/popit-sw.js":
             return self.file("popit-sw.js", "text/javascript; charset=utf-8")
+        if path in ("/bridge", "/bridge.html"):
+            return self.file("bridge.html", "text/html; charset=utf-8")
+        if path == "/bridge.js":
+            return self.file("bridge.js", "text/javascript; charset=utf-8")
         if path in ("/archive", "/archive.html"):
             return self.file("archive.html", "text/html; charset=utf-8")
         if path == "/archive.js":
@@ -1094,6 +1268,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.json(toast.settings.package_document())
             except settings_package.Refused as error:
                 return self.json({"ok": False, "refused": error.as_dict()}, 409)
+        if path == "/api/toast/bridge":
+            return self.json(bridge_state())
         if path == "/api/toast/apps":
             return self.json(toast.apps.state())
         if path.startswith("/api/toast/apps/"):
@@ -1101,6 +1277,19 @@ class Handler(BaseHTTPRequestHandler):
                 return self.json(toast.apps.document(path.rsplit("/", 1)[-1]))
             except app_package.Refused as error:
                 return self.json({"ok": False, "refused": error.as_dict()}, 409)
+        if path == "/ide":
+            return self.file("ide.html", "text/html; charset=utf-8")
+        if path == "/ide.js":
+            return self.file("ide.js", "text/javascript; charset=utf-8")
+        if path == "/ide.css":
+            return self.file("ide.css", "text/css; charset=utf-8")
+        if path == "/api/ide":
+            return self.json(toast.ide.state())
+        if path == "/api/bridge/health":
+            return self.json(toast.bridge_health())
+        if path.startswith("/api/bridge/receipt/"):
+            payload = toast.bridge_receipt(path.rsplit("/", 1)[-1])
+            return self.json(payload, 200 if payload.get("ok") else 404)
         if path == "/api/toast":
             return self.json(toast.state())
         if path == "/api/toast/civilians":
@@ -1173,6 +1362,13 @@ class Handler(BaseHTTPRequestHandler):
         toast: Toast = self.server.toast
         if not self.archive_allowed(path):
             return self.json({"ok": False, "refused": "archive-token"}, 403)
+        if path == "/api/toast/bridge/run":
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(length) or b"{}")
+            except (ValueError, json.JSONDecodeError):
+                return self.json({"ok": False, "refused": "bridge-run-body"}, 400)
+            return self.json(bridge_run(str((body or {}).get("command") or "")))
         if path == "/api/toast/ui-audit":
             try:
                 length = int(self.headers.get("Content-Length") or 0)
@@ -1271,6 +1467,40 @@ class Handler(BaseHTTPRequestHandler):
                 toast.archive.add("event", f"external call {row['state']} · {row['call_id']}",
                                   role="external", call=row["call_id"], state=row["state"])
                 return self.json(row)
+            if path == "/api/ide/open":
+                return self.json({"ok": True, **toast.ide.open(
+                    str(body.get("title") or ""), str(body.get("agent") or "Qwen"))})
+            if path == "/api/ide/ask":
+                return self.json(toast.ide.ask(str(body.get("session") or ""),
+                                               str(body.get("text") or "")))
+            if path == "/api/ide/cua":
+                try:
+                    wait = float(body.get("wait") or 12.0)
+                except (TypeError, ValueError):
+                    wait = 12.0
+                return self.json(toast.ide.cua(str(body.get("session") or ""),
+                                               body.get("actions"),
+                                               driver=str(body.get("driver") or ""),
+                                               key=str(body.get("key") or ""),
+                                               wait=wait))
+            if path == "/api/ide/probe":
+                return self.json(toast.ide.probe(str(body.get("session") or ""),
+                                                 str(body.get("probe") or "")))
+            if path == "/api/ide/close":
+                return self.json(toast.ide.close(str(body.get("session") or ""),
+                                                 str(body.get("evidence") or "")))
+            if path == "/api/refuse":
+                # A surface refused by the contour audit is a row, not a console warning: the
+                # audit posts here from every app that runs it.
+                code = str(body.get("code") or "surface-refused")[:60]
+                surface = str(body.get("surface") or "")[:160]
+                toast.archive.add("event", f"surface refused · {code} · {surface}",
+                                  role="ui", code=code, surface=surface)
+                return self.json({"ok": True, "code": code})
+            if path == "/api/ide/note":
+                return self.json(toast.ide.note(body))
+            if path == "/api/bridge/cua":
+                return self.json(toast.bridge_cua(body))
             if path == "/api/toast/grab":
                 toast.pending["grab"] = True
                 return self.json({"ok": True})
@@ -1528,7 +1758,7 @@ class Handler(BaseHTTPRequestHandler):
                 mind_bridge.Refused, dialin.Refused, calls_mod.Refused,
                 civilian_features.Refused, envelope.Refused,
                 settings_package.Refused, app_package.Refused,
-                external_agents.Refused) as error:
+                external_agents.Refused, ide_mod.Refused, bridge_mod.Refused) as error:
             return self.json({"ok": False, "refused": error.as_dict()}, 409)
         return self.json({"ok": False, "refused": "not-found"}, 404)
 
@@ -1741,6 +1971,9 @@ def serve(toast: Toast, port: int = PORT, *, bind: str = "127.0.0.1",
     server.archive = archive
     server.archive_token = toast.window_token
     server.tls = tls
+    # The first listener is the loopback app server; the IDE window is told to load from it.
+    if not getattr(toast, "port", 0):
+        toast.port = server.server_port
     if tls:
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         context.load_cert_chain(str(PHONE_CERT), str(PHONE_KEY))

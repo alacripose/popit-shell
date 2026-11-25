@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0b0d10" />
+<title>Popit bridge</title>
+<!-- The look is the package's, not this page's: the contour theme paints the ground and the
+     nine-slice, the window chrome stylesheet paints bar/tabs/body/foot, and package.js applies
+     the frame, material, motion and DPI the settings package published. This page carries no
+     stylesheet and no style block. -->
+<link rel="stylesheet" href="/contour-theme.css" />
+<link rel="stylesheet" href="/toast.css" />
+</head>
+<body>
+<section class="toast" data-contour="window" data-motion="full" data-popit="bridge-package"
+         data-schema="popit.bridge/1" aria-label="Popit bridge">
+
+  <header class="bar" data-contour data-region="bar">
+    <span class="mark" aria-hidden="true">◆</span>
+    <h1>Bridge</h1>
+    <span id="bridge-state" class="status" data-contour="card" data-state="waiting">reading</span>
+    <button id="bridge-refresh" class="icon" type="button" data-contour="card"
+            title="Read the tools box again" aria-label="Refresh">↻</button>
+    <a class="icon" href="/toast.html" data-contour="card" title="The agent desk" aria-label="Desk">◧</a>
+  </header>
+
+  <div class="tabs" data-contour data-region="status" role="tablist" aria-label="Bridge lane">
+    <button type="button" data-contour="card" data-lane="host" role="tab"
+            aria-selected="true" class="active">Host</button>
+    <button type="button" data-contour="card" data-lane="tools" role="tab"
+            aria-selected="false">Tools</button>
+    <button type="button" data-contour="card" data-lane="queue" role="tab"
+            aria-selected="false">Queue</button>
+  </div>
+
+  <div class="body" data-contour data-region="body">
+    <section class="facts" data-contour="card" data-page="host" role="tabpanel">
+      <p class="drawer-note">the family Debian box · host, memory, disk, gpu</p>
+      <div id="host-rows" class="facts-body"></div>
+    </section>
+
+    <section class="facts" data-contour="card" data-page="tools" role="tabpanel" hidden>
+      <p class="drawer-note">steam · proton · the CSDK tools that run there</p>
+      <div id="tool-rows" class="facts-body"></div>
+    </section>
+
+    <section class="facts" data-contour="card" data-page="queue" role="tabpanel" hidden>
+      <p class="drawer-note">a bounded command, run on the box</p>
+      <form id="queue-form" data-contour="card">
+        <input id="queue-command" name="command" type="text" autocomplete="off"
+               placeholder="uname -a" data-contour="card" aria-label="Command" />
+        <button id="queue-run" class="action" type="submit" data-contour="card">Run</button>
+      </form>
+      <div id="queue-rows" class="facts-body">
+        <p class="drawer-note">no command has been run from this window</p>
+      </div>
+    </section>
+  </div>
+
+  <footer class="foot" data-contour="card" data-region="foot">
+    <span id="refusal" role="status" aria-live="polite"></span>
+    <span id="checked">—</span>
+    <span id="app-identity" class="package-identity" data-verified="false">app · unverified</span>
+  </footer>
+</section>
+<script type="module" src="/ui-audit.js"></script>
+<script type="module" src="/bridge.js"></script>
+</body>
+</html>

@@ -76,7 +76,15 @@ loadContour("/contour.json")
   const APP_SURFACE = {
     dialin: { label: "DialIn", sub: "phone calling surface", glyph: "◉" },
     settings: { label: "Settings", sub: "frames · palettes · dpi", glyph: "⚙" },
+    bridge: { label: "Bridge", sub: "tools side · debian", glyph: "⇄" },
   };
+  const APP_ROUTE = { settings: "/settings.html", dialin: "/toast.html", bridge: "/bridge.html" };
+
+  // A tile launches its app. The IDE is not a tile and not a package: it is a surface
+  // dialin hosts inside its own window, so the springboard has nothing to sign for it.
+  async function openApp(name) {
+    location.href = APP_ROUTE[name] || "/toast.html";
+  }
   let appPackages = null;
 
   function shortIdentity(identity) {
@@ -153,7 +161,7 @@ loadContour("/contour.json")
           window.parent.postMessage({ source: "popit-springboard", app: tile.dataset.lane }, location.origin);
           return;
         }
-        location.href = tile.dataset.lane === "settings" ? "/settings.html" : "/toast.html";
+        openApp(tile.dataset.lane);
       });
     });
   }
