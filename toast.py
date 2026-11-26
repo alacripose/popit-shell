@@ -1319,6 +1319,13 @@ WINDOW_AUDIT_ROUTES = {
 }
 WINDOW_QUEUE: list[tuple] = []
 WINDOW_VIEW: dict = {}
+# Measurement runs in a second, hidden view loaded from the same signed origin. A probe that
+# acts — repainting a frame, refusing a package, navigating an audit route — must act there:
+# the desk the owner is working in is not a test fixture, and a probe that changes it is a
+# defect the owner has now hit twice.
+# What the owner's own window says about itself, pushed by that window. A probe reads the hidden
+# measurement view; the desk is read from here, so measuring never has to touch it.
+WINDOW_REPORT: dict = {}
 WINDOW_RESULTS: dict = {}
 WINDOW_EVAL_SEQ: list[int] = [0]
 WINDOW_PROBES = ("springboard", "springboardState", "springboardTiles", "goHome",
@@ -1339,11 +1346,24 @@ def window_audit(route: str) -> bool:
     return queue_window(("route", route, ""))
 
 
+# Probes that change the page they run in. The desk is the owner's working window, so an acting
+# probe is refused against it by name: measurement reads the desk (the window reports its own
+# paint) and an act gets a measurement window of its own. The owner has been repainted by a
+# "choose" probe twice; this is the refusal that stops a third.
+ACTING_PROBES = ("choose", "fallback", "goHome", "openApp", "windowClose")
+
+
 def window_eval(name: str, argument: object = None) -> str:
     """Ask the window to perform one of its named probes; the answer is kept under the id."""
     WINDOW_EVAL_SEQ[0] += 1
     key = f"{name}-{WINDOW_EVAL_SEQ[0]}"
     WINDOW_RESULTS[key] = {"state": "queued", "value": None, "at": None}
+    if name in ACTING_PROBES:
+        WINDOW_RESULTS[key] = {"state": "refused", "value": None, "at": time.time(),
+                               "refused": "probe-act-needs-measurement-window",
+                               "detail": f"{name} changes the page; the desk is not a fixture"}
+        print(f"toast-probe refused {key} probe-act-needs-measurement-window", flush=True)
+        return key
     if not queue_window(("eval", key, name, argument)):
         WINDOW_RESULTS[key] = {"state": "window-absent", "value": None, "at": None}
     return key
@@ -1455,11 +1475,19 @@ class Handler(BaseHTTPRequestHandler):
                     or not target.is_file():
                 return self.json({"ok": False, "refused": "prose-doc-absent", "detail": project[:60]}, 404)
             return self.send_body(target.read_bytes(), "text/html; charset=utf-8", 200, "index.html")
+        if path == "/api/toast/window/report":
+            if not WINDOW_REPORT:
+                return self.json({"ok": False, "refused": "window-report-absent"}, 404)
+            return self.json({"ok": True, "report": WINDOW_REPORT})
         if path == "/api/toast/window/eval":
             key = (parse_qs(urlsplit(self.path).query).get("id") or [""])[0]
             result = WINDOW_RESULTS.get(key)
             if not result:
                 return self.json({"ok": False, "refused": "window-eval-id"}, 404)
+            if result.get("state") == "refused":
+                return self.json({"ok": False, "state": "refused",
+                                  "refused": result.get("refused", "probe-refused"),
+                                  "detail": result.get("detail", "")}, 409)
             if result.get("state") != "measured":
                 return self.json({"ok": False, "state": result.get("state")}, 202)
             return self.json({"ok": True, "state": "measured", "value": result.get("value")})
@@ -1691,6 +1719,19 @@ class Handler(BaseHTTPRequestHandler):
                 handle.write(line + "\n")
             print(f"toast-ui-error {str(report)[:200]}", flush=True)
             return self.json({"ok": True})
+        if path == "/api/toast/window/report":
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(length) or b"{}")
+            except (ValueError, json.JSONDecodeError):
+                return self.json({"ok": False, "refused": "window-report-body"}, 400)
+            paint = (body or {}).get("paint")
+            if not isinstance(paint, dict):
+                return self.json({"ok": False, "refused": "window-report-paint"}, 400)
+            WINDOW_REPORT.clear()
+            WINDOW_REPORT.update({"paint": paint, "at": time.time(),
+                                  "origin": str((body or {}).get("at") or "")})
+            return self.json({"ok": True})
         if path == "/api/toast/window/eval":
             try:
                 length = int(self.headers.get("Content-Length") or 0)
@@ -1714,9 +1755,12 @@ class Handler(BaseHTTPRequestHandler):
             route = WINDOW_AUDIT_ROUTES.get(app)
             if not route:
                 return self.json({"ok": False, "refused": "window-audit-app"}, 400)
-            if not window_audit(route):
-                return self.json({"ok": False, "refused": "window-absent", "app": app}, 409)
-            return self.json({"ok": True, "app": app, "route": route})
+            # An audit loads its route in the page it measures, and that page is the owner's
+            # desk. The refusal is here so a caller is told no instead of being promised a
+            # navigation the window will not perform.
+            return self.json({"ok": False, "app": app, "route": route,
+                              "refused": "route-needs-measurement-window",
+                              "detail": f"{route} would navigate the owner's desk"}, 409)
         if path == "/api/toast/ui-audit":
             try:
                 length = int(self.headers.get("Content-Length") or 0)
@@ -2544,6 +2588,9 @@ def main() -> int:
     window.setWindowTitle("Popit toast")
     view = QWebEngineView(window)
     WINDOW_VIEW["view"] = view
+    # A hidden second QWebEngineView in this process killed the desk: the window process died
+    # every twenty seconds and the watchdog replaced it. The desk holds exactly one view; a
+    # measurement that has to act in a page gets its own process instead, never this one.
     # Set once the delivered origin is known: the base a window route is loaded from, and why.
     WINDOW_ORIGIN = {"base": "", "note": ""}
 
@@ -2555,7 +2602,8 @@ def main() -> int:
         kind, first, name = item[0], item[1], item[2]
         argument = item[3] if len(item) > 3 else None
         if kind == "route":
-            # Every window route is the app's own delivery: over TLS, never the loopback twin.
+            # A route act navigates a page. The desk is the owner's working window, so a route
+            # act against it is refused by name: an audit runs in its own measurement window.
             base, note = WINDOW_ORIGIN["base"], WINDOW_ORIGIN["note"]
             if note not in ("https", "https-loopback") or not base:
                 WINDOW_RESULTS[first] = {"state": "refused", "refused": "window-not-secure",
@@ -2563,13 +2611,11 @@ def main() -> int:
                                          "at": time.time()}
                 print(f"toast-window route-refused {first} window-not-secure ({note})", flush=True)
                 return
-            # The audit route carries the same build token as the window's own origin, so the
-            # page it loads is the page on disk.
-            # An app route already carries a query (`?window=mako`), so the build token joins
-            # with `&`: a second `?` made the window's own mode unreadable.
-            joiner = "&" if "?" in first else "?"
-            view.load(QUrl(base.split("/toast.html")[0] + first + f"{joiner}v={build_token()}"))
-            print(f"toast-window audit-route={first} over {base}", flush=True)
+            WINDOW_RESULTS[first] = {"state": "refused",
+                                     "refused": "route-needs-measurement-window",
+                                     "detail": f"{first} would navigate the owner's desk",
+                                     "at": time.time()}
+            print(f"toast-route-refused {first} route-needs-measurement-window", flush=True)
             return
         call = "window.popitProbe && window.popitProbe[" + json.dumps(name) + "]("
         script = call + ")" if argument is None else call + json.dumps(argument) + ")"

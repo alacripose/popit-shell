@@ -627,6 +627,32 @@ function setSurface(name) {
 // The settings package is the only first author of a window's appearance. A paint attempted
 // before that package's document has arrived is refused, not applied: this is what stopped the
 // window from drawing its own default theme while the package was still being read.
+// The measurement view is a second page on the same signed origin, loaded by the shell's probe
+// window. It never reports: the reading is the owner's window's, and a probe must not replace it.
+const MEASURE_VIEW = new URLSearchParams(location.search).get("probe") === "1";
+let paintReportTimer = 0;
+
+// What this window painted, pushed by the window itself. A check reads this instead of probing
+// the desk, so measuring the window can no longer repaint it.
+function reportPaint() {
+  if (MEASURE_VIEW) return;
+  window.clearTimeout(paintReportTimer);
+  paintReportTimer = window.setTimeout(() => {
+    let paint = "";
+    try {
+      paint = window.popitProbe ? window.popitProbe.paint() : "";
+    } catch (error) {
+      paint = "";
+    }
+    if (!paint) return;
+    fetch("/api/toast/window/report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paint: JSON.parse(paint), at: new Date().toISOString() }),
+    }).catch(() => undefined);
+  }, 200);
+}
+
 function paintTheme(theme, persist = true) {
   if (!window.__popitThemeAuthor) {
     document.body.dataset.packageRefused = "theme-not-from-settings-package";
@@ -718,6 +744,7 @@ function paintTheme(theme, persist = true) {
   }
   updateStyleChoices();
   pushSettingsState();
+  reportPaint();
 }
 
 // The settings package is the window's appearance: its document names the palette, material,
@@ -2502,6 +2529,8 @@ function wire() {
 
   // A window draws only after its package and the settings theme verify: an unverified package
   // leaves the bar and the refusal, never a plain page wearing the app's name.
+  window.__popitRefuse = refuseWindow;
+
   function refuseWindow(app) {
     const code = document.documentElement.dataset.packageRefusal || "app-refused";
     document.body.dataset.packageRefused = `${app}-${code}`;
@@ -2516,6 +2545,7 @@ function wire() {
   // it is hidden, and it stays hidden with only a refusal if that never happens.
   function markReady() {
     if (!document.body.dataset.packageRefused) document.body.dataset.windowState = "ready";
+    reportPaint();
   }
   window.setTimeout(() => {
     if (document.body.dataset.windowState === "pending") refuseWindow("dialin");
@@ -2937,7 +2967,10 @@ async function main() {
     // The act a failed package window performs: the window must fall back to the home, so the
     // measurement is the surface and the frame after the refusal, not a promise about it.
     fallback() {
-      refuseWindow("dialin");
+      // The refusal act, reached through the window's own export: the probe object is not inside
+      // the scope that defines it, and a bare call here was a ReferenceError rather than a probe.
+      if (!window.__popitRefuse) return JSON.stringify({ refused: "refuse-not-exported" });
+      window.__popitRefuse("dialin");
       return window.popitProbe.windowState();
     },
     // The act the close button performs, measured: the window must return to the surface it was

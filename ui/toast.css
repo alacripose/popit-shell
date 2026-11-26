@@ -119,9 +119,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .bar {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  row-gap: calc(var(--u) * 0.8);
-  gap: calc(var(--u) * 1.4);
+  /* One row: the title gives way before a control does. The buttons are the pinned baseline's
+     size, so the bar's own spacing is what has to fit, not the controls. */
+  flex-wrap: nowrap;
+  gap: calc(var(--u) * 0.9);
   padding: 0 calc(var(--u) * 1.2) calc(var(--u) * 1.6);
   border-bottom: 1px solid var(--line);
   user-select: none;

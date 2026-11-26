@@ -251,6 +251,37 @@ def read_sources() -> dict[str, str]:
     }
 
 
+def probe_isolation() -> None:
+    """A probe reads a second view: the desk the owner works in is never the measurement.
+
+    Every acting probe — a frame choice, a refusal, a home press — ran inside the delivered
+    window, so measuring repainted and navigated the desk the owner was using. The pump now
+    routes probes and audit routes to a hidden view loaded from the same pinned origin, and the
+    window reports its own paint for checks to read instead of being asked.
+    """
+    source = (ROOT / "toast.py").read_text(encoding="utf-8")
+    page = (ROOT / "ui" / "toast.js").read_text(encoding="utf-8")
+    check(
+        "probes-run-off-the-owners-window",
+        "an acting probe or a route act is refused against the desk, never run in it",
+        'ACTING_PROBES = ("choose", "fallback", "goHome", "openApp", "windowClose")' in source
+        and "probe-act-needs-measurement-window" in source
+        and "route-needs-measurement-window" in source
+        and "probe_view" not in source.split("def main")[1]
+        and 'get("probe") === "1"' in page,
+        "toast.py",
+        "a probe still runs in the window the owner is using",
+    )
+    check(
+        "window-reports-its-own-paint",
+        "the desk pushes what it painted; a check reads that instead of probing it",
+        "/api/toast/window/report" in source and "reportPaint()" in page
+        and "if (MEASURE_VIEW) return;" in page,
+        "ui/toast.js",
+        "the window has no self-report, so a reading has to touch it",
+    )
+
+
 def controls_pin() -> None:
     """The family's buttons are the baseline's: a sheet that authors its own is a refusal.
 
@@ -983,6 +1014,7 @@ def main(argv: list[str]) -> int:
     family_look_pin()
     landing_pin()
     toast_refusals()
+    probe_isolation()
     controls_pin()
     bar_control_refusals()
     freshness_register()
