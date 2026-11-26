@@ -74,6 +74,70 @@ LANES = {
     ),
 }
 
+# What a lane is for, in the family's own words. A line opens by saying what it is and how its
+# own record stands, so two lanes with different lives never open the same way.
+ROLES = {
+    "Buffy": "the host line",
+    "Qwen": "the Debian machine and its tools",
+    "Whisper": "the listening channel",
+    "Ash": "a resident's embodied view",
+    "Bram": "storage, supply and movement",
+}
+
+
+def opening_line(desk, worker: dict, human: dict, wish: str, contract: dict | None) -> str:
+    """This lane's opening, read from its civilian record rather than a template.
+
+    A civilian with a need below the care floor says so before it says anything else. One with
+    no contract says it will answer and claim nothing. One with a scoped contract names the
+    scope. Condition rides along, so an ill lane does not sound like a healthy one.
+    """
+    lane = str(worker.get("name") or "")
+    owner = str(human.get("name") or "")
+    role = ROLES.get(lane, "a family civilian")
+    try:
+        preflight = desk.operation(lane, wish, contract=contract or None)
+        life = preflight.get("life") or desk.life_state(lane)
+    except civilian_features.Refused as error:
+        return (f"{owner}, it's {lane} on {role}. My civilian record will not read ({error.code}), "
+                "so I am on the line only to say that.")
+    condition = str(preflight.get("condition") or life.get("condition") or "unknown")
+    needs = {name: float(value) for name, value in (life.get("needs") or {}).items()
+             if isinstance(value, (int, float))}
+    need = min(needs, key=needs.get) if needs else ""
+    state = str(preflight.get("state") or "")
+    # Every lane's record carries its own numbers, so every opening carries them too: the lowest
+    # need and its value, the capacity, the last choice it made. Two lanes never read the same.
+    facts = []
+    if need:
+        facts.append(f"{need} reads {needs[need]:.2f}")
+    capacity = life.get("capacity")
+    if isinstance(capacity, (int, float)):
+        facts.append(f"capacity reads {float(capacity):.2f}")
+    last = (life.get("lastDecision") or {}).get("kind")
+    if last:
+        facts.append(f"last choice {last}")
+    head = f"{owner}, it's {lane} on {role}."
+    if condition not in ("ok", "unknown"):
+        head = f"{owner}, it's {lane} on {role}, and my condition reads {condition}."
+    standing = ("My " + " and ".join(facts) + ".") if facts else ""
+    if state == "care-first":
+        care = str(preflight.get("care_line") or "")
+        if facts:
+            return head + " " + standing + (" " + care if care else " Care comes before work.")
+        return head + " Care comes before any work here."
+    if state == "work-allowed":
+        scope = (contract or {}).get("scope") or []
+        first = str(scope[0]) if scope else str((contract or {}).get("mission") or "")
+        if first:
+            return head + " " + standing + f" The contract is scoped to {first}."
+        return head + " " + (standing or "") + " I can take work inside the contract."
+    if state == "speech-only":
+        return (head + " " + (standing or "") +
+                " No contract is attached, so I answer you and claim no deliverable.")
+    return head + " " + (standing or "I am listening.")
+
+
 sys.path.insert(0, str(ROOT))
 import archive as archive_mod  # noqa: E402
 import axis_bridge  # noqa: E402
@@ -169,7 +233,8 @@ class Toast:
         # A surface is signed before it is served, whether this process is the shell or a
         # probe reading the same routes.
         self.apps.ensure_all()
-        self.calls = calls_mod.CallLedger(ROOT / "runlogs" / "toast" / "calls.json", self.dialin)
+        self.calls = calls_mod.CallLedger(ROOT / "runlogs" / "toast" / "calls.json", self.dialin,
+                                          opening=opening_line)
         self.civilians = civilian_features.CivilianDesk(
             ROOT / "runlogs" / "toast" / "civilians.json")
         self.bridge_ledger = bridge_mod.BridgeLedger(
@@ -510,6 +575,11 @@ class Toast:
                     want=intro.get("want", ""),
                 )
         threading.Thread(target=run, daemon=True).start()
+
+    def opening_line(self, worker: dict, human: dict, wish: str,
+                     contract: dict | None) -> str:
+        """The ledger's builder: each opening comes from the lane's own civilian record."""
+        return opening_line(self.civilians, worker, human, wish, contract)
 
     def call_back(self, row: dict) -> dict:
         """A hang-up is answered by dialling the same lane back, and saying who rang.

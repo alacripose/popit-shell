@@ -13,6 +13,11 @@ The owner's words, verbatim:
 
 > why does it play a set of number dialtones at the start instead of the actual called in numbers
 
+> why is the start response always the same thing with only their name and voice being different
+> between them.? You would think every civilian and agent responds and interacts differently through
+> their systems and lives and through the prose checker against the civilian project and prose logic
+> outputs?
+
 Read as two properties of one line:
 
 1. **A hang-up is a hang-up.** Ending a line is not a finished wish. It is archived by name
@@ -36,6 +41,11 @@ Read as two properties of one line:
 - `A6` — `python tools/tone_probe.py` decodes every roster WAV back to that row's digits: 54 rows,
   0 mismatched, `artifacts/receipts/tone-probe.json`.
 - `A7` — the `call-tone` archive row carries `number`, `dialled` and `source`.
+- `A8` — a line's opening is built from that lane's own civilian record, not from a template: the
+  `opening` line differs between two lanes whose needs differ, and a lane below the care floor opens
+  by naming its need and refuses work on the line.
+- `A9` — a lane with a scoped contract names its scope in the opening; a lane with none says it will
+  answer and claim no deliverable.
 
 ## Evidence
 
@@ -47,6 +57,9 @@ Read as two properties of one line:
 | The desk control | `ui/toast.js` `endParticipant` | posts `hangup: true`, shows `hung up · dialling back` |
 | The tone | `dialin.py` `call_tone(row, kind, number=…)` | carried number first, roster fallback, per-number file, `source` in the result |
 | The tone probe | `tools/tone_probe.py` | 54 tone files decoded, 0 mismatched |
+| The old opening | `calls.py` before this change | one literal: `"{owner}, it's {agent}. I'm listening."` — the same sentence on every line |
+| The opening builder | `toast.py` `opening_line` | role, condition, lowest need with its value, capacity, last choice, contract state |
+| Measured openings | `opening_line` against a fresh desk | Qwen `food reads 0.78`, Whisper `rest reads 0.77`, Ash `warmth reads 0.82`, Bram `shelter reads 0.79`; Ash with `warmth 0.31` opens `and my condition reads degraded … I'm not taking a job from the house until I warm` |
 
 ## What is not met yet
 

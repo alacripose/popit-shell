@@ -45,9 +45,10 @@ class Refused(Exception):
 
 
 class CallLedger:
-    def __init__(self, path: pathlib.Path, registry) -> None:
+    def __init__(self, path: pathlib.Path, registry, opening=None) -> None:
         self.path = path
         self.registry = registry
+        self.opening = opening
         self.lock = threading.RLock()
         self.rows: list[dict] = []
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -69,6 +70,16 @@ class CallLedger:
         self.path.write_text(json.dumps({"schema": SCHEMA, "calls": self.rows},
                                         indent=2, ensure_ascii=False) + "\n",
                              encoding="utf-8")
+
+    def _opening(self, worker: dict, human: dict, wish: str,
+                 contract: dict | None) -> str:
+        """Ask the caller's builder for this lane's opening line; no builder, no line."""
+        if not callable(self.opening):
+            return ""
+        try:
+            return " ".join(str(self.opening(worker, human, wish, contract) or "").split())
+        except Exception:  # a builder failure must not open a line with a made-up sentence
+            return ""
 
     def _person(self, name: str, kinds: tuple[str, ...]) -> dict:
         # The UI passes the display name ("Lucía García"); the roster id is folded to
@@ -150,12 +161,13 @@ class CallLedger:
                 "opened": now.isoformat(),
                 "expires": "" if persistent else (now + datetime.timedelta(minutes=budget)).isoformat(),
                 "state": "open", "phase": "opening", "listening": False,
-                "opening": [
-                    {"role": worker.get("kind", "agent"), "name": worker["name"],
-                     "profile": worker["id"], "presence": "on the line and listening",
-                     "want": text,
-                     "line": f"{human['name']}, it's {worker['name']}. I'm listening."},
-                ],
+                # The opening is the lane's own, built from its civilian record by the caller.
+                # One template with the name swapped made every line say the same thing, which
+                # is not what a civilian with needs, care and a contract sounds like.
+                "opening": ([{"role": worker.get("kind", "agent"), "name": worker["name"],
+                              "profile": worker["id"], "presence": "on the line and listening",
+                              "want": text, "line": opening}]
+                            if (opening := self._opening(worker, human, text, contract)) else []),
                 "queue": [],
                 "task_id": int(match.group(1)), "evidence": "",
                 "contract": dict(contract) if isinstance(contract, dict) else {},
