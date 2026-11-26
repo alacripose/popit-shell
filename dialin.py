@@ -465,8 +465,11 @@ class CivilianDialin:
             row = self.enroll(name, role, f"civilian:{identity}", kind=kind)
             target = pathlib.Path(row.get("package") or "")
             modern = row.get("format") == "modern" and (target / "manifest.json").exists()
+            # A core row is seeded at startup, not called. Dialling it here played its DTMF
+            # aloud on every start (a raised TONE_REV regenerates every core tone), which is the
+            # noise of several numbers the owner never rang. Seed silently, like the corpus.
             if not row.get("verified") or not modern:
-                row = self.dial(row)
+                row = self.dial(row, play=False)
             else:
                 try:
                     self.verify_package(target)
@@ -474,7 +477,7 @@ class CivilianDialin:
                         self.call_tone(row, kind, play=False)
                     row = dict(next(item for item in self.rows if item["id"] == row["id"]))
                 except Refused:
-                    row = self.dial(row)
+                    row = self.dial(row, play=False)
             rows.append(row)
         # The corpus is the family, not a decorative list: each ingested civilian gets a
         # real package and number, but does not play 48 DTMF bursts at startup.
