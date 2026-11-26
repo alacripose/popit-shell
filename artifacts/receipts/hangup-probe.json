@@ -1,0 +1,11 @@
+{
+  "schema": "popit.hangup-probe/1",
+  "at": "2026-11-26T01:49:34+00:00",
+  "checks": [
+    {
+      "check": "probe-line-opened",
+      "ok": false,
+      "detail": "{'code': 'call-open', 'detail': 'call-1795657775-43'}"
+    }
+  ]
+}

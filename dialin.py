@@ -26,7 +26,7 @@ import wave
 from blake3 import blake3
 
 SCHEMA = "popit.civilian-roster/1"
-TONE_REV = 2
+TONE_REV = 3
 EXCLUDED = {
     "signature", "signature_algorithm", "received_at", "admitted_at",
     "hash", "digest", "nonce", "chunk_frame",
@@ -307,7 +307,7 @@ class CivilianDialin:
             handle.writeframes(struct.pack("<" + "h" * len(samples), *samples))
 
     def call_tone(self, row: dict, kind: str = "outgoing", *,
-                  play: bool | None = None) -> dict:
+                  number: str = "", play: bool | None = None) -> dict:
         """A real telephone edge: DTMF for a line we place, a ring for a line arriving.
 
         The tone is generated before the microphone opens. It is not a decorative sound
@@ -320,8 +320,17 @@ class CivilianDialin:
                 raise Refused("civilian-unknown", str(row.get("id") or ""))
             row = actual
             tone = "incoming" if str(kind).lower() == "incoming" else "outgoing"
-            path = self.tones / f"{row['id']}-{tone}.wav"
-            digits = ""
+            # The digits are the number the call carried when it carried one; the roster's
+            # number is only the fallback. A line with neither plays its dial tone and no
+            # digits, because a made-up sequence is the sound of a number nobody rang.
+            carried = "".join(ch for ch in str(number or "") if ch.isdigit())
+            source = "call" if carried else "roster"
+            dial = carried or "".join(ch for ch in str(row.get("number") or "") if ch.isdigit())
+            # The file name carries who it dials, so a call's tone never reuses a roster tone.
+            stamp = "" if source == "roster" else "-" + (carried[-7:] or "none")
+            path = self.tones / f"{row['id']}{stamp}-{tone}.wav"
+            # Held outside the regeneration branch so a cached tone still reports its digits.
+            digits = dial[-7:] if tone == "outgoing" else ""
             if not path.exists() or int(actual.get("call_tone_rev") or 0) != TONE_REV:
                 rate = 16000
                 samples: list[int] = []
@@ -341,7 +350,6 @@ class CivilianDialin:
                 else:
                     add((350.0, 440.0), 0.86, 0.34)
                     samples.extend([0] * int(rate * 0.10))
-                    digits = "".join(ch for ch in str(row.get("number") or "") if ch.isdigit())[-7:]
                     for digit in digits:
                         pair = DTMF.get(digit)
                         if pair is None:
@@ -362,7 +370,8 @@ class CivilianDialin:
                 except Exception:
                     played = False
             return {"kind": tone, "path": str(path), "digits": digits, "played": played,
-                    "civilian": row.get("name"), "number": row.get("number")}
+                    "civilian": row.get("name"), "number": dial,
+                    "dialled": digits, "source": source}
 
     def dial(self, row: dict, *, play: bool | None = None) -> dict:
         with self.lock:

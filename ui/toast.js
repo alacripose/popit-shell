@@ -1570,9 +1570,12 @@ async function endParticipant(row) {
   const active = actives.find((call) => [call.civilian, call.agent].includes(row.name));
   if (!active) return;
   const evidence = (latest.harness || {}).path || "runlogs/toast/view-grab.png";
-  const reply = await post("/api/toast/call/close", { id: active.id, evidence });
+  // This control ends the line, so it sends a hang-up. A wish that was proved is closed
+  // from the wish list; on this route an ending is the owner hanging up, and the lane
+  // dials back instead of leaving a dead line on the desk.
+  const reply = await post("/api/toast/call/close", { id: active.id, evidence, hangup: true });
   if (!reply.ok) setText("#refusal", reply.refused?.code || "close refused");
-  else setText("#refusal", "call closed");
+  else setText("#refusal", reply.callback ? "hung up · dialling back" : "call closed");
   await poll();
 }
 

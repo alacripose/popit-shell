@@ -164,9 +164,16 @@ class CallLedger:
             self._save()
             return dict(row)
 
-    def close(self, call_id: str, evidence: str) -> dict:
+    def close(self, call_id: str, evidence: str, *, proof: bool = True) -> dict:
+        """Close a line. A hang-up is not completed work, so it files no income proof.
+
+        `proof=True` is a wish being closed by the artifact that shows it was done. `proof=False`
+        is a line ending: nobody delivered anything, and asking the income engine for a proof of
+        work refuses the hang-up itself (`income-refused`), which is how an ending became a dead
+        line on the desk.
+        """
         path = " ".join(str(evidence or "").split())
-        if not path:
+        if proof and not path:
             raise Refused("evidence-empty", "closing a wish needs a proof artifact")
         with self.lock:
             row = next((item for item in self.rows if item["id"] == call_id), None)
@@ -174,15 +181,16 @@ class CallLedger:
                 raise Refused("call-unknown", call_id)
             if row.get("state") != "open":
                 raise Refused("call-closed", f"{call_id} is {row.get('state')}")
-            self._income(
-                f"human:{row['civilian_id']}",
-                ["task", "done", str(row["task_id"]), "--evidence", path,
-                 "--note", f"wish {call_id} proof"],
-            )
+            if proof:
+                self._income(
+                    f"human:{row['civilian_id']}",
+                    ["task", "done", str(row["task_id"]), "--evidence", path,
+                     "--note", f"wish {call_id} proof"],
+                )
             row["state"] = "done"
             row["phase"] = "closed"
             row["listening"] = False
-            row["evidence"] = path
+            row["evidence"] = path or f"hang-up · {_iso()}"
             row["closed"] = _iso()
             self._save()
             return dict(row)

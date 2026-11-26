@@ -1,0 +1,38 @@
+{
+  "schema": "popit.tone-probe/popit",
+  "at": "2026-11-26T01:51:31+00:00",
+  "port": 5231,
+  "checks": [
+    {
+      "check": "surface-serves",
+      "ok": true,
+      "detail": "10656 byte(s) of page"
+    },
+    {
+      "check": "surface-is-marked",
+      "ok": true,
+      "detail": "data-popit on the page"
+    },
+    {
+      "check": "surface-has-the-table",
+      "ok": true,
+      "detail": "#tone-table present"
+    },
+    {
+      "check": "report-schema",
+      "ok": true,
+      "detail": "popit.tone-probe/1"
+    },
+    {
+      "check": "report-has-a-row-per-tone",
+      "ok": true,
+      "detail": "55 row(s)"
+    },
+    {
+      "check": "every-tone-dials-the-number-it-names",
+      "ok": true,
+      "detail": "no differing row"
+    }
+  ],
+  "failed": []
+}

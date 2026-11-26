@@ -28,6 +28,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.error
 import urllib.request
 
 SIGNED_FIELDS = ("schema", "name", "agent", "endpoint", "mcp", "capabilities",
@@ -107,8 +108,19 @@ def post(origin: str, path: str, body: dict, timeout: float = 40.0) -> dict:
     request = urllib.request.Request(
         origin + path, data=json.dumps(body).encode("utf-8"),
         headers={"Content-Type": "application/json"}, method="POST")
-    with urllib.request.urlopen(request, timeout=timeout, context=context) as answer:
-        return json.loads(answer.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(request, timeout=timeout, context=context) as answer:
+            return json.loads(answer.read().decode("utf-8"))
+    except urllib.error.HTTPError as error:
+        # A bare 409 hides which guard fired. The host sends its own code and detail; raise
+        # them so the box's log names the refusal instead of a status number.
+        text = error.read().decode("utf-8", "replace")
+        try:
+            refused = (json.loads(text).get("refused") or {})
+        except json.JSONDecodeError:
+            refused = {}
+        detail = f"{refused.get('code') or error.code}: {refused.get('detail') or text[:120]}"
+        raise RuntimeError(f"{path} refused: {detail}") from error
 
 
 def tells(path: pathlib.Path) -> list[tuple[str, re.Pattern[str]]]:
@@ -170,10 +182,15 @@ How you speak, because the family will not accept anything else:
 """
 
 
-def ask(prompt: str, history: list[str], attempt: int, named: list[str]) -> str:
+def ask(prompt: str, history: list[str], attempt: int, named: list[str],
+        grounding: str = "") -> str:
     # Qwen3 opens with a reasoning trace that is charged to the same token budget. The soft
     # switch below and the explicit `think` flag are both needed on this box's ollama build.
     system = SYSTEM.format(facts=facts()) + "\n/no_think"
+    if grounding:
+        # The desk's own C9 paragraph: condition, care choice and the contract boundary. The
+        # box answers inside it because that record is the lane's, not a description from outside.
+        system += "\nHow your own civilian record stands this turn:\n" + grounding
     if named:
         system += ("\nYour previous attempt used these banned shapes: " + ", ".join(named[:6])
                    + ". Rewrite without them.")
@@ -215,12 +232,12 @@ def spoken(text: str) -> str:
     return text[marker + len("ANSWER:"):].strip() if marker >= 0 else ""
 
 
-def answer(prompt: str, history: list[str], rules) -> tuple[str, str]:
+def answer(prompt: str, history: list[str], rules, grounding: str = "") -> tuple[str, str]:
     """One guarded reply. Returns the words and, when the guard held, what it named."""
     named: list[str] = []
     for attempt in range(3):
         try:
-            said = spoken(clean(ask(prompt, history, attempt, named)))
+            said = spoken(clean(ask(prompt, history, attempt, named, grounding)))
         except (OSError, ValueError) as error:
             return "", f"ollama-unreadable: {error}"
         found = hits(said, rules) if said else ["empty answer"]
@@ -272,6 +289,7 @@ def main(argv: list[str] | None = None) -> int:
             time.sleep(3)
             continue
         fresh = 0
+        grounding = str(polled.get("context") or "")
         for turn in polled.get("turns") or []:
             cursor = max(cursor, int(turn.get("id") or 0))
             role = str(turn.get("role") or "")
@@ -280,13 +298,22 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             fresh += 1
             history.append(f"{role}: {text}")
-            said, held = answer(text, history, rules)
+            said, held = answer(text, history, rules, grounding)
             history.append(f"{args.agent}: {said}")
-            said_row = post(args.origin, "/api/toast/call/say",
-                            {"session": session, "text": said, "speak": True})
+            try:
+                said_row = post(args.origin, "/api/toast/call/say",
+                                {"session": session, "text": said, "speak": True})
+            except urllib.error.HTTPError as error:
+                # The lane's own record refused the line. Name it and stay on the call rather
+                # than going quiet, which reads as a broken line.
+                print(json.dumps({"turn": turn.get("id"), "said": said, "guard": held,
+                                  "refused": error.read().decode("utf-8", "replace")[:300]},
+                                 ensure_ascii=False), flush=True)
+                continue
             print(json.dumps({"turn": turn.get("id"), "heard": role, "said": said,
-                              "guard": held, "archive":
-                              (said_row.get("archive") or {}).get("id")},
+                              "guard": held,
+                              "civilian": said_row.get("civilian"),
+                              "archive": (said_row.get("archive") or {}).get("id")},
                              ensure_ascii=False), flush=True)
         if args.once and fresh:
             break

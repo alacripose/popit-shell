@@ -1,0 +1,49 @@
+{
+  "schema": "popit.hangup-probe/popit",
+  "at": "2026-11-26T01:51:51+00:00",
+  "port": 5232,
+  "checks": [
+    {
+      "check": "surface-serves",
+      "ok": true,
+      "detail": "1246 byte(s) of page"
+    },
+    {
+      "check": "surface-is-marked",
+      "ok": true,
+      "detail": "data-popit on the page"
+    },
+    {
+      "check": "surface-has-the-checks",
+      "ok": true,
+      "detail": "#hangup-checks present"
+    },
+    {
+      "check": "report-schema",
+      "ok": true,
+      "detail": "popit.hangup-probe/1"
+    },
+    {
+      "check": "report-carries-the-drill",
+      "ok": false,
+      "detail": "line (none)"
+    },
+    {
+      "check": "drill-has-no-refusal",
+      "ok": false,
+      "detail": "1 refused of 1"
+    }
+  ],
+  "failed": [
+    {
+      "check": "report-carries-the-drill",
+      "ok": false,
+      "detail": "line (none)"
+    },
+    {
+      "check": "drill-has-no-refusal",
+      "ok": false,
+      "detail": "1 refused of 1"
+    }
+  ]
+}

@@ -47,12 +47,11 @@ WORK_ASK = re.compile(
     r"\b(work|job|task|build|fix|implement|handle|deliver|deploy)\b"
     r"|\bplease\s+(?:do|run|make|take)\b", re.I,
 )
+# Lane packages, by name. Buffy is not one of them: that is the Freebuff harness's own
+# nickname for the agent on this machine, so a prompt that says "You are Buffy" makes a local
+# model speak in its name and answer as a chat assistant. The Buffy line is answered by the
+# joined harness and by nothing else; see `ask_mind`'s `buffy-line-without-harness` refusal.
 LANES = {
-    "Buffy": (
-        "You are Buffy, the host agent for this Windows toast. You keep the live Freebuff "
-        "harness and the CUA drivers moving, speak directly to Alacrity, and do not repeat "
-        "Qwen's machine inspection, Ash's resident work, or Bram's supply work."
-    ),
     "Qwen": (
         "You are Qwen, the Debian machine and tool specialist. Inspect the actual Debian "
         "host when needed, answer as Qwen, and do not repeat Buffy's host work, Whisper's "
@@ -478,11 +477,15 @@ class Toast:
                 edge = self.dialin.call_tone(
                     {"id": call.get("agent_id") or str(call.get("agent") or "").lower()},
                     tone,
+                    # The number the call carried wins over the roster's number: the owner
+                    # hears the line that actually rang, not a sequence the roster holds.
+                    number=str(call.get("number") or ""),
                 )
                 heard = "played" if edge.get("played") else "retained · output busy"
                 self.archive.add("call-tone", f"{tone} dial tone · {call['agent']} · {heard}",
                                  role="call", call=call["id"], tone=tone, played=edge.get("played", False),
-                                 path=edge.get("path", ""))
+                                 path=edge.get("path", ""), number=edge.get("number", ""),
+                                 dialled=edge.get("dialled", ""), source=edge.get("source", ""))
             except dialin.Refused as error:
                 self.archive.add("event", f"{tone} tone refused · {error.code}",
                                  role="call", call=call["id"])
@@ -507,6 +510,27 @@ class Toast:
                     want=intro.get("want", ""),
                 )
         threading.Thread(target=run, daemon=True).start()
+
+    def call_back(self, row: dict) -> dict:
+        """A hang-up is answered by dialling the same lane back, and saying who rang.
+
+        The desk had no hang-up: ending a line posted the wish-close route with a proof
+        path, so the owner hanging up was archived as work completed and no one dialled
+        back. The callback is its own line, opened as incoming, so the owner hears it.
+        """
+        back = self.calls.open(
+            str(row["civilian"]), str(row["agent"]),
+            f"call back after the hang-up on {row['id']}",
+            f"line {row['id']} closed by {row['civilian']} at {row.get('closed') or iso()}",
+            0, allow_multiple=True)
+        self.archive.add(
+            "call-callback",
+            f"callback {back['id']} · {row['agent']} ringing {row['civilian']} back",
+            role="call", call=back["id"], agent=back["agent"], civilian=back["civilian"],
+            from_call=row["id"],
+        )
+        self.begin_call(back, incoming=True)
+        return back
 
     def harness_fresh(self, limit: float | None = None) -> tuple[bool, str]:
         """A reply is allowed only after the CUA textbox band was probed recently."""
@@ -569,10 +593,18 @@ class Toast:
         public `/api/toast/call/join` route verifies an envelope before it gets here.
         """
         name = " ".join(str((admission or {}).get("agent") or agent or "Buffy").split()) or "Buffy"
+        # An enrolled external civilian is named for the machine it sits on ("Qwen on the
+        # Debian box"), while the line is opened for the lane ("Qwen"). Read the lane out of
+        # the enrollment so the same line answers to both names instead of refusing.
+        lane = name.split(" on the ")[0] or name
         call = next((row for row in self.calls.actives()
-                     if row.get("agent") == name), None)
+                     if row.get("agent") in (name, lane)
+                     or row.get("agent_id") == lane.lower()
+                     or row.get("caller") == name), None)
         if call is None:
-            raise calls_mod.Refused("bridge-line-absent", f"no open call for {name}")
+            open_lanes = ", ".join(sorted(str(row.get("agent")) for row in self.calls.actives())) or "none"
+            raise calls_mod.Refused("bridge-line-absent",
+                                    f"no open call for {name} · open lines: {open_lanes}")
         session = f"callbridge-{secrets.token_hex(8)}"
         call = self.calls.mark_external(call["id"], True, session)
         latest = max((int(row.get("id") or 0) for row in self.archive.read(200)), default=0)
@@ -630,8 +662,18 @@ class Toast:
             if session in self.bridges:
                 self.bridges[session]["cursor"] = cursor
                 self.bridges[session]["seen"] = iso()
+        # The external lane answers from its own civilian record, not from my description of it.
+        # The C9 condition, the care choice and the contract boundary reach the box with the
+        # turns, because the box is the one that has to write inside them.
+        try:
+            grounding = self.civilians.context(state["agent"])
+            life = self.civilians.life_state(state["agent"])
+        except civilian_features.Refused as error:
+            grounding = f"civilian record unreadable · {error.code}"
+            life = {"condition": "unknown", "needs": {}, "state": "unreadable"}
         return {"session": session, "call": state["call"], "agent": state["agent"],
-                "cursor": cursor, "turns": turns, "waiting": not turns}
+                "cursor": cursor, "turns": turns, "waiting": not turns,
+                "context": grounding, "life": life}
 
     def bridge_say(self, session: str, text: str, *, speak: bool = True) -> dict:
         """Speak and archive a line from the attached general agent harness."""
@@ -640,6 +682,15 @@ class Toast:
         if not clean:
             raise calls_mod.Refused("bridge-empty", "a spoken bridge line needs words")
         call = next(row for row in self.calls.actives() if row["id"] == state["call"])
+        # The same preflight a host lane gets: a dead lane does not answer, an incomplete
+        # contract cannot claim a deliverable, and care below the floor speaks without work.
+        preflight = self.civilians.operation(state["agent"], clean,
+                                             contract=(call.get("contract") or None),
+                                             call=state["call"])
+        if not preflight.get("allowed", True):
+            refusal = preflight.get("refusal") or {}
+            raise calls_mod.Refused(str(refusal.get("code") or "civilian-refused"),
+                                    str(refusal.get("detail") or "")[:240])
         row = self.archive.add("cua", clean, role=state["agent"], call=call["id"],
                                external=True, source="agent-harness", session=session)
         self.calls.queue_response(call["id"], state["agent"], "agent", clean)
@@ -650,7 +701,11 @@ class Toast:
             if session in self.bridges:
                 self.bridges[session]["seen"] = iso()
         return {"session": session, "call": call["id"], "archive": row,
-                "voice": receipt, "agent": state["agent"]}
+                "voice": receipt, "agent": state["agent"],
+                "civilian": {"state": preflight.get("state"),
+                             "work_allowed": preflight.get("work_allowed"),
+                             "condition": preflight.get("condition"),
+                             "care_line": preflight.get("care_line")}}
 
     def bridge_leave(self, session: str) -> dict:
         state = self._bridge(session)
@@ -689,6 +744,19 @@ class Toast:
         try:
             if chosen:
                 for call in chosen:
+                    if call["agent"] == "Buffy" and not call.get("external"):
+                        # No package speaks in the harness's name. Without the joined harness
+                        # this line says so, instead of a local model inventing Buffy's voice.
+                        code = "buffy-line-without-harness"
+                        answer = ("No harness is joined on the Buffy line, so nothing here will "
+                                  "answer as Buffy. Join the harness to this line first.")
+                        self._lane("Buffy", "refused", code)
+                        self._line(f"Buffy · {answer}", "refused")
+                        self.archive.add("cua", answer, role="Buffy", question=text,
+                                         call=call["id"], refused={"code": code})
+                        self.calls.queue_response(call["id"], "Buffy", "agent", answer)
+                        last = {"answer": answer, "refused": {"code": code}}
+                        continue
                     self._lane(call["agent"], "thinking", "reading your line")
                     persona = LANES.get(
                         call["agent"],
@@ -1826,6 +1894,9 @@ class Handler(BaseHTTPRequestHandler):
                     str(body.get("civilian") or ""), str(body.get("agent") or ""),
                     str(body.get("wish") or ""), str(body.get("proof") or ""),
                     minutes, contract=checked,
+                    # The desk runs several lines at once; a host-side caller (a drill, a
+                    # callback) says so instead of being refused because one is already open.
+                    allow_multiple=bool(body.get("allow_multiple")),
                 )
                 toast.archive.add(
                     "event", f"wish {row['id']} · {row['civilian']} → {row['agent']} · {row['minutes']}m",
@@ -1878,8 +1949,39 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/api/toast/call/leave":
                 return self.json({"ok": True, **toast.bridge_leave(str(body.get("session") or ""))})
             if path == "/api/toast/call/close":
+                hangup = bool(body.get("hangup"))
                 row = toast.calls.close(str(body.get("id") or ""),
-                                          str(body.get("evidence") or ""))
+                                          str(body.get("evidence") or ""),
+                                          proof=not bool(body.get("hangup")))
+                callback_line = str(row.get("wish") or "").startswith("call back after")
+                if hangup and callback_line:
+                    # A callback that is hung up does not dial again; one hang-up, one ring.
+                    toast.archive.add(
+                        "call-hangup",
+                        f"{row['civilian']} hung up on the callback {row['id']} · no further ring",
+                        role="call", call=row["id"], civilian=row["civilian"],
+                        agent=row["agent"], evidence=row["evidence"],
+                    )
+                    return self.json({"ok": True, "call": row, "hangup": True, "callback": None})
+                if hangup:
+                    # The owner ended the line. That is not a finished wish, and it is not
+                    # silence: he hung up, so the lane rings him back and says so.
+                    toast.archive.add(
+                        "call-hangup",
+                        f"{row['civilian']} hung up on {row['agent']} · line {row['id']}",
+                        role="call", call=row["id"], civilian=row["civilian"],
+                        agent=row["agent"], evidence=row["evidence"],
+                    )
+                    try:
+                        back = toast.call_back(row)
+                    except calls_mod.Refused as error:
+                        toast.archive.add("event", f"callback refused · {error.code}",
+                                         role="call", call=row["id"], agent=row["agent"])
+                        return self.json({"ok": True, "call": row, "hangup": True,
+                                          "callback": None,
+                                          "refused_callback": error.as_dict()})
+                    return self.json({"ok": True, "call": row, "hangup": True,
+                                      "callback": back})
                 toast.archive.add(
                     "event", f"wish {row['id']} closed with proof · {row['evidence']}",
                     role="wish", call=row["id"], civilian=row["civilian"],
