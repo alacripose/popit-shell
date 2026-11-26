@@ -28,6 +28,7 @@ import json
 import os
 import pathlib
 import re
+import shutil
 import subprocess
 import tempfile
 import threading
@@ -50,8 +51,43 @@ MAX_CLOCK_SKEW_SECONDS = 120
 MAX_ENVELOPE_BYTES = 16 * 1024
 NONCE_RE = re.compile(r"^[0-9a-f]{32,64}$")
 CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
-_OPENSSL = os.environ.get("POPIT_OPENSSL", "openssl")
 _LOCK = threading.RLock()
+
+
+def _find_openssl() -> tuple[str, list[str]]:
+    """The openssl binary this process can actually start, and every path it looked in.
+
+    A bare ``openssl`` resolves only when the process' own PATH carries it, so a supervised
+    child that starts with a shorter PATH could not verify a single package: every app was
+    refused and the desk fell back to an unpainted home. The search is named here so a
+    refusal says where it looked instead of only that the file was missing.
+    """
+    given = os.environ.get("POPIT_OPENSSL")
+    if given:
+        return given, [f"POPIT_OPENSSL={given}"]
+    looked: list[str] = []
+    found = shutil.which("openssl")
+    if found:
+        return found, [f"path:{found}"]
+    looked.append("path:openssl")
+    roots = [os.environ.get("ProgramFiles") or r"C:\Program Files",
+             os.environ.get("ProgramFiles(x86)") or r"C:\Program Files (x86)",
+             os.environ.get("LOCALAPPDATA") or ""]
+    tails = (r"Git\usr\bin\openssl.exe", r"Git\mingw64\bin\openssl.exe",
+             r"@codebufffreebuff-desktop\resources\git\usr\bin\openssl.exe",
+             r"@codebufffreebuff-desktop\resources\git\ucrt64\bin\openssl.exe")
+    for root in roots:
+        for tail in tails:
+            if not root:
+                continue
+            candidate = os.path.join(root, tail)
+            looked.append(candidate)
+            if os.path.isfile(candidate):
+                return candidate, looked
+    return "openssl", looked
+
+
+_OPENSSL, OPENSSL_LOOKED = _find_openssl()
 
 
 class Refused(Exception):
@@ -116,7 +152,8 @@ def _openssl(args: list[str], *, timeout: int = 20) -> subprocess.CompletedProce
             errors="replace", timeout=timeout, creationflags=CREATE_NO_WINDOW,
         )
     except (OSError, subprocess.TimeoutExpired) as error:
-        raise Refused("envelope-openssl", str(error)[:240]) from error
+        looked = ", ".join(OPENSSL_LOOKED[:6])
+        raise Refused("envelope-openssl", f"{str(error)[:180]} · looked in {looked}") from error
 
 
 def keygen(private_path: pathlib.Path, public_path: pathlib.Path) -> dict:

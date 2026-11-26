@@ -84,7 +84,8 @@ APPS = {
         "script": "",
         "links": [],
         "files": ("toast.html", "toast.js", "toast.css", "settings.css", "package.js",
-                  "contour-theme.css", "contour.js", "popit-sw.js", "ui-audit.js"),
+                  "contour-theme.css", "contour.js", "popit-sw.js", "ui-audit.js",
+                  "chrome.js"),
     },
     "settings": {
         "kind": "window",
@@ -99,7 +100,7 @@ APPS = {
         "regions": REGIONS,
         "files": ("toast.html", "toast.js", "toast.css", "settings.html",
                   "settings.js", "settings.css", "package.js", "popit-sw.js",
-                  "contour-theme.css", "contour.js", "ui-audit.js"),
+                  "contour-theme.css", "contour.js", "ui-audit.js", "chrome.js"),
     },
     # Prose is the family's written surface: every project's copy, where it lives and the rule
     # it breaks, as a window built from the settings window's own page. Its body is the one
@@ -115,7 +116,8 @@ APPS = {
         "adds": ["prose inventory", "per-project progress", "external document links"],
         "regions": REGIONS,
         "files": ("toast.html", "toast.js", "toast.css", "settings.css", "package.js",
-                  "contour-theme.css", "contour.js", "popit-sw.js", "ui-audit.js"),
+                  "contour-theme.css", "contour.js", "popit-sw.js", "ui-audit.js",
+                  "chrome.js"),
     },
     "springboard": {
         "kind": "phone",
@@ -126,7 +128,8 @@ APPS = {
         "adds": ["signed tiles", "app launch", "offline shell"],
         "regions": REGIONS,
         "files": ("phone.html", "phone.js", "phone-calls.js", "phone.css", "phone-sw.js",
-                  "package.js", "contour-theme.css", "contour.js", "ui-audit.js"),
+                  "package.js", "contour-theme.css", "contour.js", "ui-audit.js",
+                  "chrome.js"),
     },
 }
 

@@ -32,6 +32,7 @@ window.addEventListener("error", (event) => {
     <span class="mark" aria-hidden="true">◆</span>
     <h1 id="window-name"></h1>
     <span id="status" class="status" data-contour="card" data-state="waiting">waiting</span>
+    <button id="home" class="icon" type="button" data-contour="card" title="Springboard" aria-label="Springboard">Home</button>
     <button id="settings" class="icon" type="button" data-contour="card" title="Popit settings · family theme, motion and size" aria-label="Settings">Settings</button>
     <button id="pin" class="icon" type="button" data-contour="card" title="Pin above other windows" aria-label="Pin">Pin</button>
     <button id="close" class="icon" type="button" data-contour="card" title="Close" aria-label="Close">Close</button>
@@ -293,5 +294,6 @@ window.addEventListener("error", (event) => {
 <svg class="clips" aria-hidden="true" width="0" height="0"><defs id="clips"></defs></svg>
 <script type="module" src="/ui-audit.js"></script>
 <script type="module" src="/toast.js"></script>
+<script src="/chrome.js" defer></script>
 </body>
 </html>

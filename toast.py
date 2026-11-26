@@ -154,6 +154,7 @@ import external_agents  # noqa: E402
 import hosts  # noqa: E402
 import mind_bridge  # noqa: E402
 import settings_package  # noqa: E402
+import app_base  # noqa: E402
 import app_package  # noqa: E402
 import voice  # noqa: E402
 
@@ -1317,7 +1318,8 @@ WINDOW_QUEUE: list[tuple] = []
 WINDOW_VIEW: dict = {}
 WINDOW_RESULTS: dict = {}
 WINDOW_EVAL_SEQ: list[int] = [0]
-WINDOW_PROBES = ("springboard", "springboardState", "springboardAudit", "frameIntegrity",
+WINDOW_PROBES = ("springboard", "springboardState", "springboardTiles", "goHome",
+                 "springboardAudit", "frameIntegrity",
                  "prose", "home", "openApp", "windowClose", "windowState", "paint",
                  "fallback", "choose")
 
@@ -1342,6 +1344,32 @@ def window_eval(name: str, argument: object = None) -> str:
     if not queue_window(("eval", key, name, argument)):
         WINDOW_RESULTS[key] = {"state": "window-absent", "value": None, "at": None}
     return key
+
+
+APP_PAGE_CACHE: dict[str, tuple[tuple, bytes]] = {}
+
+
+def app_page(name: str, entry: str, apps) -> bytes:
+    """The delivered page for one window: the settings base with the app's body slot.
+
+    Cached on the files' own stamps and the app's identity, so an edit or a new signed revision
+    is what the window is served next; nothing here answers from a page the files no longer say.
+    """
+    base = UI / app_base.SETTINGS_PAGE
+    page = UI / entry
+    identity = ""
+    try:
+        identity = str((apps.state().get("apps") or {}).get(name, {}).get("identity") or "")
+    except Exception:  # noqa: BLE001 - an app state that cannot answer is not an identity
+        identity = ""
+    key = (base.stat().st_mtime_ns, page.stat().st_mtime_ns, identity)
+    held = APP_PAGE_CACHE.get(name)
+    if held and held[0] == key:
+        return held[1]
+    body = app_base.render(base.read_text(encoding="utf-8"),
+                           page.read_text(encoding="utf-8"), identity).encode("utf-8")
+    APP_PAGE_CACHE[name] = (key, body)
+    return body
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -1441,14 +1469,20 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         if path == "/toast.html":
-            # The dialin window is the owner's desk, and its settings page is the baseline
-            # every app package subscribes to. It is served as the app's own signed page.
+            # The dialin window is the settings window's document with the desk's body in its
+            # body slot: a mutation of the signed baseline, not a page of its own that merely
+            # links the same sheets.
             try:
-                return self.file("toast.html", "text/html; charset=utf-8")
+                return self.send_body(app_page("dialin", "toast.html", toast.apps),
+                                      "text/html; charset=utf-8")
             except app_package.Refused as error:
                 return self.json({"ok": False, "refused": error.as_dict()}, 409)
         if path == "/ui-audit.js":
             return self.file("ui-audit.js", "text/javascript; charset=utf-8")
+        if path == "/chrome.js":
+            # Every window's bar carries this: a window whose own script did not take it still
+            # answers settings, home and close, and an empty surface returns to the springboard.
+            return self.file("chrome.js", "text/javascript; charset=utf-8")
         if path == "/toast.js":
             return self.file("toast.js", "text/javascript; charset=utf-8")
         if path == "/toast.css":
@@ -2319,10 +2353,16 @@ def cert_covers_loopback() -> bool:
     if not PHONE_CERT.exists():
         return False
     try:
-        result = subprocess.run(["openssl", "x509", "-in", str(PHONE_CERT), "-noout", "-text"],
+        result = subprocess.run([envelope._OPENSSL, "x509", "-in", str(PHONE_CERT),
+                                 "-noout", "-text"],
                                 capture_output=True, text=True, timeout=20)
     except (OSError, subprocess.SubprocessError):
-        return True
+        # A certificate that could not be read is not read as covering loopback: a failed
+        # measurement that answered "yes" is how a certificate with no SAN kept loading a
+        # window it could never verify.
+        return False
+    if result.returncode != 0:
+        return False
     return "IP Address:127.0.0.1" in result.stdout
 
 
@@ -2368,7 +2408,7 @@ def ensure_phone_cert(bind: str) -> bool:
         return True
     PHONE_CERT.parent.mkdir(parents=True, exist_ok=True)
     command = [
-        "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+        envelope._OPENSSL, "req", "-x509", "-newkey", "rsa:2048", "-nodes",
         "-keyout", str(PHONE_KEY), "-out", str(PHONE_CERT), "-days", "825",
         "-subj", f"/CN={bind}",
         "-addext", f"subjectAltName=IP:{bind},IP:127.0.0.1,DNS:popit.local,DNS:localhost",
@@ -2414,6 +2454,14 @@ def serve(toast: Toast, port: int = PORT, *, bind: str = "127.0.0.1",
 
 
 def main() -> int:
+    # Print never fails on a glyph. A probe value carrying ◉ or ☎ raised UnicodeEncodeError
+    # on a cp1252 console, and because that print ran inside a Qt callback the desk died with
+    # it: the log is a record of what the window answered, so it is written as UTF-8.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=PORT)
     parser.add_argument("--no-window", action="store_true")

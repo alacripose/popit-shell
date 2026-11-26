@@ -71,6 +71,10 @@ const FALLBACK_FAMILY = {
 let POPIT_THEMES = [FALLBACK_FAMILY];
 let currentTheme = "family";
 let currentSource = "family";
+// The colours this window paints, as the settings package published them. A theme the owner
+// made in the settings panel is not a row in the desk's own table, so the chosen frame,
+// material and motion repaint from this record instead of failing a lookup.
+let currentPaint = {};
 const GROUP_ORDER = [
   "Popit shell", "Family register", "Popit suite", "Deadlock", "Openlock shell",
   "Android", "Material Design", "iOS", "TouchWiz", "Simulator legacy",
@@ -719,16 +723,45 @@ function paintTheme(theme, persist = true) {
 // The settings package is the window's appearance: its document names the palette, material,
 // contour frame, motion type and dpi, so the desk, the home and the settings window paint the
 // one profile the owner saved instead of each keeping a look of its own.
+// The ten colour roles the settings package publishes, read into the keys the surface paint
+// uses. A theme the owner made in the settings panel (custom-material-…) is a real published
+// theme: refusing it because the desk's own table has no row for it is the hand-rolled table
+// deciding what the package may look like.
+const PUBLISHED_ROLES = {
+  surface: "surface",
+  deep: "deep",
+  primary: "primary",
+  tertiary: "tertiary",
+  emphasis: "emphasis",
+  ink: "text",
+  panel: "raised",
+};
+
+function publishedColors(look) {
+  const colors = (look && look.colors) || {};
+  const row = {};
+  for (const [role, key] of Object.entries(PUBLISHED_ROLES)) {
+    const value = colors[role];
+    if (typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value)) row[key] = value;
+  }
+  return row;
+}
+
 function applyPackageLook(doc) {
   const look = (doc && doc.theme) || {};
-  const row = POPIT_THEMES.find((theme) => theme.id === String(look.theme || ""));
-  if (!row) return false;
-  currentTheme = row.id;
-  currentSource = row.source || "family";
-  paintTheme({ ...row,
-               frame: look.frame || row.frame,
-               material: look.material || row.material,
-               motion: look.motion || row.motion }, false);
+  const published = String(look.theme || "").trim();
+  if (!published) return false;
+  const known = POPIT_THEMES.find((theme) => theme.id === published) || {};
+  const colors = publishedColors(look);
+  if (!known.surface && !colors.surface) return false;
+  currentTheme = published;
+  currentSource = known.source || "settings-package";
+  currentPaint = { ...known, ...colors, id: published,
+                   source: known.source || "settings-package" };
+  paintTheme({ ...currentPaint,
+               frame: look.frame || known.frame,
+               material: look.material || known.material,
+               motion: look.motion || known.motion }, false);
   applyMotion(String(look.motionPreference || "full"));
   applyZoom(Number(look.dpi) || 100);
   return true;
@@ -873,8 +906,17 @@ function chooseStyle(kind, id) {
     updateStyleChoices();
     return;
   }
-  const theme = POPIT_THEMES.find((row) => row.id === currentTheme);
+  const theme = POPIT_THEMES.find((row) => row.id === currentTheme)
+    || (currentPaint.surface ? currentPaint : null);
   if (!theme) return;
+  if (theme === currentPaint) {
+    // A published palette: the panel's choice is painted over the package's colours, and the
+    // published roles stay the paint for every later repaint of this window.
+    currentPaint = { ...currentPaint, [kind]: value };
+    paintTheme(currentPaint);
+    updateStyleChoices();
+    return;
+  }
   if (theme.source === "custom") {
     const row = customPalettes.find((palette) => palette.id === theme.id);
     if (row) {
@@ -2652,6 +2694,9 @@ function wire() {
   });
 
   $("#hide").addEventListener("click", () => post("/api/toast/hide"));
+  // The home is in the desk's own bar: the SpringBoard is a surface of this window, so its
+  // control is the desk's, not a fallback that only answers when the script did not run.
+  $("#home")?.addEventListener("click", () => setSurface("springboard"));
   $("#close").addEventListener("click", () => post("/api/toast/close"));
   $("#pin").addEventListener("click", async () => {
     const on = $("#pin").dataset.pinned !== "true";
@@ -3008,6 +3053,29 @@ async function main() {
         launchers: document.querySelectorAll("[data-launcher]").length,
         surface: document.querySelector(".toast")?.dataset.surface || "",
       });
+    },
+    // What the home's own document holds, read across the frame boundary: a frame that is
+    // loaded but carries no tile is why a window stayed blank, and the count says which.
+    springboardTiles() {
+      const frame = $("#springboard-frame");
+      let doc = null;
+      try { doc = frame ? frame.contentDocument : null; } catch (error) { doc = null; }
+      const tiles = doc ? doc.getElementById("tiles") : null;
+      return JSON.stringify({
+        frame: !!frame,
+        doc: !!doc,
+        children: tiles ? tiles.children.length : -1,
+        text: tiles ? String(tiles.innerText || "").trim().slice(0, 120) : "",
+        ready: (frame && frame.dataset.ready) || "",
+        pending: (frame && frame.dataset.pending) || "",
+      });
+    },
+    // The surface switch the Home control performs, called through the window itself so the
+    // behaviour is measured rather than asserted from the source.
+    goHome() {
+      setSurface("springboard");
+      const board = document.querySelector("#springboard");
+      return JSON.stringify({ surface: activeSurface, board: !!board && !board.hidden });
     },
     springboardState() {
       const frame = $("#springboard-frame");

@@ -112,6 +112,50 @@ TITLE_RE = r"<h1>SETTINGS</h1>"
 BODY_OPEN = '<div class="pages" data-region="body">'
 KICKER_RE = r'<span class="kicker">POPIT</span>'
 
+HEAD_RE = re.compile(r"<head>(?P<head>.*?)</head>", re.DOTALL | re.IGNORECASE)
+BODY_RE = re.compile(r"<body(?P<attrs>[^>]*)>(?P<body>.*?)</body>", re.DOTALL | re.IGNORECASE)
+# Whole head items, never bare opening tags: a script copied as `<script>` without its body
+# swallows every link after it, and the page it produces loads no stylesheet and runs nothing.
+HEAD_ITEM_RE = re.compile(
+    r"<script\b[^>]*>.*?</script>|<script\b[^>]*/>|<link\b[^>]*>|<meta\b[^>]*>|<title>.*?</title>",
+    re.DOTALL | re.IGNORECASE)
+
+
+def render(base_html: str, app_html: str, identity: str = "") -> str:
+    """The page a window is delivered: the settings package's document, the app's body slot.
+
+    A window is a mutation of the settings window, not a page that merely links its sheets. The
+    base supplies the document, its head and its link and script provision; the app supplies the
+    body children it declared, so the desk's markup sits inside the settings package's document
+    and its own provenance is written on the body for the audit to read.
+    """
+    base_head = HEAD_RE.search(base_html)
+    base_body = BODY_RE.search(base_html)
+    app_body = BODY_RE.search(app_html)
+    if not (base_head and base_body and app_body):
+        raise Refused("app-base-page", "the settings page or the app page carries no head and body")
+    head = base_head.group("head")
+    seen = {match.group(0).strip().lower() for match in HEAD_ITEM_RE.finditer(head)}
+    app_head = HEAD_RE.search(app_html)
+    extra: list[str] = []
+    if app_head:
+        for match in HEAD_ITEM_RE.finditer(app_head.group("head")):
+            item = match.group(0).strip()
+            if item.lower().startswith("<title"):
+                continue
+            if item.lower() in seen:
+                continue
+            seen.add(item.lower())
+            extra.append(item)
+    attrs = " ".join(part for part in (base_body.group("attrs"), app_body.group("attrs")) if part.strip())
+    provenance = f' data-base-package="{BASE_PACKAGE}" data-base-document="{SETTINGS_PAGE}"'
+    if identity:
+        provenance += f' data-base-identity="{identity}"'
+    additions = ("\n" + "\n".join(extra)) if extra else ""
+    return ("<!doctype html>\n<html lang=\"en\">\n<head>" + head.rstrip() + additions
+            + "\n</head>\n<body" + attrs + provenance + ">" + app_body.group("body")
+            + "</body>\n</html>\n")
+
 
 def check(document: object, name: str, settings) -> dict:
     """Refuse a payload that is not a current mutated subscription; return it when it is."""
