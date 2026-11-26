@@ -1,11 +1,11 @@
 {
   "schema": "popit.prose-probe/1",
-  "at": "2026-11-25T21:06:44Z",
+  "at": "2026-11-26T01:26:26Z",
   "checks": [
     {
       "check": "prose-app-is-signed",
       "ok": true,
-      "detail": "app-prose@6+blake3:7c17550b712d6757707661b3fa3ccfe6ff85fc8212fa354227d8d9c4ac4d8b62 refused None"
+      "detail": "app-prose@53+blake3:49eb9bcd14e3ae8e8e0b37a143a233bf5f1bf5fa07190612171bdf0cba0910d8 refused None"
     },
     {
       "check": "prose-app-is-the-settings-window",
@@ -14,23 +14,23 @@
     },
     {
       "check": "prose-window-audit-is-measured",
-      "ok": true,
-      "detail": "passed "
+      "ok": false,
+      "detail": "pending "
     },
     {
       "check": "prose-window-shows-every-project",
-      "ok": true,
-      "detail": "11 row(s) for 11 project(s)"
+      "ok": false,
+      "detail": "0 row(s) for 11 project(s)"
     },
     {
       "check": "prose-window-is-in-its-own-mode",
       "ok": false,
-      "detail": "window prose package dialin"
+      "detail": "window  package dialin"
     },
     {
       "check": "prose-window-links-every-document",
-      "ok": true,
-      "detail": "11 document link(s) for 11 project(s)"
+      "ok": false,
+      "detail": "0 document link(s) for 11 project(s)"
     },
     {
       "check": "prose-window-carries-the-spinner",
@@ -39,32 +39,33 @@
     },
     {
       "check": "prose-window-knows-the-driver",
-      "ok": true,
-      "detail": "driver read · 12 staged"
+      "ok": false,
+      "detail": "driver  · 0 staged"
     },
     {
       "check": "prose-document-is-served-by-the-shell",
       "ok": true,
-      "detail": "200, 342739 bytes"
+      "detail": "200, 181886 bytes"
     }
   ],
-  "passed": 8,
-  "failed": 1,
+  "passed": 4,
+  "failed": 5,
   "window": {
-    "app": "app-prose@6+blake3:7c17550b712d6757707661b3fa3ccfe6ff85fc8212fa354227d8d9c4ac4d8b62",
+    "app": "app-prose@53+blake3:49eb9bcd14e3ae8e8e0b37a143a233bf5f1bf5fa07190612171bdf0cba0910d8",
     "audit": {
-      "state": "passed"
+      "state": "pending"
     },
     "state": {
-      "window": "prose",
+      "window": "",
       "package": "dialin",
-      "rows": 11,
+      "base": "",
+      "rows": 0,
       "spinning": 0,
-      "drawn": 28881,
+      "drawn": 0,
       "refused": [],
-      "driver": "read",
-      "staged": 12,
-      "documents": 11,
+      "driver": "",
+      "staged": 0,
+      "documents": 0,
       "spinnerCss": true
     }
   },

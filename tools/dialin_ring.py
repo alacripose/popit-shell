@@ -145,7 +145,10 @@ async def offer() -> tuple[str, object]:
 
 async def ring(origin: str, key: pathlib.Path, seconds: float) -> dict:
     book = json.loads(STATE.read_text(encoding="utf-8")) if STATE.is_file() else {}
-    contact = (book.get("rings") or [{}])[-1].get("contact") or {}
+    # The contact is the most recent enrollment, not the most recent act: a ring row says
+    # nothing about which line this box may dial.
+    contact = next((row.get("contact") for row in reversed(book.get("rings") or [])
+                    if row.get("contact")), {})
     agent = str(contact.get("id") or "")
     if not agent:
         raise SystemExit("this box has no contact yet; run `enroll` with a one-time code first")
