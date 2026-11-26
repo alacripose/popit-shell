@@ -1,0 +1,83 @@
+{
+  "schema": "popit.app-store/1",
+  "store": "popit shelf · github landing pages",
+  "publisher": "popit-publisher",
+  "kinds": [
+    "window",
+    "phone"
+  ],
+  "driver": {
+    "id": "cua-chat",
+    "role": "freebuff chat probe"
+  },
+  "generated_by": "tools/app_store.py",
+  "apps": [
+    {
+      "name": "dialin",
+      "kind": "window",
+      "entry": "toast.html",
+      "pages": 4,
+      "regions": 4,
+      "identity": "app-dialin@108+blake3:41e27959d75ce7542a46f72d73f0d07c4619527189cd1be0ffea764cbec18a1a",
+      "revision": 108,
+      "ui_audit": "passed",
+      "verified": true,
+      "driver": "cua-chat",
+      "added_to_the_family": [
+        "call desk",
+        "lane selection",
+        "voice document",
+        "probe log",
+        "the bridge surface"
+      ]
+    },
+    {
+      "name": "settings",
+      "kind": "window",
+      "entry": "toast.html",
+      "pages": 7,
+      "regions": 4,
+      "identity": "app-settings@99+blake3:a1a51a78e5d884cf9091e3411ce3aa8511f039923e8295b1039d374fd5bdd8c5",
+      "revision": 99,
+      "ui_audit": "passed",
+      "verified": true,
+      "driver": "cua-chat",
+      "added_to_the_family": [
+        "appearance",
+        "motion",
+        "layout",
+        "apps",
+        "functions",
+        "device",
+        "package"
+      ]
+    },
+    {
+      "name": "springboard",
+      "kind": "phone",
+      "entry": "phone.html",
+      "pages": 3,
+      "regions": 4,
+      "identity": "app-springboard@85+blake3:00fdf25e6405e24a89bd55ae450bfbbccc7d3455056b2ef02817a6d0d31a34e1",
+      "revision": 85,
+      "ui_audit": "passed",
+      "verified": true,
+      "driver": "cua-chat",
+      "added_to_the_family": [
+        "signed tiles",
+        "app launch",
+        "offline shell"
+      ]
+    }
+  ],
+  "refused": [
+    {
+      "name": "bridge",
+      "kind": "window page",
+      "refused": {
+        "code": "app-kind-foreign",
+        "detail": "bridge: a window page is hosted by its window, not signed as a package"
+      }
+    }
+  ]
+}

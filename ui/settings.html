@@ -4,11 +4,15 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Popit settings package</title>
+<!-- The family theme and the settings window's chrome are the base's provision; the package
+     page adds only its own sheet. -->
+<link rel="stylesheet" href="/contour-theme.css" />
 <link rel="stylesheet" href="/settings.css" />
 </head>
-<body>
-<main class="sheet" data-popit="settings-package" data-schema="popit.settings/1">
-  <header class="head">
+<body data-window="popit-settings-package">
+<main class="sheet" data-popit="settings-package" data-schema="popit.settings/1"
+      data-contour="window" data-chrome="popit-settings">
+  <header class="head" data-contour="card" data-region="bar">
     <div class="mark" aria-hidden="true"><span></span></div>
     <div class="titles">
       <h1>Settings package</h1>
@@ -20,7 +24,7 @@
     </div>
   </header>
 
-  <section class="identity" aria-label="Package identity">
+  <section class="identity" data-contour="card" data-region="status" aria-label="Package identity">
     <div class="row"><span>identity</span><code id="package-identity">—</code></div>
     <div class="row"><span>digest</span><code id="package-digest">—</code></div>
     <div class="row"><span>app</span><code id="app-identity" data-verified="false">—</code></div>
@@ -30,7 +34,7 @@
     <p class="note" id="package-note">The panel is the authoring surface; this document is what other Popit windows subscribe to.</p>
   </section>
 
-  <div class="columns">
+  <div class="columns" data-region="body">
     <section class="block" aria-label="Settings the package carries">
       <h2>Carried settings</h2>
       <table class="data">
@@ -54,12 +58,13 @@
     <p class="note">A window subscribes with its own Ed25519 key in the family trust registry, one nonce per delivery. An unsigned or replayed request is refused by name.</p>
   </section>
 
-  <footer class="foot">
+  <footer class="foot" data-contour="card" data-region="foot">
     <span id="refusal" role="status" aria-live="polite"></span>
     <span id="checked">—</span>
   </footer>
 </main>
 <script type="module" src="/ui-audit.js"></script>
+<script type="module" src="/contour.js"></script>
 <script type="module" src="/settings.js"></script>
 </body>
 </html>

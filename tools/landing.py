@@ -63,7 +63,6 @@ READING_FIELDS = (
 )
 
 
-# ----------------------------------------------------------------- the machine's readings
 def _fetch(path: str) -> dict:
     """Read one axis route, from Windows when it resolves and through WSL when it does not."""
     url = f"{MACHINE}{path}"
@@ -107,7 +106,6 @@ def machine() -> dict:
     }
 
 
-# ----------------------------------------------------------------- the repository's pins
 def pins() -> dict:
     pin = json.loads(PIN.read_text(encoding="utf-8"))
     profile = json.loads(CONTOUR.read_text(encoding="utf-8"))
@@ -146,7 +144,6 @@ def pins() -> dict:
     }
 
 
-# ----------------------------------------------------------------- the page's sentences
 def compose(m: dict, p: dict) -> dict[str, str]:
     first, last = (p["refusals"][0], p["refusals"][-1]) if p["refusals"] else ("", "")
     return {
@@ -188,7 +185,6 @@ def numbers(m: dict, p: dict) -> list[tuple[str, str]]:
     ]
 
 
-# ----------------------------------------------------------------- family prose tools
 def prose_seal(texts: list[str]) -> str:
     """The digest of the copy the family tools approved, so `--check` needs no tool on disk."""
     return hashlib.sha256("\n".join(texts).encode("utf-8")).hexdigest()
@@ -230,7 +226,6 @@ def prose_check(texts: list[str]) -> None:
             raise SystemExit(f"landing-prose-refused: prose.mjs said {run.stderr.strip()[:160]}")
 
 
-# ----------------------------------------------------------------- the page
 def digest(path: Path) -> str:
     # The name is the hash of the bytes the server sends, not of this checkout's line endings, so
     # two checkouts of the same content publish the same asset name.

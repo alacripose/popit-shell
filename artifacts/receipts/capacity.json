@@ -1,0 +1,13 @@
+{
+  "schema": "popit.capacity/1",
+  "at": "2026-11-25T18:57:52Z",
+  "scanned": [
+    "authority",
+    "probes",
+    "docs"
+  ],
+  "acknowledged": 0,
+  "refused": 0,
+  "rows": [],
+  "act": "name the unit the cut work belongs to (`python tools/capacity_audit.py ack <digest> <unit>`) or do the work"
+}

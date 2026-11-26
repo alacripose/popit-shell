@@ -13,6 +13,17 @@ loadContour("/contour.json")
 (() => {
   "use strict";
 
+  // The home is delivered inside the agent window. Loaded as a page of its own it is the fake
+  // SpringBoard, so this page refuses to paint rather than render a copy of the surface.
+  if (window.parent === window) {
+    document.body.innerHTML = "";
+    const node = document.createElement("p");
+    node.id = "standalone-refusal";
+    node.textContent = "springboard-standalone-refused";
+    document.body.append(node);
+    return;
+  }
+
   const $ = (id) => document.getElementById(id);
   const state = { lanes: null, archive: null, selected: null, view: "home", refreshTimer: 0 };
   const secure = window.isSecureContext === true;
@@ -73,17 +84,36 @@ loadContour("/contour.json")
   // The SpringBoard shows signed app packages, not lanes dressed as apps. DialIn is the
   // phone calling surface and Settings is the theme package; anything without a package
   // identity is not a tile, and a package that fails verification cannot be opened.
+  // Names and marks only. A tile carries the app's name and its signed identity; the one-line
+  // descriptions that used to sit here were copy nobody asked for, so they are gone.
   const APP_SURFACE = {
-    dialin: { label: "DialIn", sub: "phone calling surface", glyph: "◉" },
-    settings: { label: "Settings", sub: "frames · palettes · dpi", glyph: "⚙" },
-    bridge: { label: "Bridge", sub: "tools side · debian", glyph: "⇄" },
+    dialin: { label: "DialIn", glyph: "◉" },
+    settings: { label: "Settings", glyph: "⚙" },
+    prose: { label: "Prose", glyph: "¶" },
+    bridge: { label: "Bridge", glyph: "⇄" },
   };
-  const APP_ROUTE = { settings: "/settings.html", dialin: "/toast.html", bridge: "/bridge.html" };
+  // The settings tile opens the settings app package's window — the panel the desk draws —
+  // never the package document page that names its revision.
+  // The settings tile opens the settings package window itself — the desk's own page in its
+  // settings-window mode — never the package document page, and never a copy of the panel.
+  const APP_ROUTE = { settings: "/toast.html?window=settings", dialin: "/toast.html",
+                      prose: "/toast.html?window=prose", bridge: "/bridge.html" };
 
-  // A tile launches its app. The IDE is not a tile and not a package: it is a surface
-  // dialin hosts inside its own window, so the springboard has nothing to sign for it.
-  async function openApp(name) {
-    location.href = APP_ROUTE[name] || "/toast.html";
+  // Every app is delivered the way the settings window is delivered: its own signed page in
+  // the window that delivered the SpringBoard, not a second OS window rendering a copy.
+
+  function launchFor(name) {
+    // The tile opens the launch the package signed, not a route the home remembers.
+    const row = (appPackages && appPackages.apps && appPackages.apps[name]) || {};
+    return row.launch || APP_ROUTE[name] || "";
+  }
+
+  function openApp(name) {
+    const route = launchFor(name);
+    if (!route) return;
+    // An app opens in the window that delivered the SpringBoard, the way the desk is
+    // delivered: no second OS window holding a copy of a surface.
+    location.assign(route);
   }
   let appPackages = null;
 
@@ -94,15 +124,24 @@ loadContour("/contour.json")
 
   function packageTiles() {
     const apps = (appPackages && appPackages.apps) || {};
-    return Object.keys(APP_SURFACE).filter((name) => apps[name]).map((name) => {
-      const row = apps[name] || {};
+    // A name the registry lists as foreign is shown as refused: a rejection is named on the
+    // home, never silently dropped from it.
+    const foreign = (appPackages && appPackages.foreign) || {};
+    return Object.keys(APP_SURFACE).filter((name) => apps[name] || foreign[name]).map((name) => {
+      const row = apps[name] || foreign[name] || {};
       const refusal = row.refused || null;
+      // An icon frame carries a signature only when the package proves it launches its mutated
+      // window: the shell reads the signed entry page and reports that the launch opens it.
+      const launch = row.launch || "";
+      const proof = Boolean(launch) && Boolean(row.launch_proof && row.launch_proof.ok);
       return {
         key: name,
         ...APP_SURFACE[name],
-        verified: row.verified === true && !refusal,
+        verified: row.verified === true && !refusal && proof,
         identity: row.identity || "",
-        refusal: refusal ? String(refusal.code || refusal) : "",
+        launch,
+        refusal: refusal ? String(refusal.code || refusal)
+          : (row.verified === true && !proof ? "app-tile-unproven-launch" : ""),
       };
     });
   }
@@ -125,10 +164,6 @@ loadContour("/contour.json")
       .map((item) => `${item.key}:${item.verified}:${item.identity}:${item.refusal}`).join("|");
     if (tiles.dataset.signature === signature && items.length) return;
     tiles.dataset.signature = signature;
-    const count = activeLanes().length;
-    $("home-status").textContent = state.lanes
-      ? `${count} live lane${count === 1 ? "" : "s"} · commons ${state.lanes.commons.all ? "answering all" : "narrowed"}`
-      : "connecting to the live archive";
     if (!items.length) {
       tiles.innerHTML = `<p class="tile-empty">${appPackages
         ? "No signed app package is available."
@@ -136,7 +171,7 @@ loadContour("/contour.json")
       return;
     }
     tiles.innerHTML = items.map((item) => `
-      <button class="tile${item.verified ? "" : " refused"}" type="button"
+      <button class="tile surface-motion${item.verified ? "" : " refused"}" type="button"
               data-kind="app" data-lane="${escapeHTML(item.key)}"
               data-verified="${item.verified}"
               data-package-identity="${escapeHTML(item.identity)}"
@@ -146,7 +181,6 @@ loadContour("/contour.json")
         <span class="tile-badge">${item.verified ? "SIGNED" : "REFUSED"}</span>
         <span class="tile-glyph" data-contour="window">${escapeHTML(item.glyph)}</span>
         <span class="tile-name">${escapeHTML(item.label)}</span>
-        <span class="tile-sub">${escapeHTML(item.sub)}</span>
         <span class="tile-package">${escapeHTML(item.verified
           ? shortIdentity(item.identity) : item.refusal)}</span>
       </button>
@@ -155,10 +189,12 @@ loadContour("/contour.json")
     tiles.querySelectorAll(".tile").forEach((tile) => {
       if (tile.dataset.verified !== "true") return;
       tile.addEventListener("click", () => {
-        // Embedded in the shell, an app hands control back to it instead of navigating
-        // the SpringBoard away from itself.
+        // Every tile opens the way dialin does: embedded in the shell, the tile hands control
+        // back to the window that delivered it, and that window shows the app itself. A tile
+        // that opened its own OS window would be a copy of the surface, not the surface.
         if (window.parent !== window) {
-          window.parent.postMessage({ source: "popit-springboard", app: tile.dataset.lane }, location.origin);
+          window.parent.postMessage({ source: "popit-springboard", app: tile.dataset.lane },
+                                    location.origin);
           return;
         }
         openApp(tile.dataset.lane);
@@ -184,7 +220,7 @@ loadContour("/contour.json")
     if (!box) return;
     const rows = visibleRows();
     if (!rows.length) {
-      box.innerHTML = `<p class="empty">No lines in ${escapeHTML(laneLabel())} yet. The room is listening.</p>`;
+      box.innerHTML = `<p class="empty">No lines in ${escapeHTML(laneLabel())} yet.</p>`;
       return;
     }
     box.innerHTML = rows.map((row) => `
@@ -219,10 +255,11 @@ loadContour("/contour.json")
       renderTiles();
       renderChatMeta();
       if (state.view === "chat") renderMessages();
-      const mic = next.mic && next.mic.state;
-      if (mic) $("home-status").textContent = `${activeLanes().length} live lanes · mic ${mic}`;
     } catch (error) {
-      $("home-status").textContent = `archive not reachable · ${error.message}`;
+      // A home that cannot read the archive shows the refusal in the bar, not a status sentence:
+      // the count of lanes and the microphone state were a construction the family refuses.
+      const pill = $("secure-pill");
+      if (pill) pill.textContent = `archive refused · ${error.message}`;
     }
   }
 
@@ -385,7 +422,7 @@ loadContour("/contour.json")
       $("voice-start").disabled = true;
       $("voice-stop").disabled = false;
       $("transcript").textContent = "";
-      $("voice-status").textContent = "Listening. Speak a full thought; stop when you are done or the clip reaches 30 seconds.";
+      $("voice-status").textContent = "Speaking.";
       timer = window.setInterval(updateVoiceTimer, 250);
       autoStop = window.setTimeout(() => stopVoice(true), 30000);
     } catch (error) {
@@ -505,5 +542,16 @@ loadContour("/contour.json")
 })();
 
 // The SpringBoard is a signed app package and takes the family theme the settings
-// package published, rather than painting a private copy of the family look.
-attach("springboard", { identitySelector: "#package-identity" });
+// package published, rather than painting a private copy of the family look. The same
+// document supplies the layout each app's window is opened with.
+let settingsPublished = {};
+attach("springboard", { identitySelector: "#package-identity" }).then((doc) => {
+  settingsPublished = (doc && doc.theme) || {};
+}).finally(() => {
+  // The home tells the window that delivered it when it has painted its own package, so the
+  // window shows a finished SpringBoard instead of a page that has not applied its theme,
+  // layout and scale yet.
+  if (window.parent !== window) {
+    window.parent.postMessage({ source: "popit-springboard", ready: true }, location.origin);
+  }
+});

@@ -1,0 +1,72 @@
+{
+  "schema": "popit.prose-probe/1",
+  "at": "2026-11-25T21:06:44Z",
+  "checks": [
+    {
+      "check": "prose-app-is-signed",
+      "ok": true,
+      "detail": "app-prose@6+blake3:7c17550b712d6757707661b3fa3ccfe6ff85fc8212fa354227d8d9c4ac4d8b62 refused None"
+    },
+    {
+      "check": "prose-app-is-the-settings-window",
+      "ok": true,
+      "detail": "entry toast.html kind window"
+    },
+    {
+      "check": "prose-window-audit-is-measured",
+      "ok": true,
+      "detail": "passed "
+    },
+    {
+      "check": "prose-window-shows-every-project",
+      "ok": true,
+      "detail": "11 row(s) for 11 project(s)"
+    },
+    {
+      "check": "prose-window-is-in-its-own-mode",
+      "ok": false,
+      "detail": "window prose package dialin"
+    },
+    {
+      "check": "prose-window-links-every-document",
+      "ok": true,
+      "detail": "11 document link(s) for 11 project(s)"
+    },
+    {
+      "check": "prose-window-carries-the-spinner",
+      "ok": true,
+      "detail": "the spinner's keyframes are in the signed sheet"
+    },
+    {
+      "check": "prose-window-knows-the-driver",
+      "ok": true,
+      "detail": "driver read · 12 staged"
+    },
+    {
+      "check": "prose-document-is-served-by-the-shell",
+      "ok": true,
+      "detail": "200, 342739 bytes"
+    }
+  ],
+  "passed": 8,
+  "failed": 1,
+  "window": {
+    "app": "app-prose@6+blake3:7c17550b712d6757707661b3fa3ccfe6ff85fc8212fa354227d8d9c4ac4d8b62",
+    "audit": {
+      "state": "passed"
+    },
+    "state": {
+      "window": "prose",
+      "package": "dialin",
+      "rows": 11,
+      "spinning": 0,
+      "drawn": 28881,
+      "refused": [],
+      "driver": "read",
+      "staged": 12,
+      "documents": 11,
+      "spinnerCss": true
+    }
+  },
+  "receipt": "F:\\Documents\\popit-shell\\artifacts\\receipts\\prose-probe.json"
+}

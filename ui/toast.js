@@ -136,6 +136,10 @@ let activeFrame = "popit";
 // frame option switches this window to that surface; it does not build a second launcher.
 const SURFACE_KEY = "popit.surface";
 let activeSurface = "desk";
+// Where a package window goes when it closes: the surface it was opened from. A window opened
+// from the home returns to the home, and a home that is not painted is loaded again, because a
+// blank window is not a state this application may reach.
+let returnSurface = "desk";
 let activeMaterial = "paper";
 let activeMotion = "reveal";
 let customPalettes = [];
@@ -366,7 +370,12 @@ function themeColors() {
 }
 
 let settingsPushTimer = 0;
+// A publish is an edit, not a paint: only a control in the settings panel sets this, so neither
+// a window's boot paint nor merely opening the settings window can replace the saved profile.
+let settingsAuthoring = false;
+
 function pushSettingsState() {
+  if (!settingsAuthoring) return;
   clearTimeout(settingsPushTimer);
   settingsPushTimer = setTimeout(() => {
     fetch("/api/toast/settings/state", {
@@ -383,6 +392,7 @@ function pushSettingsState() {
         colors: themeColors(),
       }),
     }).catch(() => {});
+    settingsAuthoring = false;
   }, 250);
 }
 
@@ -432,12 +442,13 @@ async function loadThemes() {
     POPIT_THEMES = [...familyRows, ...pairRows];
     loadCustomPalettes();
     refreshCustomThemes();
-    setText("#theme-note", "Family roster + 37 player colours + community palettes");
+    setText("#theme-note", "");
   } catch (error) {
     POPIT_THEMES = [familyTheme(FALLBACK_FAMILY)];
     loadCustomPalettes();
     refreshCustomThemes();
-    setText("#theme-note", `Family fallback · ${error.message}`);
+    // A fallback is named by its refusal code, not described: the note is not copy.
+    setText("#theme-note", String(error.message || "theme-refused"));
   }
 }
 
@@ -494,7 +505,85 @@ function updateStyleChoices() {
   updatePlanetSelection();
 }
 
+// The home is a delivered window of its own. It is shown once its package has painted, and the
+// frame's own document is read for that paint: a window whose home only waited for a message
+// showed its bar with no frame whenever the message had already gone by.
+function showHome() {
+  const board = document.querySelector("#springboard");
+  const frame = document.querySelector("#springboard-frame");
+  if (!board || !frame) return false;
+  board.hidden = false;
+  frame.hidden = false;
+  const tiles = () => {
+    try { return frame.contentDocument?.querySelectorAll(".tile").length || 0; }
+    catch (error) { return 0; }
+  };
+  const settle = () => {
+    if (!tiles()) { frame.dataset.pending = "true"; return false; }
+    frame.dataset.ready = "true";
+    frame.dataset.pending = "false";
+    // The bar names the surface that is showing: the home's own brand is its word for itself.
+    const name = document.querySelector("#window-name");
+    const brand = frame.contentDocument?.querySelector(".brand strong");
+    if (name && brand && brand.textContent.trim()) name.textContent = brand.textContent.trim();
+    return true;
+  };
+  if (settle()) return true;
+  let tries = 0;
+  const poll = window.setInterval(() => {
+    tries += 1;
+    if (settle() || tries >= 40) window.clearInterval(poll);
+  }, 250);
+  return true;
+}
+
+// Closing a package window returns to the surface it was opened from. The surface function is the
+// only place that decides what a surface shows, so close and tile-click cannot disagree.
+function closePackageWindow() {
+  const panel = document.querySelector("#settings-panel");
+  if (panel) panel.hidden = true;
+  try { window.popitProse && window.popitProse.close && window.popitProse.close(); }
+  catch (error) { /* this window carries no prose body */ }
+  delete document.body.dataset.windowMode;
+  const back = window.__popitReturnSurface === "springboard" ? "springboard" : "desk";
+  window.__popitReturnSurface = "desk";
+  setSurface(back);
+}
+
+// The window's name is its surface's name. A bar reading SPRINGBOARD over the desk's body is the
+// same defect as a frame that does not match the package: it names something it is not showing.
+function nameSurface() {
+  const node = document.querySelector("#window-name");
+  if (!node) return;
+  if (activeSurface === "springboard") {
+    const brand = document.querySelector("#springboard-frame")
+      ?.contentDocument?.querySelector(".brand strong");
+    if (brand && brand.textContent.trim()) node.textContent = brand.textContent.trim();
+    return;
+  }
+  const key = document.body.dataset.windowMode === "prose" ? "prose" : "dialin";
+  const title = (window.__popitTitles || {})[key];
+  if (title) node.textContent = title;
+}
+
+// A window paints the settings package's frame, material and motion or it refuses. This is the
+// check the refusal hangs on: a surface with a look of its own is not a variant, it is wrong.
+function styleMatchesPackage() {
+  const want = window.__popitPackageStyle;
+  if (!want) return false;
+  const root = document.documentElement.dataset;
+  return (!want.frame || root.contourFrame === want.frame)
+    && (!want.material || root.material === want.material)
+    && (!want.motion || root.motionProfile === want.motion);
+}
+
 function setSurface(name) {
+  // Every surface change is kept, so a window that loses its surface can say what moved it.
+  window.__popitSurfaces = window.__popitSurfaces || [];
+  if (window.__popitSurfaces.length > 40) window.__popitSurfaces.shift();
+  // The caller is kept too: a surface change with no visible cause is the thing being hunted.
+  const caller = String(new Error().stack || "").split("\n")[2] || "";
+  window.__popitSurfaces.push({ at: Date.now(), name, by: caller.trim().slice(0, 120) });
   activeSurface = name === "springboard" ? "springboard" : "desk";
   const toast = document.querySelector(".toast");
   if (toast) toast.dataset.surface = activeSurface;
@@ -502,25 +591,53 @@ function setSurface(name) {
   if (board) board.hidden = activeSurface !== "springboard";
   const frame = $("#springboard-frame");
   if (frame && activeSurface === "springboard") {
+    // The home is served on the same origin as this window: when the window is delivered over
+    // the pinned https origin, the SpringBoard package is loaded over https too, never as a
+    // loopback page beside a secure window.
+    const frameSrc = new URL(frame.dataset.src || "/phone.html?embedded=1",
+                             location.origin).toString();
+    // A frame that has not painted stays hidden: the window shows its ground, never a
+    // half-applied page. Entering the home re-reads the signed package, so a settings change
+    // published while the desk was open is what the SpringBoard paints.
     if (!frame.getAttribute("src")) {
-      frame.setAttribute("src", frame.dataset.src || "/phone.html");
-    } else {
-      // Re-entering the home re-reads the signed package, so a settings change published
-      // while the desk was open is what the SpringBoard paints.
+      frame.dataset.ready = "false";
+      frame.setAttribute("src", frameSrc);
+    } else if (frame.dataset.ready !== "true") {
       try { frame.contentWindow.location.reload(); } catch (error) { /* still loading */ }
     }
+    showHome();
   }
-  // The settings dialog is the desk's authoring panel; the home is not behind it.
+  // The settings dialog is the desk's authoring panel; the home is not behind it. A window mode
+  // belongs to the package window that was open: the home has none, and leaving the mode set hid
+  // the home behind `.toast > *:not(.bar):not(#settings-panel)`, which is a bar with no frame.
   if (activeSurface === "springboard") {
+    delete document.body.dataset.windowMode;
     const panel = $("#settings-panel");
     if (panel) panel.hidden = true;
   }
   try { localStorage.setItem(SURFACE_KEY, activeSurface); } catch (error) { /* storage refused */ }
+  nameSurface();
   updateStyleChoices();
 }
 
+// The settings package is the only first author of a window's appearance. A paint attempted
+// before that package's document has arrived is refused, not applied: this is what stopped the
+// window from drawing its own default theme while the package was still being read.
 function paintTheme(theme, persist = true) {
+  if (!window.__popitThemeAuthor) {
+    document.body.dataset.packageRefused = "theme-not-from-settings-package";
+    document.body.dataset.windowState = "refused";
+    return;
+  }
   const style = resolvedStyle(theme);
+  // The settings package owns the contour, material and motion. A later local repaint may change
+  // which palette is painted, but never the frame the package chose for this window.
+  const pinned = window.__popitPackageStyle;
+  if (pinned) {
+    if (pinned.frame) style.frame = pinned.frame;
+    if (pinned.material) style.material = pinned.material;
+    if (pinned.motion) style.motion = pinned.motion;
+  }
   const resolved = { ...theme, ...style };
   const panel = $("#settings-panel");
   if (!panel) return;
@@ -579,16 +696,74 @@ function paintTheme(theme, persist = true) {
     }
   }
   if (persist) localStorage.setItem("popit.theme", resolved.id);
-  setText("#theme-name", `${resolved.name} · 4 roles`);
+  setText("#theme-name", resolved.name);
   setText("#style-name", resolved.name);
   setText("#theme-origin", resolved.origin || "");
+  // A window wears the package's frame, material and motion or it refuses. Measured after the
+  // paint, so the refusal names a look the window actually has.
+  if (window.__popitPackageStyle) {
+    if (styleMatchesPackage()) {
+      if (document.body.dataset.packageRefused === "window-style-mismatch") {
+        delete document.body.dataset.packageRefused;
+        document.body.dataset.windowState = "ready";
+      }
+    } else {
+      document.body.dataset.packageRefused = "window-style-mismatch";
+      document.body.dataset.windowState = "refused";
+    }
+  }
   updateStyleChoices();
   pushSettingsState();
 }
 
-function applyTheme(id, options = {}) {
-  const theme = POPIT_THEMES.find((row) => row.id === id) || POPIT_THEMES[0];
-  paintTheme(theme, options.persist !== false);
+// The settings package is the window's appearance: its document names the palette, material,
+// contour frame, motion type and dpi, so the desk, the home and the settings window paint the
+// one profile the owner saved instead of each keeping a look of its own.
+function applyPackageLook(doc) {
+  const look = (doc && doc.theme) || {};
+  const row = POPIT_THEMES.find((theme) => theme.id === String(look.theme || ""));
+  if (!row) return false;
+  currentTheme = row.id;
+  currentSource = row.source || "family";
+  paintTheme({ ...row,
+               frame: look.frame || row.frame,
+               material: look.material || row.material,
+               motion: look.motion || row.motion }, false);
+  applyMotion(String(look.motionPreference || "full"));
+  applyZoom(Number(look.dpi) || 100);
+  return true;
+}
+
+function applyTheme(source, options = {}) {
+  // The settings package is the only author of a window's appearance: its document names the
+  // theme, frame, material and motion. A window whose package does not name a known theme is
+  // refused rather than painted with some other surface's default.
+  const authored = source && typeof source === "object" ? (source.theme || source) : null;
+  const id = String((authored ? authored.theme : source) || "");
+  const theme = POPIT_THEMES.find((row) => row.id === id);
+  if (!theme) {
+    document.documentElement.dataset.packageRefusal = "settings-theme-unknown";
+    document.body.dataset.packageRefused = `theme-${id || "missing"}`;
+    document.body.dataset.windowState = "refused";
+    return false;
+  }
+  if (authored) {
+    window.__popitThemeAuthor = true;
+    delete document.body.dataset.packageRefused;
+    document.documentElement.dataset.settingsTheme = id;
+  }
+  const styled = authored
+    ? { ...theme,
+        frame: authored.frame || theme.frame,
+        material: authored.material || theme.material,
+        motion: authored.motion || theme.motion }
+    : theme;
+  if (authored) {
+    window.__popitPackageStyle = { theme: id, frame: styled.frame,
+                                   material: styled.material, motion: styled.motion };
+  }
+  paintTheme(styled, authored ? Boolean(options.persist) : options.persist !== false);
+  return true;
 }
 
 function renderStyleOptions() {
@@ -683,6 +858,14 @@ function chooseStyle(kind, id) {
   if (kind === "frame") activeFrame = value;
   else if (kind === "material") activeMaterial = value;
   else activeMotion = value;
+  // The panel is the settings package's authoring surface: its choice is the package's style
+  // from here on, so the pin that keeps a boot paint from overriding the package follows it
+  // instead of freezing the frame the window happened to open with.
+  window.__popitPackageStyle = {
+    theme: currentTheme || (window.__popitPackageStyle || {}).theme || "",
+    frame: activeFrame, material: activeMaterial, motion: activeMotion,
+  };
+  settingsAuthoring = true;
   if (paletteDraft) {
     paletteDraft[kind] = value;
     pushPaletteHistory();
@@ -1177,7 +1360,8 @@ function motionPreference() {
   return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ? "reduced" : "full";
 }
 
-function applyMotion(mode) {
+function applyMotion(mode, author = false) {
+  if (author) settingsAuthoring = true;
   const value = mode === "reduced" ? "reduced" : "full";
   $(".toast")?.setAttribute("data-motion", value);
   localStorage.setItem("popit.motion", value);
@@ -1639,9 +1823,7 @@ function renderLanes(state) {
     commons.dataset.on = "true";
     commons.setAttribute("aria-pressed", "true");
     commons.textContent = all ? "Commons · all lanes" : "Commons · unrestricted";
-    commons.title = all
-      ? "Commons addresses every live lane automatically"
-      : "Return to commons to address every live lane";
+    commons.title = all ? "Commons: every lane" : "Commons";
   }
   const key = lanes.map((lane) => `${lane.name}:${lane.channel}:${selected.has(lane.name)}`).join("|")
     + `|${all}|${commons ? commons.dataset.on : ""}`;
@@ -1654,8 +1836,7 @@ function renderLanes(state) {
     chip.className = "lane-chip";
     chip.dataset.on = String(selected.has(lane.name));
     chip.textContent = lane.name;
-    chip.title = `${lane.name} · ${lane.channel} · ${selected.has(lane.name)
-      ? "answers unaddressed turns" : "listening only"}`;
+    chip.title = `${lane.name} · ${lane.channel}`;
     chip.setAttribute("aria-pressed", String(selected.has(lane.name)));
     chip.addEventListener("click", async () => {
       // Lane chips are an exclusive selector; clicking the active lane returns
@@ -1669,7 +1850,7 @@ function renderLanes(state) {
   if (!lanes.length) {
     const empty = document.createElement("span");
     empty.className = "lane-empty";
-    empty.textContent = "no live lanes";
+    empty.textContent = "no lanes";
     box.append(empty);
   }
 }
@@ -1930,7 +2111,8 @@ function renderHarness(state) {
   }
 }
 
-function applyZoom(percent) {
+function applyZoom(percent, author = false) {
+  if (author) settingsAuthoring = true;
   const value = Math.max(60, Math.min(180, Math.round(Number(percent) || 100)));
   const range = $("#dpi-range");
   if (range) {
@@ -1947,8 +2129,9 @@ function applyZoom(percent) {
   if (popitWindow) {
     popitWindow.set_zoom(wanted);
   } else {
+    // CSS zoom already narrows the layout box by the same factor; narrowing it again made the
+    // page's own measurements disagree with what it paints.
     document.documentElement.style.zoom = String(wanted);
-    document.documentElement.style.width = `${(100 / wanted).toFixed(4)}%`;
   }
   document.documentElement.dataset.scale = String(Number(wanted.toFixed(3)));
   pushSettingsState();
@@ -2191,17 +2374,17 @@ function wire() {
     });
   }
   const settingsPanel = $("#settings-panel");
-  currentTheme = storedTheme();
-  const selectedTheme = POPIT_THEMES.find((theme) => theme.id === currentTheme);
-  currentSource = selectedTheme?.source || "family";
-  planetSource = currentSource === "player" || currentSource === "custom" ? currentSource : "family";
+  // Nothing is painted from this machine's storage: the window's material, frame, motion and
+  // dpi are the settings package's, and they arrive with the package document.
+  currentTheme = "";
+  currentSource = "family";
+  planetSource = "family";
   renderStyleOptions();
-  applyTheme(currentTheme);
   applyMotion(motionPreference());
   wirePaletteForge();
   renderPlanetoids();
   for (const button of document.querySelectorAll("[data-motion-choice]")) {
-    button.addEventListener("click", () => applyMotion(button.dataset.motionChoice));
+    button.addEventListener("click", () => applyMotion(button.dataset.motionChoice, true));
   }
   $("#settings").addEventListener("click", () => {
     settingsPanel.hidden = !settingsPanel.hidden;
@@ -2211,8 +2394,10 @@ function wire() {
     fillContours(document);
   });
   $("#settings-package")?.addEventListener("click", () => {
-    window.open("/settings.html", "popit-settings-package", "width=820,height=820");
+    window.open("/toast.html?window=settings", "popit-settings-package", "width=820,height=820");
   });
+  $("#prose-run")?.addEventListener("click", () => popitProse.run());
+  $("#prose-close")?.addEventListener("click", () => closePackageWindow());
 
   // The SpringBoard is the phone page, so an app on it hands control back by name rather
   // than by navigating the shell away.
@@ -2220,9 +2405,39 @@ function wire() {
     if (event.origin !== location.origin) return;
     const data = event.data;
     if (!data || data.source !== "popit-springboard") return;
+    // The home has painted its package: only now is it a finished surface.
+    if (data.ready) {
+      const frame = $("#springboard-frame");
+      if (frame) {
+        frame.dataset.ready = "true";
+        frame.dataset.pending = "false";
+      }
+      return;
+    }
+    // Every app opens in this window, the way the desk does: the SpringBoard hands the app
+    // back by name and the window that delivered it shows the app.
     if (data.app === "dialin") setSurface("desk");
+    // The home hands itself back too: a window that came from the SpringBoard returns to it
+    // through the same surface call, never left on a bar with no frame behind it.
+    if (data.app === "springboard") setSurface("springboard");
     if (data.app === "settings") {
-      window.open("/settings.html", "popit-settings-package", "width=820,height=820");
+      returnSurface = activeSurface;
+      window.__popitReturnSurface = activeSurface;
+      setSurface("desk");
+      document.body.dataset.windowMode = "settings";
+      const panel = $("#settings-panel");
+      if (panel.hidden) $("#settings").click();
+    }
+    if (data.app === "prose") {
+      returnSurface = activeSurface;
+      window.__popitReturnSurface = activeSurface;
+      document.body.dataset.windowMode = "prose";
+      popitProse.boot();
+    }
+    if (data.app === "bridge") {
+      // The bridge's page is a re-creation of the window, and a re-creation is refused by
+      // name. It opens again when it is the settings window with the bridge's body.
+      setText("#refusal", "bridge · app-kind-foreign · a window page, not a package");
     }
   });
 
@@ -2230,12 +2445,68 @@ function wire() {
 
   // The desk is an app package too: it reads the same signed identity the SpringBoard
   // and the settings window read, and takes its theme from the settings package.
-  attach("dialin", { identitySelector: "#package-identity" });
-  $("#settings-close").addEventListener("click", () => {
-    if (paletteDraft) closePaletteEditor();
-    settingsPanel.hidden = true;
-    stopPlanetLoop();
-  });
+  // The window's name is the delivered package's name, never a word this page carries: a name
+  // that is not in the signed document is not the window.
+  function nameWindow(doc, fallback, app) {
+    const authored = (doc && doc.authored) || {};
+    const title = String(authored.title || fallback || "");
+    window.__popitTitles = window.__popitTitles || {};
+    if (app) window.__popitTitles[app] = title;
+    setText("#window-name", title);
+  }
+
+  // A window draws only after its package and the settings theme verify: an unverified package
+  // leaves the bar and the refusal, never a plain page wearing the app's name.
+  function refuseWindow(app) {
+    const code = document.documentElement.dataset.packageRefusal || "app-refused";
+    document.body.dataset.packageRefused = `${app}-${code}`;
+    const node = document.querySelector("#refusal");
+    if (node) node.textContent = `${app} · ${code}`;
+    // The fallback is the home, never a themed bar with an empty body: the window keeps the
+    // controls and the resize it is framed by only when a surface that owns them is showing.
+    if (app !== "springboard") setSurface("springboard");
+  }
+
+  // A window paints only after the settings package's own document has been applied; until then
+  // it is hidden, and it stays hidden with only a refusal if that never happens.
+  function markReady() {
+    if (!document.body.dataset.packageRefused) document.body.dataset.windowState = "ready";
+  }
+  window.setTimeout(() => {
+    if (document.body.dataset.windowState === "pending") refuseWindow("dialin");
+  }, 6000);
+
+  attach("dialin", { identitySelector: "#package-identity" })
+    .then((doc) => {
+      nameWindow(doc, "", "dialin");
+      if (!doc || !applyPackageLook(doc)) refuseWindow("dialin");
+      else markReady();
+    })
+    .catch(() => {
+      nameWindow(null, "dialin-refused", "dialin");
+      refuseWindow("dialin");
+    });
+  if (document.body.dataset.windowMode === "prose") {
+    attach("prose", { identitySelector: "#package-identity" })
+      .then((doc) => {
+        if (!doc) refuseWindow("prose"); else markReady();
+        nameWindow(doc, "prose", "prose");
+      })
+      .catch(() => {
+        nameWindow(null, "prose-refused", "prose");
+        refuseWindow("prose");
+      });
+  }
+  // A window that resolves to nothing is not a state this shell allows: if the page has not named
+  // itself shortly after load, the desk is shown from its own baseline instead of a blank frame.
+  window.setTimeout(() => {
+    const name = $("#window-name");
+    if (name && !name.textContent.trim()) {
+      setText("#window-name", "dialin");
+      setSurface("desk");
+    }
+  }, 6000);
+  $("#settings-close").addEventListener("click", () => closePackageWindow());
   for (const button of document.querySelectorAll("[data-settings-tab-choice]")) {
     button.setAttribute("aria-selected", String(button.dataset.settingsTabChoice === settingsTab));
   }
@@ -2245,14 +2516,17 @@ function wire() {
   showSettingsPane(settingsTab);
   settingsPanel.hidden = true;
   applyZoom(Number(localStorage.getItem("popit.zoom") || 100));
-  $("#dpi-range").addEventListener("input", (event) => applyZoom(event.target.value));
-  $("#dpi-down").addEventListener("click", () => applyZoom(Number($("#dpi-range").value) - 5));
-  $("#dpi-up").addEventListener("click", () => applyZoom(Number($("#dpi-range").value) + 5));
-  $("#dpi-reset").addEventListener("click", () => applyZoom(100));
+  $("#dpi-range").addEventListener("input", (event) => applyZoom(event.target.value, true));
+  $("#dpi-down").addEventListener("click", () => applyZoom(Number($("#dpi-range").value) - 5, true));
+  $("#dpi-up").addEventListener("click", () => applyZoom(Number($("#dpi-range").value) + 5, true));
+  $("#dpi-reset").addEventListener("click", () => applyZoom(100, true));
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !paletteDraft) {
       settingsPanel.hidden = true;
       stopPlanetLoop();
+      delete document.body.dataset.windowMode;
+      setSurface(returnSurface === "springboard" ? "springboard" : "desk");
+      returnSurface = "desk";
     }
   });
 
@@ -2388,9 +2662,9 @@ async function main() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/popit-sw.js").catch(() => undefined);
   }
-  // The desk is the authoring surface: once it has painted, it hands the published
-  // document the roles it painted with. The server publishes only when they changed.
-  window.setTimeout(pushSettingsState, 800);
+  // The desk does not publish its own paint into the settings package: the settings package is
+  // the author every window subscribes to, and a boot-time push made the desk's local default
+  // the baseline for every app. Only an edit in the settings panel publishes.
   await loadThemes();
   wire();
   $("#pin").dataset.pinned = "true";
@@ -2403,6 +2677,354 @@ async function main() {
     fillContours(document);
   } catch (error) {
     setText("#refusal", `contour · ${error.message}`);
+  }
+  // The settings package window is this page opened as a window: after the desk has painted,
+  // its own settings control opens the panel. The panel, its motion and its logic are the
+  // desk's — this window is the same page, never a second copy of it.
+  if (new URLSearchParams(location.search).get("window") === "settings") {
+    document.body.dataset.windowMode = "settings";
+    $("#settings").click();
+  }
+  // The prose window is this page with the prose panel as its body: same bar, same frame. It is
+  // booted once the probe below exists, so a failed load still leaves the window measurable.
+  // The prose app: the family's written surface, drawn in this window. Rows come from the
+  // shell's own receipts; a run is a request to the shell, never work the page performs.
+  const popitProse = {
+    last: { rows: [], driver: {}, report: {} },
+    timer: 0,
+    close() {
+      if (this.timer) window.clearInterval(this.timer);
+      this.timer = 0;
+    },
+    async fetchJson(path) {
+      const reply = await fetch(path, { cache: "no-store" });
+      return reply.ok ? reply.json() : null;
+    },
+    async load() {
+      const [report, progress] = await Promise.all([
+        this.fetchJson("/api/toast/prose/report.json"),
+        this.fetchJson("/api/toast/prose/progress.json"),
+      ]);
+      const progressRows = (progress && progress.rows) || [];
+      const rows = progressRows.length ? progressRows : ((report && report.rows) || []);
+      this.last = { rows,
+                    driver: (progress && progress.driver) || (report && report.driver) || {},
+                    report: report || {} };
+      this.paint();
+      return this.last;
+    },
+    paint() {
+      const table = $("#prose-table");
+      if (!table) return;
+      const { rows, driver } = this.last;
+      const state = $("#prose-state");
+      const refused = rows.filter((row) => row.refusal).length;
+      const busy = rows.filter((row) => row.busy || row.phase === "queued").length;
+      if (state) {
+        state.textContent = !rows.length ? "reading"
+          : busy ? `${busy} running of ${rows.length}`
+          : `${rows.length - refused} of ${rows.length} documented`;
+      }
+      const driverNode = $("#prose-driver");
+      if (driverNode) {
+        driverNode.textContent = `driver ${driver.state || "unknown"} · ${driver.detail || "—"}`
+          + (driver.projects && driver.projects.length ? ` · ${driver.projects.length} staged` : "");
+      }
+      table.textContent = "";
+      if (!rows.length) {
+        const row = document.createElement("div");
+        row.className = "prose-row";
+        row.id = "prose-reading";
+        const spin = document.createElement("span");
+        spin.className = "prose-spinner";
+        const label = document.createElement("span");
+        label.textContent = "reading the family…";
+        row.append(spin, label);
+        table.append(row);
+        return;
+      }
+      for (const row of rows) {
+        const line = document.createElement("div");
+        line.className = "prose-row";
+        line.id = `prose-${row.name}`;
+        const refusal = row.refusal && row.refusal.code;
+        line.dataset.refused = String(Boolean(refusal));
+        const name = document.createElement("span");
+        name.className = "prose-name";
+        if (row.busy || row.phase === "queued") {
+          const spin = document.createElement("span");
+          spin.className = "prose-spinner";
+          name.append(spin);
+        }
+        name.append(document.createTextNode(row.name));
+        const progress = document.createElement("span");
+        const bar = document.createElement("span");
+        bar.className = "prose-bar";
+        const fill = document.createElement("i");
+        fill.style.width = `${row.percent || 0}%`;
+        bar.append(fill);
+        progress.append(bar);
+        const phase = document.createElement("span");
+        phase.className = "prose-phase";
+        phase.textContent = row.phase || "";
+        const extractors = document.createElement("span");
+        extractors.textContent = Object.entries(row.extractors || {})
+          .map(([kind, count]) => `${kind}:${count}`).join(" ");
+        const drawn = document.createElement("span");
+        drawn.textContent = String(row.visible ?? "");
+        const hits = document.createElement("span");
+        hits.textContent = String(row.hits ?? "");
+        const driverCell = document.createElement("span");
+        driverCell.textContent = refusal || row.driver || "";
+        const doc = document.createElement("span");
+        if (row.doc_url) {
+          const link = document.createElement("a");
+          link.href = row.doc_url;
+          link.textContent = "read";
+          doc.append(link);
+        } else {
+          doc.textContent = "—";
+        }
+        line.append(name, progress, phase, extractors, drawn, hits, driverCell, doc);
+        table.append(line);
+      }
+    },
+    async run() {
+      const state = $("#prose-state");
+      if (state) state.textContent = "starting";
+      await fetch("/api/toast/prose/run", { method: "POST" }).catch(() => null);
+      window.setTimeout(() => this.load(), 600);
+    },
+    async boot() {
+      // The window's base is the page it was mutated from; the app now delivered in it is prose.
+      // Both are named, so a reader sees the base was not replaced by a page of its own.
+      this.base = document.documentElement.dataset.packageApp || "";
+      document.body.dataset.windowMode = "prose";
+      document.documentElement.dataset.packageApp = "prose";
+      await this.load();
+      const identity = $("#package-identity");
+      const name = (this.last.report || {}).identity || "";
+      if (identity && name) identity.textContent = name;
+      this.timer = window.setInterval(() => this.load(), 1200);
+    },
+    // The measurement: what the delivered window actually shows, for the window probe.
+    state() {
+      const rows = this.last.rows || [];
+      return JSON.stringify({
+        window: document.body.dataset.windowMode || "",
+        package: document.documentElement.dataset.packageApp || "",
+        base: this.base || "",
+        rows: rows.length,
+        spinning: rows.filter((row) => row.busy || row.phase === "queued").length,
+        drawn: rows.reduce((sum, row) => sum + (Number(row.visible) || 0), 0),
+        refused: rows.filter((row) => row.refusal)
+          .map((row) => `${row.name}:${row.refusal.code}`).slice(0, 12),
+        driver: (this.last.driver || {}).state || "",
+        staged: ((this.last.driver || {}).projects || []).length,
+        documents: rows.filter((row) => row.doc_url).length,
+        spinnerCss: Array.from(document.styleSheets).some((sheet) => {
+          try {
+            return Array.from(sheet.cssRules).some((rule) => String(rule.cssText).includes("prose-spin"));
+          } catch (error) {
+            return false;
+          }
+        }),
+      });
+    },
+  };
+  window.popitProse = popitProse;
+
+  // The shell's harness probe: named acts the delivered window performs and reports back, so
+  // a check reads the window instead of a browser tab beside it.
+  window.popitProbe = {
+    // The prose app's own measurement: what its window shows, read from the window.
+    prose() {
+      return popitProse.state();
+    },
+    // The act a tile performs: the home hands the app to this window by name, so the probe hands
+    // it the same message the frame posts rather than reaching into the frame.
+    openApp(name) {
+      window.postMessage({ source: "popit-springboard", app: String(name || "") },
+                         location.origin);
+      return JSON.stringify({ surface: document.querySelector(".toast")?.dataset.surface || "",
+                              mode: document.body.dataset.windowMode || "" });
+    },
+    // What the settings package actually painted: theme, contour frame, material and motion,
+    // read from the live document rather than from the code that was supposed to set them.
+    paint() {
+      try {
+        const toast = document.querySelector(".toast");
+        const style = toast ? getComputedStyle(toast) : null;
+        const root = getComputedStyle(document.documentElement);
+        return JSON.stringify({
+          state: document.body.dataset.windowState || "",
+          refused: document.body.dataset.packageRefused || "",
+          theme: document.documentElement.dataset.settingsTheme || "",
+          frame: document.documentElement.dataset.contourFrame || "",
+          material: document.documentElement.dataset.material || "",
+          motion: document.documentElement.dataset.motionProfile || "",
+          surface: root.getPropertyValue("--popit-surface").trim(),
+          ground: root.getPropertyValue("--popit-ground").trim(),
+          pinned: window.__popitPackageStyle || null,
+          match: styleMatchesPackage(),
+          dataTheme: document.documentElement.dataset.theme || "",
+          author: Boolean(window.__popitThemeAuthor),
+          height: toast ? Math.round(toast.getBoundingClientRect().height) : 0,
+          visible: style ? style.visibility : "",
+        });
+      } catch (error) {
+        return JSON.stringify({ error: String((error && error.message) || error) });
+      }
+    },
+    // The act a style button performs, measured: frame, material and motion are the settings
+    // package's, and the window must paint the one the panel chose.
+    choose(arg) {
+      const [kind, id] = String(arg || "").split("/");
+      chooseStyle(kind, id);
+      // A measurement must not author the package: the probe paints the choice and cancels the
+      // publish that a real button press schedules, so probing never replaces the saved profile.
+      settingsAuthoring = false;
+      return window.popitProbe.paint();
+    },
+    // The act a failed package window performs: the window must fall back to the home, so the
+    // measurement is the surface and the frame after the refusal, not a promise about it.
+    fallback() {
+      refuseWindow("dialin");
+      return window.popitProbe.windowState();
+    },
+    // The act the close button performs, measured: the window must return to the surface it was
+    // opened from, and a home that is not painted must be loaded again rather than left blank.
+    windowClose() {
+      try {
+        closePackageWindow();
+      } catch (error) {
+        return JSON.stringify({ refused: String((error && error.message) || error) });
+      }
+      return window.popitProbe.windowState();
+    },
+    // What the window shows right now: which surface, which window mode, its name, and whether
+    // the home frame is painted. This is the reading the close path is held to.
+    windowState() {
+      const frame = $("#springboard-frame");
+      return JSON.stringify({
+        surface: document.querySelector(".toast")?.dataset.surface || "",
+        mode: document.body.dataset.windowMode || "",
+        name: $("#window-name")?.textContent.trim() || "",
+        identity: $("#package-identity")?.textContent.trim() || "",
+        refused: document.body.dataset.packageRefused || "",
+        theme: document.documentElement.dataset.contourFrame || "",
+        panel: Boolean($("#settings-panel") && !$("#settings-panel").hidden),
+        trace: (window.__popitSurfaces || []).slice(-6),
+        board: Boolean($("#springboard") && !$("#springboard").hidden
+                       && $("#springboard").getBoundingClientRect().height > 0),
+        toast: Math.round((document.querySelector(".toast")?.getBoundingClientRect().height) || 0),
+                frame: frame ? { hidden: Boolean(frame.hidden), src: frame.getAttribute("src") || "",
+                          ready: frame.dataset.ready || "", pending: frame.dataset.pending || "",
+                          doc: Boolean(frame.contentDocument),
+                          theme: frame.contentDocument?.documentElement?.dataset?.contourFrame || "",
+                          dpi: frame.contentDocument?.documentElement?.dataset?.dpi || "",
+                          tiles: frame.contentDocument?.querySelectorAll(".tile").length || 0,
+                          text: (frame.contentDocument?.body?.innerText || "").trim()
+                            .replace(/\s+/g, " ").slice(0, 120),
+                          height: Math.round(frame.getBoundingClientRect().height),
+                          boardHeight: Math.round((document.querySelector("#springboard")||frame)
+                            .getBoundingClientRect().height),
+                         painted: frame.getBoundingClientRect().height > 0 } : null,
+      });
+    },
+    // The home's measurement, read by the window that delivers it: the frame is this window's
+    // own surface, so the tiles below are the ones the owner sees, not a second rendering.
+    home() {
+      const frame = $("#springboard-frame");
+      if (!frame) return JSON.stringify({ frame: false });
+      const src = frame.getAttribute("src") || "";
+      let doc = null;
+      try { doc = frame.contentDocument; } catch (error) { doc = null; }
+      if (!doc) return JSON.stringify({ frame: true, src, readable: false });
+      const tiles = Array.from(doc.querySelectorAll(".tile")).map((tile) => ({
+        lane: tile.dataset.lane || "",
+        verified: tile.dataset.verified || "",
+        badge: tile.querySelector(".tile-badge")?.textContent.trim() || "",
+        package: tile.querySelector(".tile-package")?.textContent.trim() || "",
+      }));
+      return JSON.stringify({
+        frame: true, readable: true, src,
+        embedded: src.includes("embedded=1"),
+        secure: src.startsWith("https:"),
+        identity: doc.querySelector("#package-identity")?.textContent.trim() || "",
+        title: doc.querySelector(".brand strong")?.textContent.trim() || "",
+        status: doc.querySelector("#home-status")?.textContent.trim() || "",
+        tiles,
+      });
+    },
+    springboard() {
+      setSurface("springboard");
+      return window.popitProbe.springboardState();  // the state at first paint
+    },
+    // The SpringBoard is measured where it lives: in the frame that the settings window
+    // delivers, at the frame's own size. It is never loaded as a page of its own.
+    springboardAudit() {
+      setSurface("springboard");
+      const frame = $("#springboard-frame");
+      if (!frame) return JSON.stringify({ frame: false });
+      frame.dataset.ready = "false";
+      frame.dataset.pending = "true";
+      const src = new URL("/phone.html?embedded=1&uiaudit=1&app=springboard", location.origin).toString();
+      frame.setAttribute("src", src);
+      // The audit flag is the measurement's, not the window's state: once it has reported, the
+      // frame is loaded again as the plain signed page.
+      window.setTimeout(() => {
+        frame.dataset.ready = "false";
+        frame.dataset.pending = "true";
+        frame.setAttribute("src", new URL("/phone.html?embedded=1", location.origin).toString());
+      }, 9000);
+      return JSON.stringify({ pending: frame.dataset.pending || "", src,
+                              origin: location.origin,
+                              painted: getComputedStyle(frame).visibility !== "hidden" });
+    },
+    // Proof that the frame is the signed SpringBoard and nothing else: where it points, what
+    // it says it is, and that this window has no second launcher.
+    frameIntegrity() {
+      const frame = $("#springboard-frame");
+      if (!frame) return JSON.stringify({ frame: false });
+      const src = frame.getAttribute("src") || "";
+      let identity = "";
+      let marker = "";
+      let path = "";
+      try {
+        path = new URL(src, location.origin).pathname;
+        const doc = frame.contentDocument;
+        identity = doc?.querySelector("#package-identity")?.textContent.trim() || "";
+        marker = doc?.documentElement?.dataset.packageApp || doc?.body?.dataset.popit || "";
+      } catch (error) { /* a refused frame is reported as having no identity */ }
+      // The home's tiles are read by the home itself, in its own window, not through this
+      // frame: reading a surface through a bare iframe is what the family's probe rule forbids.
+      return JSON.stringify({
+        src, path, identity, marker,
+        frames: document.querySelectorAll("iframe").length,
+        launchers: document.querySelectorAll("[data-launcher]").length,
+        surface: document.querySelector(".toast")?.dataset.surface || "",
+      });
+    },
+    springboardState() {
+      const frame = $("#springboard-frame");
+      if (!frame) return JSON.stringify({ frame: false });
+      const box = frame.getBoundingClientRect();
+      return JSON.stringify({
+        pending: frame.dataset.pending || "",
+        ready: frame.dataset.ready || "",
+        src: frame.getAttribute("src") || "",
+        origin: location.origin,
+        painted: getComputedStyle(frame).visibility !== "hidden",
+        width: Math.round(box.width),
+      });
+    },
+  };
+  if (new URLSearchParams(location.search).get("window") === "prose") {
+    popitProse.boot().catch((error) => {
+      const state = $("#prose-state");
+      if (state) state.textContent = `prose · ${error.message}`;
+    });
   }
   await poll();
   if (typeof EventSource !== "undefined") {

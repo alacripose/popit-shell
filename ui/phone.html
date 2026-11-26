@@ -16,38 +16,25 @@
 </head>
 <body>
   <div class="page">
-    <header class="topbar">
+    <header class="topbar" data-region="bar">
       <button class="home-key" id="home-key" type="button" aria-label="Home" data-contour="card">
         <span class="diamond" aria-hidden="true"></span>
       </button>
-      <div class="brand">
-        <span class="brand-kicker">POPIT</span>
-        <strong>SPRINGBOARD</strong>
-      </div>
-      <span class="secure-pill" id="secure-pill" data-contour="card">checking</span>
+      <span class="secure-pill" id="secure-pill" data-contour="card" data-region="status">checking</span>
     </header>
 
     <main id="stage">
-      <section class="screen home" id="home-screen" aria-labelledby="home-title">
-        <div class="hero">
-          <p class="eyebrow">SIGNED APP PACKAGES</p>
-          <h1 id="home-title">A room that answers.</h1>
-          <p class="hero-copy">Tap a signed app. Every tile carries its package identity and the family contour, and a refused package stays closed.</p>
-          <div class="live-row"><span class="pulse-dot"></span><span id="home-status">connecting to the live archive</span></div>
-        </div>
-        <div class="tiles" id="tiles" aria-label="Popit apps"></div>
+      <section class="screen home" id="home-screen" aria-label="Home">
+        <div class="tiles" id="tiles" data-region="body" aria-label="Popit apps"></div>
         <div class="page-dots" aria-hidden="true"><i class="on"></i><i></i></div>
-        <p class="hint">DialIn is the phone calling surface. Settings carries the family contour, material and size.</p>
       </section>
 
       <section class="screen view" id="chat-screen" aria-labelledby="chat-title" hidden>
         <div class="view-head">
-          <button class="back-key" type="button" data-home data-contour="card">← HOME</button>
           <div>
             <p class="eyebrow" id="chat-eyebrow">COMMONS</p>
             <h2 id="chat-title">Shared room</h2>
           </div>
-          <span class="live-pill" data-contour="card"><span class="pulse-dot"></span>LIVE</span>
         </div>
         <div class="chat-meta" id="chat-meta"></div>
         <div class="messages" id="messages" aria-live="polite"></div>
@@ -63,7 +50,6 @@
 
       <section class="screen view" id="voice-screen" aria-labelledby="voice-title" hidden>
         <div class="view-head">
-          <button class="back-key" type="button" data-home data-contour="card">← HOME</button>
           <div>
             <p class="eyebrow">PHONE VOICE</p>
             <h2 id="voice-title">Talk to the room</h2>
@@ -79,20 +65,17 @@
           </div>
           <p class="voice-timer" id="voice-timer">00:00</p>
           <div class="transcript" id="transcript" aria-live="polite" data-contour="card"></div>
-          <p class="hint">Mic capture needs the HTTPS certificate. <a href="/popit-cert.cer">Install popit-cert.cer</a> first. Plain HTTP is read-only.</p>
         </div>
       </section>
 
       <section class="screen view" id="agents-screen" aria-labelledby="agents-title" hidden>
         <div class="view-head">
-          <button class="back-key" type="button" data-home data-contour="card">← HOME</button>
           <div>
             <p class="eyebrow">EXTERNAL LINES</p>
             <h2 id="agents-title">Verified agents</h2>
           </div>
           <span class="secure-pill" id="agents-secure" data-contour="card">secure</span>
         </div>
-        <p class="hint" id="agents-note">Owner-issued codes enroll an agent once. A verified contact gets a Popit line, not a carrier number.</p>
         <div class="agent-tools">
           <button class="agent-button primary" id="agent-invite" type="button" data-contour="card">INVITE AGENT</button>
           <button class="agent-button" id="agent-refresh" type="button" data-contour="card">REFRESH</button>
@@ -104,12 +87,11 @@
           <button class="agent-button" id="enrollment-dismiss" type="button" data-contour="card">DONE</button>
         </div>
         <div class="agent-list" id="agent-list" aria-live="polite"></div>
-        <p class="hint" id="agent-list-note">No verified external lines yet.</p>
       </section>
     </main>
 
-    <footer class="foot">
-      <span>THE FAMILY SURFACE · <span id="clock">--:--</span></span>
+    <footer class="foot" data-region="foot">
+      <span id="clock">--:--</span>
       <span id="package-identity" class="package-identity" data-verified="false">app · unverified</span>
       <span id="foot-mode">LAN</span>
     </footer>

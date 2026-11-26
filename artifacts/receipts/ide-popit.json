@@ -1,0 +1,109 @@
+{
+  "schema": "popit.ide-probe/1",
+  "at": "2026-11-25T04:14:05Z",
+  "loader": "popit.ide/1",
+  "checks": [
+    {
+      "check": "ide-page",
+      "ok": true,
+      "detail": "/ide 200 · 8/8 ids"
+    },
+    {
+      "check": "ide-assets",
+      "ok": true,
+      "detail": "/ide.js /ide.css"
+    },
+    {
+      "check": "ide-state-schema",
+      "ok": true,
+      "detail": "popit.ide/1"
+    },
+    {
+      "check": "ide-state-bridge",
+      "ok": true,
+      "detail": "stopped · "
+    },
+    {
+      "check": "ide-app-package",
+      "ok": true,
+      "detail": "ide"
+    },
+    {
+      "check": "ide-window-hosts-surface",
+      "ok": true,
+      "detail": "the agent window hosts the IDE app surface, not a desk tab · http 200"
+    },
+    {
+      "check": "ide-session-open",
+      "ok": true,
+      "detail": "ide-48e2003498 · call call-1795577129-34"
+    },
+    {
+      "check": "ide-refusal-recorded",
+      "ok": true,
+      "detail": "note probe-note · 3 turns"
+    },
+    {
+      "check": "ide-probe-fleet",
+      "ok": true,
+      "detail": "cua-chat·0, cua-2·0, cua-3·0, cua-4·0"
+    },
+    {
+      "check": "ide-probe-bridge-refuses",
+      "ok": true,
+      "detail": "bridge-stopped · port — · beats 0 · flaps 0 · "
+    },
+    {
+      "check": "bridge-act-idempotent",
+      "ok": true,
+      "detail": "task-c1de9bc4 == task-c1de9bc4 · tasks +1"
+    },
+    {
+      "check": "bridge-ledger-survives-restart",
+      "ok": true,
+      "detail": "task-c1de9bc4 · done from a reopened ledger"
+    },
+    {
+      "check": "bridge-key-refused",
+      "ok": true,
+      "detail": "bridge-key"
+    },
+    {
+      "check": "bridge-seq-refused",
+      "ok": true,
+      "detail": "bridge-seq-regressed"
+    },
+    {
+      "check": "bridge-token-required",
+      "ok": true,
+      "detail": "no token, http 403"
+    },
+    {
+      "check": "bridge-token-accepted",
+      "ok": true,
+      "detail": "token, http 200"
+    },
+    {
+      "check": "bridge-tunnel-health",
+      "ok": true,
+      "detail": "allocated 46385, http 200 · "
+    },
+    {
+      "check": "qwen-lane-answered",
+      "ok": true,
+      "detail": "answer · My host is Debian and my model is Qwen."
+    },
+    {
+      "check": "ide-act-receipt",
+      "ok": true,
+      "detail": "done"
+    },
+    {
+      "check": "ide-session-close",
+      "ok": true,
+      "detail": "closed"
+    }
+  ],
+  "passed": 20,
+  "failed": 0
+}

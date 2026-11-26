@@ -89,7 +89,6 @@ import dialin  # noqa: E402
 import envelope  # noqa: E402
 import external_agents  # noqa: E402
 import hosts  # noqa: E402
-import ide as ide_mod  # noqa: E402
 import mind_bridge  # noqa: E402
 import settings_package  # noqa: E402
 import app_package  # noqa: E402
@@ -182,11 +181,6 @@ class Toast:
         self.bridge = bridge_mod.TunnelSupervisor(
             self.window_token, target_host=hosts.lan_host(), target_port=5208,
             target_file=ROOT / "runlogs" / "toast" / "bridge-target.json",
-        )
-        self.ide = ide_mod.IdeDesk(
-            ROOT / "runlogs" / "toast", mind=self.mind, fleet=self.fleet,
-            calls=self.calls, archive=self.archive, bridge=self.bridge,
-            ledger=self.bridge_ledger, view=self.debian,
         )
         self.live = True
         self.call = "natural-language"
@@ -1011,7 +1005,6 @@ class Toast:
                 "external": self.external.state(),
                 "civilians": self.civilians.state(),
                 "calls": self.calls.state(),
-                "ide": self.ide.state(),
                 "bridge": self.bridge.state(),
                 "bridge_ledger": self.bridge_ledger.state()["counters"],
                 "lanes": self.lane_state(),
@@ -1043,8 +1036,7 @@ class Toast:
                 "bridge": self.bridge.state(),
                 "ledger": self.bridge_ledger.state(),
                 "toast": {"at": iso(), "revision": self.revision},
-                "drivers": self.fleet.state()["drivers"],
-                "ide": (self.ide.state().get("active") or {}).get("id", "")}
+                "drivers": self.fleet.state()["drivers"]}
 
     def bridge_receipt(self, task_id: str) -> dict:
         try:
@@ -1137,6 +1129,83 @@ class Toast:
             return task.as_dict()
 
 
+# The delivered window audits itself. The shell loads the page into the window it already
+# shows with the audit flag; that page measures its own surface and posts the report to
+# /api/toast/ui-audit. A route that typed "passed" here would be a lie, so this only opens a
+# surface and records what the window measured.
+# One family prose pass at a time, started by the prose app's own button. A second request
+# inside the window replays instead of starting a second pass over every project.
+PROSE_RUN = {"at": 0.0, "pid": 0}
+
+
+def prose_run() -> dict:
+    """Start `tools/prose_family.py run` in the background and say which process carries it."""
+    import subprocess
+    import sys
+    import time
+    now = time.time()
+    pid = int(PROSE_RUN.get("pid") or 0)
+    if now - float(PROSE_RUN.get("at") or 0) < 20 and pid:
+        return {"ok": True, "started": False, "pid": pid,
+                "detail": "a pass started less than twenty seconds ago"}
+    log = ROOT / "runlogs" / "prose" / "run.log"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    handle = log.open("a", encoding="utf-8")
+    try:
+        process = subprocess.Popen([sys.executable, str(ROOT / "tools" / "prose_family.py"), "run"],
+                                   cwd=str(ROOT), stdout=handle, stderr=subprocess.STDOUT,
+                                   creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    finally:
+        handle.close()
+    PROSE_RUN.update({"at": now, "pid": process.pid})
+    return {"ok": True, "started": True, "pid": process.pid}
+
+
+WINDOW_AUDIT_ROUTES = {
+    "dialin": "/toast.html?uiaudit=1&app=dialin",
+    "settings": "/toast.html?window=settings&uiaudit=1&app=settings",
+    # The prose app is the settings window's page in its prose mode, so its audit opens the
+    # window the owner opens, not a page beside it.
+    "prose": "/toast.html?window=prose&uiaudit=1&app=prose",
+    # The SpringBoard is measured as its own signed app, top level in the shell's window: never
+    # by reading it through the frame it is delivered in.
+    "springboard": "/phone.html?embedded=1&uiaudit=1&app=springboard",
+    "bridge": "/bridge.html?uiaudit=1&app=bridge",
+    # No springboard route: the home is only ever the frame inside this window, so it is
+    # measured there rather than loaded as a page of its own.
+    "desk": "/toast.html",
+}
+WINDOW_QUEUE: list[tuple] = []
+WINDOW_VIEW: dict = {}
+WINDOW_RESULTS: dict = {}
+WINDOW_EVAL_SEQ: list[int] = [0]
+WINDOW_PROBES = ("springboard", "springboardState", "springboardAudit", "frameIntegrity",
+                 "prose", "home", "openApp", "windowClose", "windowState", "paint",
+                 "fallback", "choose")
+
+
+def queue_window(item: tuple) -> bool:
+    """Queue an act for the delivered window; a window that is not up refuses by name."""
+    if not WINDOW_VIEW.get("view"):
+        return False
+    WINDOW_QUEUE.append(item)
+    return True
+
+
+def window_audit(route: str) -> bool:
+    return queue_window(("route", route, ""))
+
+
+def window_eval(name: str, argument: object = None) -> str:
+    """Ask the window to perform one of its named probes; the answer is kept under the id."""
+    WINDOW_EVAL_SEQ[0] += 1
+    key = f"{name}-{WINDOW_EVAL_SEQ[0]}"
+    WINDOW_RESULTS[key] = {"state": "queued", "value": None, "at": None}
+    if not queue_window(("eval", key, name, argument)):
+        WINDOW_RESULTS[key] = {"state": "window-absent", "value": None, "at": None}
+    return key
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "popit-toast/1"
 
@@ -1186,12 +1255,60 @@ class Handler(BaseHTTPRequestHandler):
         toast: Toast = self.server.toast
         if not self.archive_allowed(path):
             return self.json({"ok": False, "refused": "archive-token"}, 403)
+        if path.startswith("/api/toast/prose/stage/"):
+            # The prose program's staging bundle: the driver pulls a project's prose over the
+            # shell's own origin, so the transfer names the shell instead of a second server.
+            if not getattr(self.server, "tls", False) and self.client_address[0] not in ("127.0.0.1", "::1"):
+                return self.json({"ok": False, "refused": "secure-origin-required"}, 403)
+            name = path.rsplit("/", 1)[-1]
+            suffix = ".tar.gz" if name.endswith(".tar.gz") else ".json" if name.endswith(".json") else ""
+            stem = name[:-len(suffix)] if suffix else ""
+            if not stem or not all(char.isalnum() or char in "-_" for char in stem):
+                return self.json({"ok": False, "refused": "prose-stage-name"}, 404)
+            target = ROOT / "runlogs" / "prose" / "stage" / (stem + suffix)
+            if not target.is_file():
+                return self.json({"ok": False, "refused": "prose-stage-absent", "detail": stem}, 404)
+            kind = "application/gzip" if suffix == ".tar.gz" else "application/json"
+            return self.send_body(target.read_bytes(), kind, 200, name)
+        if path in ("/api/toast/prose/report.json", "/api/toast/prose/progress.json"):
+            # The prose app reads the family's receipts through the shell; the page holds no
+            # clock and no reading of its own.
+            report = path.endswith("report.json")
+            target = (ROOT / "artifacts" / "receipts" / "prose-family.json") if report \
+                else (ROOT / "runlogs" / "prose" / "progress.json")
+            if not target.is_file():
+                return self.json({"schema": "popit.prose-family/1", "rows": [], "state": "not-run"})
+            return self.send_body(target.read_bytes(), "application/json", 200, target.name)
+        if path.startswith("/api/toast/prose/doc/"):
+            project = path.rsplit("/", 1)[-1]
+            target = ROOT / "docs" / "prose" / project / "index.html"
+            if not project or not all(char.isalnum() or char in "-_" for char in project) \
+                    or not target.is_file():
+                return self.json({"ok": False, "refused": "prose-doc-absent", "detail": project[:60]}, 404)
+            return self.send_body(target.read_bytes(), "text/html; charset=utf-8", 200, "index.html")
+        if path == "/api/toast/window/eval":
+            key = (parse_qs(urlsplit(self.path).query).get("id") or [""])[0]
+            result = WINDOW_RESULTS.get(key)
+            if not result:
+                return self.json({"ok": False, "refused": "window-eval-id"}, 404)
+            if result.get("state") != "measured":
+                return self.json({"ok": False, "state": result.get("state")}, 202)
+            return self.json({"ok": True, "state": "measured", "value": result.get("value")})
         if path == "/":
-            # The phone's home is the SpringBoard, not the desk: the desk is the dialin app
-            # package, and wrapping it in a shell on a phone draws two chromes over one page.
-            return self.file("phone.html", "text/html; charset=utf-8")
+            # The home is never a page of its own: it is the signed SpringBoard app delivered in
+            # the agent window. A bare home is the fake surface, so the bare route is the desk.
+            self.send_response(302)
+            self.send_header("Location", "/toast.html")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         if path == "/toast.html":
-            return self.file("toast.html", "text/html; charset=utf-8")
+            # The dialin window is the owner's desk, and its settings page is the baseline
+            # every app package subscribes to. It is served as the app's own signed page.
+            try:
+                return self.file("toast.html", "text/html; charset=utf-8")
+            except app_package.Refused as error:
+                return self.json({"ok": False, "refused": error.as_dict()}, 409)
         if path == "/ui-audit.js":
             return self.file("ui-audit.js", "text/javascript; charset=utf-8")
         if path == "/toast.js":
@@ -1199,7 +1316,14 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/toast.css":
             return self.file("toast.css", "text/css; charset=utf-8")
         if path == "/settings.html":
+            # The settings window is the delivered window: its own signed page, opened in its
+            # own named window, and the package every app subscribes to for its look.
             return self.file("settings.html", "text/html; charset=utf-8")
+        if path == "/bridge.html":
+            try:
+                return self.file("bridge.html", "text/html; charset=utf-8")
+            except app_package.Refused as error:
+                return self.json({"ok": False, "refused": error.as_dict()}, 409)
         if path == "/settings.js":
             return self.file("settings.js", "text/javascript; charset=utf-8")
         if path == "/settings.css":
@@ -1220,6 +1344,13 @@ class Handler(BaseHTTPRequestHandler):
                                   "detail": str(error)[:160]}, 500)
             return self.send_body(body, "application/x-x509-ca-cert", 200, "popit-cert.cer")
         if path in ("/phone", "/phone.html"):
+            # Only the window's own delivery may load the home. A top-level request for it is
+            # the refused fake SpringBoard, named rather than served.
+            query = parse_qs(urlsplit(self.path).query)
+            if not query.get("embedded"):
+                return self.json({"ok": False, "refused": "springboard-standalone-refused",
+                                  "detail": "the home is delivered in the agent window; "
+                                            "request it with embedded=1 from that frame"}, 409)
             return self.file("phone.html", "text/html; charset=utf-8")
         if path == "/phone.css":
             return self.file("phone.css", "text/css; charset=utf-8")
@@ -1277,14 +1408,6 @@ class Handler(BaseHTTPRequestHandler):
                 return self.json(toast.apps.document(path.rsplit("/", 1)[-1]))
             except app_package.Refused as error:
                 return self.json({"ok": False, "refused": error.as_dict()}, 409)
-        if path == "/ide":
-            return self.file("ide.html", "text/html; charset=utf-8")
-        if path == "/ide.js":
-            return self.file("ide.js", "text/javascript; charset=utf-8")
-        if path == "/ide.css":
-            return self.file("ide.css", "text/css; charset=utf-8")
-        if path == "/api/ide":
-            return self.json(toast.ide.state())
         if path == "/api/bridge/health":
             return self.json(toast.bridge_health())
         if path.startswith("/api/bridge/receipt/"):
@@ -1369,6 +1492,47 @@ class Handler(BaseHTTPRequestHandler):
             except (ValueError, json.JSONDecodeError):
                 return self.json({"ok": False, "refused": "bridge-run-body"}, 400)
             return self.json(bridge_run(str((body or {}).get("command") or "")))
+        if path == "/api/toast/ui-error":
+            # A window's own script error, kept where the shell's log already is.
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                report = json.loads(self.rfile.read(length) or b"{}")
+            except (ValueError, json.JSONDecodeError):
+                report = {}
+            line = json.dumps({"at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                               "report": report}, ensure_ascii=False)
+            target = ROOT / "runlogs" / "toast" / "ui-errors.jsonl"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with target.open("a", encoding="utf-8") as handle:
+                handle.write(line + "\n")
+            print(f"toast-ui-error {str(report)[:200]}", flush=True)
+            return self.json({"ok": True})
+        if path == "/api/toast/window/eval":
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(length) or b"{}")
+            except (ValueError, json.JSONDecodeError):
+                return self.json({"ok": False, "refused": "window-eval-body"}, 400)
+            name = str((body or {}).get("name") or "")
+            if name not in WINDOW_PROBES:
+                return self.json({"ok": False, "refused": "window-eval-name"}, 400)
+            # A probe that performs an act names what it acts on; the argument is JSON, not a
+            # fragment spliced into JavaScript.
+            argument = (body or {}).get("arg")
+            return self.json({"ok": True, "id": window_eval(name, argument), "name": name})
+        if path == "/api/toast/window/audit":
+            try:
+                length = int(self.headers.get("Content-Length") or 0)
+                body = json.loads(self.rfile.read(length) or b"{}")
+            except (ValueError, json.JSONDecodeError):
+                return self.json({"ok": False, "refused": "window-audit-body"}, 400)
+            app = str((body or {}).get("app") or "")
+            route = WINDOW_AUDIT_ROUTES.get(app)
+            if not route:
+                return self.json({"ok": False, "refused": "window-audit-app"}, 400)
+            if not window_audit(route):
+                return self.json({"ok": False, "refused": "window-absent", "app": app}, 409)
+            return self.json({"ok": True, "app": app, "route": route})
         if path == "/api/toast/ui-audit":
             try:
                 length = int(self.headers.get("Content-Length") or 0)
@@ -1413,6 +1577,19 @@ class Handler(BaseHTTPRequestHandler):
             return self.mcp(body)
         loopback = self.client_address[0] in ("127.0.0.1", "::1")
         try:
+            if path == "/api/toast/apps/ensure":
+                # Hot reload's signing half: a changed surface is re-signed by this shell's
+                # publisher, attributed to the live driver, without restarting the process.
+                # A measurement is not implied: a re-signed package carries `ui_audit:
+                # pending` until the driver audits the page, and tools/freshness.py names
+                # that act instead of letting the audit go stale.
+                if not getattr(self.server, "tls", False) and not loopback:
+                    return self.json({"ok": False, "refused": "secure-origin-required"}, 403)
+                return self.json({"ok": True, "apps": toast.apps.ensure_all()})
+            if path == "/api/toast/prose/run":
+                if not getattr(self.server, "tls", False) and not loopback:
+                    return self.json({"ok": False, "refused": "secure-origin-required"}, 403)
+                return self.json(prose_run())
             if path == "/api/toast/apps/verify":
                 # The app registry keeps the phone's posture: a signed identity is read
                 # over a secure origin, and loopback is the machine itself.
@@ -1467,28 +1644,6 @@ class Handler(BaseHTTPRequestHandler):
                 toast.archive.add("event", f"external call {row['state']} · {row['call_id']}",
                                   role="external", call=row["call_id"], state=row["state"])
                 return self.json(row)
-            if path == "/api/ide/open":
-                return self.json({"ok": True, **toast.ide.open(
-                    str(body.get("title") or ""), str(body.get("agent") or "Qwen"))})
-            if path == "/api/ide/ask":
-                return self.json(toast.ide.ask(str(body.get("session") or ""),
-                                               str(body.get("text") or "")))
-            if path == "/api/ide/cua":
-                try:
-                    wait = float(body.get("wait") or 12.0)
-                except (TypeError, ValueError):
-                    wait = 12.0
-                return self.json(toast.ide.cua(str(body.get("session") or ""),
-                                               body.get("actions"),
-                                               driver=str(body.get("driver") or ""),
-                                               key=str(body.get("key") or ""),
-                                               wait=wait))
-            if path == "/api/ide/probe":
-                return self.json(toast.ide.probe(str(body.get("session") or ""),
-                                                 str(body.get("probe") or "")))
-            if path == "/api/ide/close":
-                return self.json(toast.ide.close(str(body.get("session") or ""),
-                                                 str(body.get("evidence") or "")))
             if path == "/api/refuse":
                 # A surface refused by the contour audit is a row, not a console warning: the
                 # audit posts here from every app that runs it.
@@ -1497,8 +1652,6 @@ class Handler(BaseHTTPRequestHandler):
                 toast.archive.add("event", f"surface refused · {code} · {surface}",
                                   role="ui", code=code, surface=surface)
                 return self.json({"ok": True, "code": code})
-            if path == "/api/ide/note":
-                return self.json(toast.ide.note(body))
             if path == "/api/bridge/cua":
                 return self.json(toast.bridge_cua(body))
             if path == "/api/toast/grab":
@@ -1615,16 +1768,24 @@ class Handler(BaseHTTPRequestHandler):
                     published = toast.settings.delivery().get("settings") or {}
                 except settings_package.Refused:
                     published = {}
+                apps: dict = {}
                 if held != published:
                     toast.settings.publish()
-                return self.json({"ok": True, "settings": held})
+                    # A real publish moves the base identity; the apps that subscribe to it
+                    # are re-signed in the same act, so no window is left app-base-stale.
+                    apps = toast.apps.ensure_all()
+                return self.json({"ok": True, "settings": held, "apps": apps})
             if path == "/api/toast/settings/publish":
                 row = toast.settings.publish(body if isinstance(body, dict) and body else None)
+                # The same act re-signs every subscribing app: a new base identity does not
+                # leave the windows that read it refused.
+                apps = toast.apps.ensure_all()
                 return self.json({"ok": True, "identity": row["identity"],
                                   "digest": row["digest"], "revision": row["revision"],
                                   "payload_digest": row["payload_digest"],
                                   "signature": row["signature"],
-                                  "published_at": row["published_at"]})
+                                  "published_at": row["published_at"],
+                                  "apps": apps})
             if path == "/api/toast/settings/subscribe":
                 return self.json({"ok": True, **toast.settings.subscribe(body)})
             if path == "/api/toast/dialin":
@@ -1758,7 +1919,7 @@ class Handler(BaseHTTPRequestHandler):
                 mind_bridge.Refused, dialin.Refused, calls_mod.Refused,
                 civilian_features.Refused, envelope.Refused,
                 settings_package.Refused, app_package.Refused,
-                external_agents.Refused, ide_mod.Refused, bridge_mod.Refused) as error:
+                external_agents.Refused, bridge_mod.Refused) as error:
             return self.json({"ok": False, "refused": error.as_dict()}, 409)
         return self.json({"ok": False, "refused": "not-found"}, 404)
 
@@ -1931,16 +2092,75 @@ def lan_address() -> str:
         return "127.0.0.1"
 
 
+def pinned_certificate_sha256() -> str:
+    """The fingerprint of the certificate this shell serves, for pinning the app window to it."""
+    try:
+        der = ssl.PEM_cert_to_DER_cert(PHONE_CERT.read_text(encoding="ascii"))
+    except (OSError, ValueError):
+        return ""
+    if isinstance(der, str):  # older ssl returns DER as text
+        der = der.encode("latin-1")
+    return hashlib.sha256(der).hexdigest()
+
+
+def cert_covers_loopback() -> bool:
+    """True when the certificate names 127.0.0.1, so the window can load it over TLS."""
+    if not PHONE_CERT.exists():
+        return False
+    try:
+        result = subprocess.run(["openssl", "x509", "-in", str(PHONE_CERT), "-noout", "-text"],
+                                capture_output=True, text=True, timeout=20)
+    except (OSError, subprocess.SubprocessError):
+        return True
+    return "IP Address:127.0.0.1" in result.stdout
+
+
+def build_token() -> str:
+    """A token over the window's own files, so a launch never runs an older script.
+
+    The window is a page of files that this session edits; a URL that never changes lets the
+    engine, a service worker or a cache answer with the previous build, and the window then
+    draws code that no longer exists on disk.
+    """
+    digest = hashlib.sha256()
+    for path in sorted((ROOT / "ui").glob("*")):
+        if path.suffix not in {".js", ".css", ".html", ".json"} or not path.is_file():
+            continue
+        stat = path.stat()
+        digest.update(f"{path.name}:{stat.st_size}:{int(stat.st_mtime)}".encode())
+    return digest.hexdigest()[:12]
+
+
+def app_window_origin(https_server, bind: str, https_port: int,
+                      loopback_port: int, window_https=None) -> tuple[str, str]:
+    """The origin the desktop window loads: the delivered app package, over TLS.
+
+    There is no bare-http twin. A window served over http has no certificate to pin, so its
+    package cannot be proven and its frame cannot be trusted; the earlier fallback to
+    `http://127.0.0.1` was a loosening of that rule, and it is removed rather than left as a
+    quiet branch. With no TLS listener the origin is empty and every window route refuses by name
+    (`window-not-secure`) instead of drawing a window that cannot prove what it is.
+    """
+    token = build_token()
+    if window_https is not None:
+        return (f"https://127.0.0.1:{window_https.server_port}/toast.html?v={token}",
+                "https-loopback")
+    if https_server is not None and bind:
+        return f"https://{bind}:{https_port}/toast.html?v={token}", "https"
+    # No secure listener: no window. The shape is a refusal, not an http page.
+    return "", "window-not-secure"
+
+
 def ensure_phone_cert(bind: str) -> bool:
     """Generate a local SAN certificate for the phone's secure origin."""
-    if PHONE_CERT.exists() and PHONE_KEY.exists():
+    if PHONE_CERT.exists() and PHONE_KEY.exists() and cert_covers_loopback():
         return True
     PHONE_CERT.parent.mkdir(parents=True, exist_ok=True)
     command = [
         "openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
         "-keyout", str(PHONE_KEY), "-out", str(PHONE_CERT), "-days", "825",
         "-subj", f"/CN={bind}",
-        "-addext", f"subjectAltName=IP:{bind},DNS:popit.local,DNS:localhost",
+        "-addext", f"subjectAltName=IP:{bind},IP:127.0.0.1,DNS:popit.local,DNS:localhost",
     ]
     try:
         result = subprocess.run(command, capture_output=True, text=True, timeout=30)
@@ -1989,6 +2209,8 @@ def main() -> int:
     parser.add_argument("--probe-seconds", type=float, default=4.0)
     parser.add_argument("--lan-port", type=int, default=5209)
     parser.add_argument("--https-port", type=int, default=5210)
+    # The window's own TLS listener on loopback: the delivered app is never the bare-http twin.
+    parser.add_argument("--window-https-port", type=int, default=5211)
     parser.add_argument("--lan-bind", default="")
     parser.add_argument("--no-lan", action="store_true")
     parser.add_argument("--no-https", action="store_true")
@@ -2000,6 +2222,7 @@ def main() -> int:
     archive_server = serve(toast, 5208, bind=lan_bind, archive=True)
     lan_server = None
     https_server = None
+    window_https = None
     if not args.no_lan:
         try:
             lan_server = serve(toast, args.lan_port, bind=lan_bind)
@@ -2013,6 +2236,13 @@ def main() -> int:
                     print(f"popit https refused · {lan_bind}:{args.https_port} · {error}", flush=True)
             else:
                 print("popit https refused · a local certificate could not be generated", flush=True)
+            # The window loads its own TLS origin, which needs no LAN name to resolve.
+            try:
+                window_https = serve(toast, args.window_https_port, bind="127.0.0.1",
+                                     tls=True)
+            except (OSError, ssl.SSLError) as error:
+                print(f"popit window https refused · 127.0.0.1:{args.window_https_port} · {error}",
+                      flush=True)
     toast.start()
     print(f"popit toast http://127.0.0.1:{server.server_port}/", flush=True)
     if lan_server is not None:
@@ -2046,6 +2276,46 @@ def main() -> int:
     window.setAttribute(Qt.WA_TranslucentBackground, True)
     window.setWindowTitle("Popit toast")
     view = QWebEngineView(window)
+    WINDOW_VIEW["view"] = view
+    # Set once the delivered origin is known: the base a window route is loaded from, and why.
+    WINDOW_ORIGIN = {"base": "", "note": ""}
+
+    def pump_window() -> None:
+        """Run the act a caller asked the delivered window to perform, if any."""
+        if not WINDOW_QUEUE:
+            return
+        item = WINDOW_QUEUE.pop(0)
+        kind, first, name = item[0], item[1], item[2]
+        argument = item[3] if len(item) > 3 else None
+        if kind == "route":
+            # Every window route is the app's own delivery: over TLS, never the loopback twin.
+            base, note = WINDOW_ORIGIN["base"], WINDOW_ORIGIN["note"]
+            if note not in ("https", "https-loopback") or not base:
+                WINDOW_RESULTS[first] = {"state": "refused", "refused": "window-not-secure",
+                                         "detail": f"the app window is {note or 'unbound'}",
+                                         "at": time.time()}
+                print(f"toast-window route-refused {first} window-not-secure ({note})", flush=True)
+                return
+            # The audit route carries the same build token as the window's own origin, so the
+            # page it loads is the page on disk.
+            # An app route already carries a query (`?window=mako`), so the build token joins
+            # with `&`: a second `?` made the window's own mode unreadable.
+            joiner = "&" if "?" in first else "?"
+            view.load(QUrl(base.split("/toast.html")[0] + first + f"{joiner}v={build_token()}"))
+            print(f"toast-window audit-route={first} over {base}", flush=True)
+            return
+        call = "window.popitProbe && window.popitProbe[" + json.dumps(name) + "]("
+        script = call + ")" if argument is None else call + json.dumps(argument) + ")"
+
+        def keep(value: object) -> None:
+            WINDOW_RESULTS[first] = {"state": "measured", "value": value, "at": time.time()}
+            print(f"toast-window probe={first} value={value}", flush=True)
+
+        view.page().runJavaScript(script, 0, keep)
+
+    window_pump = QTimer(window)
+    window_pump.timeout.connect(pump_window)
+    window_pump.start(400)
     view.page().setBackgroundColor(Qt.transparent)
 
     class WindowBridge(QObject):
@@ -2115,13 +2385,66 @@ def main() -> int:
 
     view.page().javaScriptConsoleMessage = console
 
+    # The secure origin is self-signed, so it is not trusted by the platform store. The window
+    # pins the shell's own certificate instead: the exact certificate this process serves is
+    # accepted, anything else is refused. That is narrower than the platform's trust, never
+    # wider, and it keeps the app window on the same HTTPS origin the phone is served from.
+    pinned_cert = pinned_certificate_sha256()
+
+    def certificate_error(error) -> None:
+        digest = ""
+        try:
+            chain = error.certificateChain()
+            digest = hashlib.sha256(bytes(chain[0].toDer())).hexdigest() if chain else ""
+        except (AttributeError, TypeError, ValueError):
+            digest = ""
+        if pinned_cert and digest == pinned_cert:
+            print("toast-cert=pin-accepted", flush=True)
+            try:
+                error.acceptCertificate()
+            except (AttributeError, RuntimeError) as refusal:
+                print(f"toast-cert=pin-accept-refused {refusal}", flush=True)
+            return
+        print(f"toast-cert=refused pinned={pinned_cert[:16]}({len(pinned_cert)})"
+              f" got={digest[:16]}({len(digest)})", flush=True)
+        try:
+            error.rejectCertificate()
+        except (AttributeError, RuntimeError):
+            pass
+
+    try:
+        view.page().certificateError.connect(certificate_error)
+        print("toast-cert=pin-armed", flush=True)
+    except (AttributeError, TypeError) as unavailable:
+        print(f"toast-cert=pin-unavailable {unavailable}", flush=True)
+
+    secure_loaded = False
+
     def loaded(ok: bool) -> None:
+        nonlocal secure_loaded
         print(f"toast-view loaded={ok}", flush=True)
+        if not ok and origin.startswith("https") and not secure_loaded:
+            # A window that cannot be delivered over TLS is not shown over bare http: the
+            # loopback twin is the refusal shape, so the window says what refused instead.
+            print("toast-origin=refused window-not-secure after a refused secure load", flush=True)
+            WINDOW_ORIGIN["note"] = "https-refused"
+            view.setHtml(
+                "<!doctype html><meta charset='utf-8'>"
+                "<body style='background:#0c0e11;color:#e9e2d0;font:14px/1.5 monospace;"
+                "padding:24px'><p>window-not-secure</p>"
+                f"<p>The app window could not be delivered over TLS from {origin}.</p>"
+                "<p>A window served over bare http is not the app.</p></body>")
+            return
+        if ok and origin.startswith("https"):
+            secure_loaded = True
         view.page().runJavaScript(
             "JSON.stringify({body:document.body.innerText.slice(0,80),"
             "bar:document.querySelector('.bar')?.getBoundingClientRect().toJSON(),"
             "at:document.elementsFromPoint(210,40).map(e=>e.className||e.tagName),"
-            "color:document.querySelector('.bar h1')&&getComputedStyle(document.querySelector('.bar h1')).color})",
+            "color:document.querySelector('.bar h1')&&getComputedStyle(document.querySelector('.bar h1')).color,"
+            "springboard:(()=>{const f=document.querySelector('#springboard-frame');"
+            "return f?{pending:f.dataset.pending||'',ready:f.dataset.ready||'',hidden:f.hidden,"
+            "src:f.getAttribute('src')||''}:null})()})",
             0,
             lambda value: print(
                 ("toast-view dom=" + str(value)).encode("ascii", "backslashreplace").decode(),
@@ -2176,7 +2499,16 @@ def main() -> int:
         placement_timer.start(240)
 
     app.aboutToQuit.connect(save_placement)
-    view.load(QUrl(f"http://127.0.0.1:{server.server_port}/toast.html"))
+    # The window loads the app package this shell delivers. Over TLS it is the same package the
+    # phone reads, on the origin whose certificate is pinned above.
+    origin, origin_note = app_window_origin(https_server, lan_bind, args.https_port,
+                                            server.server_port, window_https)
+    print(f"toast-origin={origin} ({origin_note})", flush=True)
+    if origin.endswith("/toast.html"):
+        WINDOW_ORIGIN.update({"base": origin[:-len("/toast.html")], "note": origin_note})
+    else:
+        WINDOW_ORIGIN.update({"base": "", "note": origin_note})
+    view.load(QUrl(origin))
 
     def show_window() -> None:
         window.show()
@@ -2263,6 +2595,8 @@ def main() -> int:
         archive_server.shutdown()
         if lan_server is not None:
             lan_server.shutdown()
+        if window_https is not None:
+            window_https.shutdown()
         if https_server is not None:
             https_server.shutdown()
 

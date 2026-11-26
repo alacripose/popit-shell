@@ -1,5 +1,4 @@
 // The bridge package window. It carries readings, not furniture.
-//
 // The frame, material, motion, DPI and palette are the settings package's: attach("bridge")
 // verifies this page's signed identity, applies the published theme and sets data-motion, and
 // loadContour/fillContours paint the measured nine-slice. The bar, tabs, body and foot are the

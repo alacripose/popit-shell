@@ -8,3 +8,9 @@ models/
 # The call desk is its own published checkout (alacripose/popit-call); it is copied here
 # for the companion run, not vendored into this history.
 call-client/
+# The settings publisher's private half stays on the machine that signs with it. The
+# public half, settings.pem, is what another window needs to check a signature.
+settings.key
+# A prose inventory is a scan dump. It records home paths and whatever a skill document
+# quoted, so it is regenerated on the machine that scans instead of being committed.
+docs/prose/*/inventory.json

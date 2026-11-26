@@ -19,10 +19,12 @@ from __future__ import annotations
 import datetime
 import json
 import pathlib
+import re
 import threading
 
 from blake3 import blake3
 
+import app_base
 import dialin
 import envelope
 import settings_package
@@ -43,51 +45,77 @@ DERIVES = {"package": "popit-settings", "fields": ["theme", "layout", "motion", 
 # refused `app-window-incomplete` — the thin-page class never gets a signature.
 REGION_CONTRACT = ("bar", "status", "body", "foot")
 REGIONS = list(REGION_CONTRACT)
+# A package may not sign an icon frame it cannot prove opens: every window names the launch URL
+# of its mutated base, the window is measured before its tile verifies, and the tile opens that
+# URL. A window without a launch is refused `app-tile-without-launch` and gets no signature.
+LAUNCH_RULE = "entry page + ?window=<name> for a named window, the entry page for the desk"
 
-# The only signing forms a mutable package may take are the three reference packages':
-# dialin and settings are `window`, the springboard is `phone`. A surface hosted inside a
-# window is not a package and has no identity of its own; it is refused `app-kind-foreign`
-# rather than signed as a fourth kind. The IDE is exactly that case.
+# The only signing forms a mutable package may take are the two reference packages':
+# dialin and settings are `window`, the springboard is `phone`. There is no hosted-surface
+# kind: an app that is neither a window nor the phone home is refused `app-kind-foreign`
+# instead of being signed as a third form.
 KINDS = ("window", "phone")
-FOREIGN = {"ide": "surface"}
+# A page of its own shape is not a package: the bridge is a window page (its own bar, tabs and
+# body), and a window is the settings window with its body mutated. It is hosted by the shell,
+# listed in the store as refused, and never signed — the same way the retired IDE chip was.
+FOREIGN: dict[str, str] = {"bridge": "window page"}
+# An app adds pages; it never adds window furniture. A payload that names bar controls,
+# chrome or a control set is refused `app-bar-control`, so a package cannot inject a button
+# into the shell's bar the way the retired IDE chip did.
+BAR_CONTROL_KEYS = ("bar_controls", "chrome", "controls")
 
 APPS = {
     "dialin": {
         "kind": "window",
         "entry": "toast.html",
+        # The desk is delivered in the settings window the family's panel lives in.
+        "window": "popit-settings-package",
+        "launch": "/toast.html",
         "title": "DialIn desk",
         "summary": "the agent desk: calls, lanes, the voice document and the window chrome",
         "pages": ["local", "mind", "settings", "call"],
         "adds": ["call desk", "lane selection", "voice document", "probe log",
-                 "hosted IDE surface"],
-        "hosts": ["ide", "bridge"],
+                 "the bridge surface"],
+        "hosts": ["bridge"],
         "regions": REGIONS,
-        "files": ("toast.html", "toast.js", "toast.css", "package.js", "contour-theme.css",
-                  "ui-audit.js"),
-    },
-    "bridge": {
-        "kind": "window",
-        "entry": "bridge.html",
-        "title": "Bridge",
-        "summary": "the client's tools side on the family Debian box: host, steam, proton, queue",
-        "pages": ["host", "tools", "queue"],
-        "adds": ["host audit", "steam and proton rows", "job queue", "a remote command from the window"],
-        "hosts": [],
-        "regions": REGIONS,
-        # No stylesheet of its own: the window wears contour-theme.css and the desk's chrome
-        # stylesheet, and package.js applies the published theme, motion and DPI.
-        "files": ("bridge.html", "bridge.js", "package.js", "contour-theme.css", "toast.css",
-                  "ui-audit.js"),
+        # The copy of the settings window carries the desk's script and stylesheet.
+        # The desk's own script is not loaded by the copy: the copy is the settings window,
+        # and the desk body is the rebuild's to author.
+        "script": "",
+        "links": [],
+        "files": ("toast.html", "toast.js", "toast.css", "settings.css", "package.js",
+                  "contour-theme.css", "contour.js", "popit-sw.js", "ui-audit.js"),
     },
     "settings": {
         "kind": "window",
-        "entry": "settings.html",
+        # The settings window is the panel inside the desk, restored to its own bytes: that page
+        # is the subscribed baseline, and settings.html stays served as the package document.
+        "entry": "toast.html",
+        "launch": "/toast.html?window=settings",
         "title": "Settings package",
         "summary": "the mutable base: appearance, motion, layout, apps and functions",
         "pages": ["appearance", "motion", "layout", "apps", "functions", "device", "package"],
         "adds": ["appearance", "motion", "layout", "apps", "functions", "device", "package"],
         "regions": REGIONS,
-        "files": ("settings.html", "settings.js", "settings.css", "package.js", "ui-audit.js"),
+        "files": ("toast.html", "toast.js", "toast.css", "settings.html",
+                  "settings.js", "settings.css", "package.js", "popit-sw.js",
+                  "contour-theme.css", "contour.js", "ui-audit.js"),
+    },
+    # Prose is the family's written surface: every project's copy, where it lives and the rule
+    # it breaks, as a window built from the settings window's own page. Its body is the one
+    # mutation; its frame, motion and palette are the package's.
+    "prose": {
+        "kind": "window",
+        "entry": "toast.html",
+        "window": "popit-settings-package",
+        "launch": "/toast.html?window=prose",
+        "title": "Prose",
+        "summary": "every family project's prose, the rule it breaks and its document",
+        "pages": ["family"],
+        "adds": ["prose inventory", "per-project progress", "external document links"],
+        "regions": REGIONS,
+        "files": ("toast.html", "toast.js", "toast.css", "settings.css", "package.js",
+                  "contour-theme.css", "contour.js", "popit-sw.js", "ui-audit.js"),
     },
     "springboard": {
         "kind": "phone",
@@ -97,8 +125,8 @@ APPS = {
         "pages": ["home", "dialin", "settings"],
         "adds": ["signed tiles", "app launch", "offline shell"],
         "regions": REGIONS,
-        "files": ("phone.html", "phone.js", "phone.css", "phone-sw.js", "package.js",
-                  "contour-theme.css", "ui-audit.js"),
+        "files": ("phone.html", "phone.js", "phone-calls.js", "phone.css", "phone-sw.js",
+                  "package.js", "contour-theme.css", "contour.js", "ui-audit.js"),
     },
 }
 
@@ -133,6 +161,18 @@ def _spec(name: str) -> dict:
         raise Refused("app-unknown", str(name))
     if spec["kind"] not in KINDS:
         raise Refused("app-kind-foreign", f"{name}: {spec['kind']} is not a mutable kind")
+    # The icon frame is only as honest as the window it opens. A window names its base's launch
+    # URL and that URL must open the entry page in this app's own window mode.
+    if spec["kind"] == "window":
+        launch = str(spec.get("launch") or "")
+        mode = str(spec.get("window") or "")
+        entry = str(spec.get("entry") or "")
+        named = f"window={name}" in launch
+        expected = named or (name == "dialin" and launch == f"/{entry}")
+        if not launch.startswith(f"/{entry}") or not expected:
+            raise Refused("app-tile-without-launch",
+                          f"{name}: a window signs its tile only with the launch that opens it "
+                          f"({LAUNCH_RULE})")
     return spec
 
 
@@ -171,18 +211,145 @@ class AppPackages:
             data = target.read_bytes()
             facts[file] = {"name": file, "bytes": len(data),
                            "digest": "blake3:" + blake3(data).hexdigest()}
+        # The two conventions of a mutable app package are checked on the same bytes that
+        # are about to be signed: it subscribes to the settings app, and it declares every
+        # file it loads. A new feature or dependency that skips either is refused by name.
+        self._check_subscription(name)
+        self._check_dependencies(name)
+        self._check_derivation(name)
         return facts
+
+    # The settings app package is the floating settings window; every other window is built
+    # from it. A window that does not carry the shared sheets it is built from is refused.
+    DERIVED_SHEETS = ("contour-theme.css", "package.js", "contour.js")
+
+    def _check_derivation(self, name: str) -> None:
+        """A window that is not the settings window must be built from it.
+
+        Owner's rule: the settings app package is the floating window that appears, and a
+        window that is not from it is refused. So a `window` package carries the shared
+        sheets the settings window publishes and links them from its entry page; only the
+        settings package itself is the baseline.
+        """
+        spec = _spec(name)
+        if spec["kind"] != "window" or name == "settings":
+            return
+        # A window package is the settings window's own page with its body mutated. A window
+        # with a page of its own is a re-creation of the window, and a re-creation drifts from
+        # the one the owner uses — refused `app-handrolled-window`, naming the baseline entry.
+        baseline_entry = str(_spec("settings")["entry"])
+        if str(spec["entry"]) != baseline_entry:
+            raise Refused("app-handrolled-window",
+                          f"{name}: its entry {spec['entry']} is a page of its own; a window "
+                          f"is {baseline_entry} with its body mutated")
+        files = set(spec["files"])
+        missing = [sheet for sheet in self.DERIVED_SHEETS if sheet not in files]
+        if missing:
+            raise Refused("app-not-derived-from-settings",
+                          f"{name}: a window is built from the settings window; missing "
+                          f"{', '.join(missing)}")
+        page = (self.ui_root / spec["entry"]).read_text(encoding="utf-8")
+        scripts = "".join((self.ui_root / file).read_text(encoding="utf-8")
+                          for file in spec["files"] if file.endswith(".js"))
+        if "/contour-theme.css" not in page or "/package.js" not in (page + scripts):
+            raise Refused("app-not-derived-from-settings",
+                          f"{name}: its entry does not load the settings window's sheets")
+        # The chrome, the motion and how a control looks are the settings window's provision:
+        # a window carries its chrome sheet and marks its window with the settings chrome.
+        # Delivery is the settings window's delivery: the page declares the window it is
+        # delivered in, and it carries the settings chrome. An app that does not name its
+        # own delivered window is refused, and so is one that paints its own chrome.
+        window = self.window_name(name)
+        if f'data-window="{window}"' not in page:
+            raise Refused("app-not-delivered-as-window",
+                          f"{name}: its page is not delivered as {window} the way the "
+                          "settings window is")
+        # The chrome, the motion and how a control looks are the baseline window's provision:
+        # a window wears every sheet the baseline wears, and paints no motion of its own.
+        baseline_page = (self.ui_root / _spec("settings")["entry"]).read_text(encoding="utf-8")
+        baseline_sheets = set(re.findall(r'href="(/[^"]+\.css)"', baseline_page))
+        sheets = set(re.findall(r'href="(/[^"]+\.css)"', page))
+        missing_sheets = sorted(baseline_sheets - sheets)
+        if not baseline_sheets or missing_sheets or re.search(r"@keyframes", page):
+            raise Refused("app-chrome-handrolled",
+                          f"{name}: it does not wear the baseline window's chrome "
+                          f"({', '.join(missing_sheets) or 'private keyframes'})")
+
+    # The assets a page loads rather than navigates to. A route, an image or the phone's
+    # manifest is not a package dependency; a script or a stylesheet is.
+    DEPENDENCY_RE = re.compile(r"['\"](/[A-Za-z0-9_\-./]+\.(?:js|css))['\"]")
+
+    def deprecated(self, name: str) -> str:
+        """The reason an app is retired, or an empty string when it is a live app."""
+        return str(_spec(name).get("deprecated") or "")
+
+    def window_name(self, name: str) -> str:
+        """The window an app is delivered in: the same naming the settings window uses.
+
+        An app declares its window in its spec when it is delivered inside another window —
+        the desk is delivered in the settings window the family's panel lives in, and it says
+        so instead of claiming a window of its own that does not exist.
+        """
+        declared = str(_spec(name).get("window") or "")
+        return declared or f"popit-{name}-package"
+
+    def _check_subscription(self, name: str) -> None:
+        """Every app package subscribes to the settings app; the script attaches by name.
+
+        The owner made this project convention: an app reads the signed settings document
+        (`attach("<name>")` from `/package.js`) instead of carrying a private theme copy.
+        """
+        scripts = [file for file in _spec(name)["files"] if file.endswith(".js")]
+        for file in scripts:
+            text = (self.ui_root / file).read_text(encoding="utf-8")
+            if f'attach("{name}"' in text:
+                return
+        raise Refused("app-not-subscribed",
+                      f'{name}: no signed script attaches to the settings package '
+                      f'(attach("{name}"))')
+
+    def _check_dependencies(self, name: str) -> None:
+        """A package signs everything it loads; an undeclared dependency is refused.
+
+        The owner's condition for the rebuild: the app must still sign properly when it
+        brings in new features and dependencies. A script or stylesheet the page loads but
+        the package does not declare would be served, audited and rendered without being
+        covered by the identity, so it is refused before signing.
+        """
+        spec = _spec(name)
+        declared = set(spec["files"])
+        for file in spec["files"]:
+            if not file.endswith((".html", ".js")):
+                continue
+            text = (self.ui_root / file).read_text(encoding="utf-8")
+            for match in self.DEPENDENCY_RE.finditer(text):
+                dependency = match.group(1).lstrip("/")
+                if dependency not in declared:
+                    raise Refused("app-dependency-undeclared",
+                                  f"{name}: {file} loads /{dependency}, which its signed "
+                                  "files do not declare")
 
     def payload(self, name: str) -> bytes:
         spec = _spec(name)
+        retired = self.deprecated(name)
+        if retired:
+            raise Refused("app-deprecated", f"{name}: {retired}")
         authored = {key: spec[key] for key in
                     ("kind", "entry", "title", "summary", "pages", "adds", "regions")}
         authored["hosts"] = list(spec.get("hosts") or [])
+        # The base is the settings package's signed delivery plus this app's mutations. A
+        # package that cannot name that base is not signed: a simple derivation is what lets
+        # a hand-rolled view through, so the mutation record is part of the signed payload.
+        try:
+            base = app_base.subscription(self.settings, name, spec, APPS["settings"])
+        except app_base.Refused as error:
+            raise Refused(error.code, error.detail) from error
         return dialin.canonical_json({
             "schema": APP_SCHEMA,
             "app": name,
             "authored": authored,
             "derives": DERIVES,
+            "base": base,
             "files": _files(self._read(name)),
         })
 
@@ -335,6 +502,58 @@ class AppPackages:
                 return self.publish(name, driver=driver)
         return self.document(name)
 
+    def launch_proof(self, name: str, files: list) -> dict:
+        """What the icon frame would open, read from the bytes the signature covers.
+
+        An icon frame is a signature on a promise: tapping it opens this app's window. The proof
+        is the signed entry page, carrying every region of the window contract and the panel the
+        launch names, with the signed script implementing that window mode, and each byte read is
+        checked against the digest the payload signs. A package that cannot show it is refused
+        `app-tile-unproven-launch` rather than signed.
+        """
+        spec = _spec(name)
+        if spec["kind"] != "window":
+            # The home is not an icon frame: it is the surface the frames sit on.
+            return {"ok": True, "url": "", "kind": spec["kind"], "home": True,
+                    "mode": "", "entry": str(spec.get("entry") or ""), "refused": ""}
+        launch = str(spec.get("launch") or "")
+        entry = str(spec.get("entry") or "")
+        mode = launch.split("?window=", 1)[1].split("&", 1)[0] if "?window=" in launch else ""
+        signed = {str(row.get("name") or ""): str(row.get("digest") or "")
+                  for row in files if isinstance(row, dict)}
+
+        def read(file: str) -> str:
+            """The file's text, only when its digest is the one the payload signed."""
+            if file not in signed:
+                return ""
+            try:
+                raw = (self.ui_root / file).read_bytes()
+            except OSError:
+                return ""
+            if "blake3:" + blake3(raw).hexdigest() != signed[file]:
+                return ""
+            return raw.decode("utf-8", "replace")
+
+        html = read(entry) if entry else ""
+        if not html:
+            return {"ok": False, "url": launch, "mode": mode, "entry": entry,
+                    "refused": "app-tile-unproven-launch",
+                    "detail": "the entry page is not the byte the payload signs"}
+        script = read("toast.js")
+        regions = [region for region in REGION_CONTRACT
+                   if f'data-region="{region}"' not in html]
+        panel = (not mode) or f'id="{mode}"' in html or f'id="{mode}-panel"' in html
+        implemented = (not mode) or f'get("window") === "{mode}"' in script
+        ok = bool(launch) and bool(html) and not regions and panel and implemented
+        return {"ok": ok, "url": launch, "mode": mode, "entry": entry,
+                "regions": REGION_CONTRACT, "panel": panel,
+                "mode_implemented": implemented,
+                "refused": "" if ok else "app-tile-unproven-launch",
+                "detail": "" if ok else (
+                    f"missing regions {','.join(regions)}" if regions else
+                    "the launch names a panel this page does not carry" if not panel else
+                    "the signed script has no window mode for this launch")}
+
     def ensure_all(self) -> dict:
         rows = {}
         for name in APPS:
@@ -380,7 +599,10 @@ class AppPackages:
     # -- verifying ----------------------------------------------------------------------
     def verify(self, name: str) -> dict:
         """The package must still describe the files, and the publisher must be trusted."""
-        _ = _spec(name)
+        spec = _spec(name)
+        retired = str(spec.get("deprecated") or "")
+        if retired:
+            raise Refused("app-deprecated", f"{name}: {retired}")
         held = self._held(name)
         if not held:
             raise Refused("app-unsigned", str(name))
@@ -409,6 +631,21 @@ class AppPackages:
             raise Refused("app-not-authored", f"{name}: manifest missing {', '.join(missing)}")
         if "theme" not in (body.get("derives") or {}).get("fields", []):
             raise Refused("app-not-authored", f"{name}: does not derive the settings theme")
+        # An app adds pages, never window furniture. A payload that names bar controls or
+        # chrome is refused by name: the bar belongs to the shell, and a package that could
+        # add a control there would be a second, unsigned author of the window.
+        controls = [key for key in BAR_CONTROL_KEYS if authored.get(key)]
+        if controls:
+            raise Refused("app-bar-control",
+                          f"{name}: adds {', '.join(controls)}; a package adds pages, not controls")
+        # The app-package base: a mutated signed subscription to the settings package. No
+        # subscription → app-not-mutated; an old base → app-base-stale; a mutation record
+        # that does not recompute → app-base-digest. Plain derivation is refused, because it
+        # is exactly how a hand-rolled view (the desk's private palette) got signed before.
+        try:
+            app_base.check(body.get("base"), name, self.settings)
+        except app_base.Refused as error:
+            raise Refused(error.code, error.detail) from error
         # The window contract: the manifest declares the family regions and the entry page
         # actually carries them. A page with a header and a list is not a window package.
         declared = authored.get("regions") or []
@@ -454,10 +691,16 @@ class AppPackages:
             "app": name,
             "verified": True,
             "ui_audit": record.get("ui_audit", ""),
+            # The measurement the window produced: size, timestamp and findings, so a reader
+            # sees the numbers and not only the word "passed".
+            "ui_audit_report": self.ui_audit(name) or {},
+            "launch_proof": self.launch_proof(
+                name, json.loads(published.decode("utf-8")).get("files", [])),
             "app_standard": record.get("app_standard", APP_SCHEMA),
             "driver": record.get("driver", ""),
             "authored": body.get("authored") or {},
             "derives": body.get("derives") or {},
+            "launch": str(_spec(name).get("launch") or ""),
             "identity": identity,
             "digest": digest,
             "payload_digest": record.get("payload_digest", ""),
@@ -471,7 +714,10 @@ class AppPackages:
 
     def document(self, name: str) -> dict:
         """What a window reads: the signed identity plus the theme the family published."""
-        _ = _spec(name)
+        spec = _spec(name)
+        retired = str(spec.get("deprecated") or "")
+        if retired:
+            raise Refused("app-deprecated", f"{name}: {retired}")
         facts = self.verify(name)
         theme = {}
         theme_identity = ""
@@ -493,6 +739,9 @@ class AppPackages:
             "revision": facts["revision"],
             "published_at": facts["published_at"],
             "ui_audit": facts.get("ui_audit", ""),
+            "ui_audit_report": facts.get("ui_audit_report") or {},
+            "launch": facts.get("launch", ""),
+            "launch_proof": facts.get("launch_proof") or {},
             "files": facts["files"],
             "public_key": facts["public_key"],
             "signature": facts["signature"],
@@ -518,12 +767,14 @@ class AppPackages:
                 row.update({"identity": facts["identity"], "verified": True,
                             "revision": facts["revision"],
                             "ui_audit": facts.get("ui_audit", ""),
+                            "launch": facts.get("launch", ""),
+                            "launch_proof": facts.get("launch_proof") or {},
                             "driver": facts.get("driver", "")})
             except Refused as error:
                 row["refused"] = error.as_dict()
             rows[name] = row
-        # A foreign surface is reported, not hidden: the springboard and the store both
-        # read this list to say why the IDE is not a signed package.
+        # A foreign surface is reported, not hidden: a name that is not a signable kind is
+        # listed with the refusal that says why, rather than silently dropped.
         foreign = {}
         for name, kind in FOREIGN.items():
             try:

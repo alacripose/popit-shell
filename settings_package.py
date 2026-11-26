@@ -61,9 +61,28 @@ DPI_MIN, DPI_MAX, DPI_STEP = 60, 180, 5
 MAX_PALETTES = 64
 MAX_PALETTE_BYTES = 64 * 1024
 
+# Layout is carried by the same signed document as the theme: an app reads its own
+# columns, gutter, padding, rail width and density, so a layout change is published once
+# and every window derives it rather than hard-coding a frame of its own.
+LAYOUT_APPS = ("dialin", "settings", "springboard", "bridge")
+LAYOUT_DENSITIES = ("compact", "regular", "roomy")
+LAYOUT_BOUNDS = {
+    "columns": (1, 4),
+    "gutter": (0, 32),
+    "pad": (0, 32),
+    "rail": (0, 420),
+}
+_DEFAULT_LAYOUT = {
+    "dialin": {"columns": 1, "gutter": 8, "pad": 8, "rail": 0, "density": "regular"},
+    "settings": {"columns": 2, "gutter": 16, "pad": 18, "rail": 184, "density": "regular"},
+    "springboard": {"columns": 3, "gutter": 11, "pad": 16, "rail": 0, "density": "roomy"},
+    "bridge": {"columns": 1, "gutter": 10, "pad": 12, "rail": 0, "density": "regular"},
+}
+
 REFUSALS = (
     "settings-dpi",
     "settings-frame",
+    "settings-layout",
     "settings-material",
     "settings-motion",
     "settings-palette",
@@ -182,6 +201,37 @@ def _validate(settings: dict) -> dict:
         if not COLOR_RE.fullmatch(text):
             raise Refused("settings-colors", f"{name} is not a #rrggbb colour: {text!r}")
         held_colors[name] = text
+    layout = settings.get("layout") or {}
+    if not isinstance(layout, dict):
+        raise Refused("settings-layout", "layout must be an object of per-app layouts")
+    held_layout: dict = {}
+    for name, row in layout.items():
+        if name not in LAYOUT_APPS:
+            raise Refused("settings-layout",
+                          f"{name!r} is not one of {', '.join(LAYOUT_APPS)}")
+        if not isinstance(row, dict):
+            raise Refused("settings-layout", f"{name} layout must be an object")
+        checked_row: dict = {}
+        for key, (low, high) in LAYOUT_BOUNDS.items():
+            fallback = _DEFAULT_LAYOUT[name][key]
+            try:
+                value = int(row.get(key, fallback))
+            except (TypeError, ValueError):
+                raise Refused("settings-layout", f"{name}.{key} must be an integer")
+            if value < low or value > high:
+                raise Refused("settings-layout",
+                              f"{name}.{key}={value} is outside {low}..{high}")
+            checked_row[key] = value
+        density = str(row.get("density") or _DEFAULT_LAYOUT[name]["density"])
+        if density not in LAYOUT_DENSITIES:
+            raise Refused("settings-layout",
+                          f"{name}.density {density!r} is not one of "
+                          f"{', '.join(LAYOUT_DENSITIES)}")
+        checked_row["density"] = density
+        held_layout[name] = checked_row
+    # An older package predates layout: it keeps the family defaults rather than refusing.
+    for name in LAYOUT_APPS:
+        held_layout.setdefault(name, dict(_DEFAULT_LAYOUT[name]))
     return {
         "theme": theme,
         "frame": frame,
@@ -191,6 +241,7 @@ def _validate(settings: dict) -> dict:
         "dpi": dpi,
         "palettes": palettes,
         "colors": held_colors,
+        "layout": held_layout,
     }
 
 
@@ -232,6 +283,7 @@ class SettingsPackage:
             "dpi": 100,
             "palettes": [],
             "colors": {},
+            "layout": {name: dict(row) for name, row in _DEFAULT_LAYOUT.items()},
         }
 
     def _read_state(self) -> dict:
@@ -249,6 +301,12 @@ class SettingsPackage:
             settings = dict(self.defaults())
             if isinstance(held.get("settings"), dict):
                 settings.update(held["settings"])
+            # A stored layout for an app that no longer exists is dropped, never published:
+            # the retired IDE surface left one behind, and a layout row is a signed value.
+            layout = settings.get("layout")
+            if isinstance(layout, dict):
+                settings["layout"] = {name: row for name, row in layout.items()
+                                      if name in LAYOUT_APPS}
             return settings
 
     def adopt(self, settings: dict) -> dict:
@@ -302,15 +360,47 @@ class SettingsPackage:
                                if key in self.defaults()})
             checked = _validate(merged)
             held = self._read_state()
+            # A publish that changes nothing is the same package, not a new revision. Every
+            # app subscribes to this identity, so minting a revision on a no-op push would
+            # invalidate every window a moment after it was signed (the settings window's own
+            # attach included) and the desk would be refused app-base-stale while the owner
+            # is using it.
+            same_settings = held.get("settings") == checked
+            held_device = held.get("device")
+            if isinstance(device, dict):
+                report = device
+            elif same_settings and isinstance(held_device, dict) and held_device:
+                # The device report carries live readings; reusing the published one keeps the
+                # signed identity still until the owner changes a setting.
+                report = held_device
+            else:
+                report = device_report()
+            # A package signed before preferences were removed from signed bytes still carries
+            # them. That payload is not a no-op: it is re-signed without them, so the digest
+            # cannot keep a copy of the owner's material, frame, motion, dpi or device.
+            carries_preferences = False
+            try:
+                body = json.loads((self._latest() / "payload.bin").read_text(encoding="utf-8"))
+                carries_preferences = any(key in body for key in ("settings", "device"))
+            except (OSError, ValueError):
+                carries_preferences = False
+            if held.get("identity") and same_settings and held_device == report \
+                    and not carries_preferences:
+                return {**self.verify(self._latest()), "delivery": self.delivery()}
             revision = int(held.get("revision") or 0) + 1
             published_at = iso()
+            # The signed bytes name the document and a digest of what was authored. They do not
+            # carry the preference values themselves: a value in a package is a value re-signed
+            # into every window, and the owner's material, frame, motion and dpi are the owner's
+            # local state, read live by the windows that already trust this identity.
             payload = dialin.canonical_json({
                 "schema": SCHEMA,
                 "name": NAME,
                 "revision": revision,
                 "published_at": published_at,
-                "settings": checked,
-                "device": device if isinstance(device, dict) else device_report(),
+                "settings_digest": "blake3:" + blake3(
+                    dialin.canonical_json(checked)).hexdigest(),
+                "settings_keys": sorted(checked),
             })
             manifest = {
                 "name": NAME,
@@ -352,6 +442,7 @@ class SettingsPackage:
                 "payload_digest": record["payload_digest"],
                 "package": str(target),
                 "settings": checked,
+                "device": report,
             }, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
             return {**facts, "delivery": self._delivery_from(target, record)}
 
@@ -407,8 +498,13 @@ class SettingsPackage:
             "public_key": record["public_key"],
             "published_at": record.get("published_at", ""),
             "package": str(target),
-            "settings": body.get("settings") or {},
-            "device": body.get("device") or {},
+            "settings": self.current(),
+            "device": (self._read_state().get("device") or {}),
+            "settings_digest": body.get("settings_digest", ""),
+            "settings_match": (
+                not body.get("settings_digest")
+                or body.get("settings_digest") == "blake3:" + blake3(
+                    dialin.canonical_json(self.current())).hexdigest()),
         }
 
     def _latest(self) -> pathlib.Path:
@@ -436,8 +532,13 @@ class SettingsPackage:
             "signature": record.get("signature", ""),
             "signature_algorithm": record.get("signature_algorithm", ""),
             "public_key": record.get("public_key", ""),
-            "settings": body.get("settings") or {},
-            "device": body.get("device") or {},
+            "settings": self.current(),
+            "device": (self._read_state().get("device") or {}),
+            "settings_digest": body.get("settings_digest", ""),
+            "settings_match": (
+                not body.get("settings_digest")
+                or body.get("settings_digest") == "blake3:" + blake3(
+                    dialin.canonical_json(self.current())).hexdigest()),
         }
 
     def delivery(self) -> dict:

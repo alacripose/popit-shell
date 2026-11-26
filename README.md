@@ -93,6 +93,7 @@ page holds however many 132 px slots fit the window row at the current width.
 | `ui/contour.js` | The only shape authority: `contourPath` and `contourWindowPath` |
 | `toast.py` | The pinned agent toast: live Freebuff capture, delegated CUA drivers, voice queue |
 | `cua.py` | The Windows CUA drivers: window capture, focus, pointer, keys, text and task receipts |
+| `bridge.py` | The Windows client bridge: reverse tunnel, heartbeat, idempotency ledger, spooling client |
 | `voice.py` | Per-driver generated voices, the civilian queue gate, and the default-microphone listener |
 | `voice_profiles.json` | Pinned driver and individual profiles: drivers, Buffy, Qwen, Ash, Bram, and the civilian address |
 | `civilian_features.py` | Feeling-wheel identity, typed decisions, contracts and the C9 life adapter |
@@ -102,6 +103,7 @@ page holds however many 132 px slots fit the window row at the current width.
 | `docs/civilians.md` | The 17-feature family register, 46-row scope, call grounding, limits and reproduction |
 | `docs/civilians-contracts.md` | The full contract schema, narrowing rule and runtime blockers |
 | `tools/toast_probe.py` | The toast receipt, including distinct waveforms, addressing, and the live microphone |
+| `tools/popit_bridge.py` | The Debian-side bridge CLI: health, acts, receipts and spool drain |
 | `tools/civilian_audit.py` | The family civilian inventory, indexed report and Popit probe |
 | `tools/gate.py` | 25 checks and a selftest: the contour, the pins, the toast frame and the refusals |
 
@@ -151,6 +153,29 @@ While the harness session is attached, the local Buffy lane yields so two minds 
 answer under one name. `call.leave` hands the lane back. The same operations are exposed as
 MCP tools by `/mcp`; `tools/buffy_call_mcp.py` is a stdio proxy for an MCP client, with
 `call.join`, `call.turns`, `call.say` and `call.leave`.
+
+## The Windows bridge
+
+`python toast.py` serves the desk at `http://127.0.0.1:5207` (origin
+`https://<lan-ip>:5210`, the address the routing table reports). The bar carries only the shell's own settings, pin and close
+controls: an app package cannot add a control to it, and the retired `IDE` chip that sat there
+is refused by name (`docs/app-packages.md`). The SpringBoard's tile opens the bridge page in
+the same window.
+
+The Debian side drives the same fleet through `bridge.py`. A reverse tunnel gives it a loopback
+URL to the token-gated listener, the supervisor reads `/api/bridge/health` from Debian and
+reopens the tunnel after two missed beats with bounded backoff, and a key names one act: a
+replay returns the first receipt rather than clicking twice.
+
+```
+python3 tools/popit_bridge.py health
+python3 tools/popit_bridge.py cua --key act.0001 --action capture --window Freebuff
+python3 tools/popit_bridge.py drain      # replay the spool after a reconnect
+```
+
+The client spools an act before sending it, so a tunnel that flaps mid-act is retried under the
+same key. `python tools/app_package_probe.py` reads the signed packages, and
+`python tools/freshness.py probe` reads the Popit freshness register.
 
 ## The shape rule
 

@@ -1,0 +1,27 @@
+{
+  "schema": "popit.capacity-probe/1",
+  "rows": [
+    {
+      "name": "capacity-page-is-a-popit-surface",
+      "passed": true,
+      "detail": "missing []"
+    },
+    {
+      "name": "capacity-report-is-served",
+      "passed": true,
+      "detail": "schema popit.capacity/1, scanned ['authority', 'probes', 'docs']"
+    },
+    {
+      "name": "capacity-receipt-matches-the-scan",
+      "passed": true,
+      "detail": "refused 0 vs 0"
+    },
+    {
+      "name": "no-unacked-capacity-excuse",
+      "passed": true,
+      "detail": "none"
+    }
+  ],
+  "passed": 4,
+  "failed": 0
+}

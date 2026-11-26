@@ -17,6 +17,7 @@ import hashlib
 import io
 import json
 import pathlib
+import re
 import threading
 import time
 import uuid
@@ -43,6 +44,9 @@ MOUSEEVENTF_LEFTUP = 0x0004
 MOUSEEVENTF_RIGHTDOWN = 0x0008
 MOUSEEVENTF_RIGHTUP = 0x0010
 DECLARED_ACTIONS = {"capture", "probe_chat", "focus", "move", "click", "key", "type", "wait"}
+# A key names one act. The fleet keeps the first task a key produced, so a bridge retry
+# after a tunnel flap reads that receipt instead of clicking a second time.
+KEY_RE = re.compile(r"^[a-z0-9][a-z0-9._:-]{7,95}$")
 
 
 def iso() -> str:
@@ -354,13 +358,14 @@ class Task:
     results: list[dict] = field(default_factory=list)
     refusal: dict | None = None
     announce: bool = False
+    key: str = ""
     _abort: threading.Event = field(default_factory=threading.Event, repr=False)
 
     def as_dict(self) -> dict:
         return {
             "id": self.id, "driver": self.driver, "status": self.status, "at": self.at,
             "finished": self.finished, "results": self.results, "refusal": self.refusal,
-            "actions": len(self.actions),
+            "actions": len(self.actions), "key": self.key,
         }
 
 
@@ -370,6 +375,7 @@ class Fleet:
     def __init__(self, drivers: int = 4) -> None:
         self.lock = threading.RLock()
         self.tasks: list[Task] = []
+        self.by_key: dict[str, str] = {}
         self.on_task = None
         self.drivers = [Driver("cua-chat", "freebuff chat probe")]
         for index in range(1, max(1, drivers)):
@@ -384,13 +390,17 @@ class Fleet:
                     for d in self.drivers
                 ],
                 "tasks": [t.as_dict() for t in self.tasks[-8:]][::-1],
+                "keys": len(self.by_key),
             }
 
-    def submit(self, actions: list[dict], driver_id: str = "", *, announce: bool = False) -> dict:
+    def submit(self, actions: list[dict], driver_id: str = "", *, announce: bool = False,
+               key: str = "") -> dict:
         if not isinstance(actions, list) or not actions:
             raise Refused("actions-empty", "a task needs at least one action")
         if len(actions) > 32:
             raise Refused("actions-too-many", str(len(actions)))
+        if key and not KEY_RE.fullmatch(key):
+            raise Refused("key-invalid", str(key)[:96])
         unknown = {
             str(item.get("action")) for item in actions
             if not isinstance(item, dict) or item.get("action") not in DECLARED_ACTIONS
@@ -399,6 +409,10 @@ class Fleet:
             raise Refused("action-not-declared", ", ".join(sorted(unknown)),
                           allowed=sorted(DECLARED_ACTIONS))
         with self.lock:
+            if key and key in self.by_key:
+                existing = next((t for t in self.tasks if t.id == self.by_key[key]), None)
+                if existing is not None:
+                    return {**existing.as_dict(), "replayed": True}
             if driver_id:
                 driver = next((d for d in self.drivers if d.id == driver_id), None)
                 if driver is None:
@@ -407,11 +421,13 @@ class Fleet:
             else:
                 driver = min(self.drivers, key=lambda d: d.tasks)
             task = Task(id="task-" + uuid.uuid4().hex[:8], driver=driver.id,
-                        actions=actions, announce=announce)
+                        actions=actions, announce=announce, key=key)
             self.tasks.append(task)
+            if key:
+                self.by_key[key] = task.id
             driver.tasks += 1
         threading.Thread(target=self._run, args=(task,), daemon=True).start()
-        return task.as_dict()
+        return {**task.as_dict(), "replayed": False}
 
     def wait(self, task_id: str, timeout: float = 8.0) -> dict:
         deadline = time.monotonic() + timeout

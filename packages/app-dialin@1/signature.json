@@ -1,0 +1,15 @@
+{
+  "app": "dialin",
+  "app_standard": "popit.app/2",
+  "digest": "blake3:1da40af30d3b714076e4c52f90e1c2ef116546561fddca87b12e7eb47275f113",
+  "driver": "",
+  "identity": "app-dialin@1+blake3:1da40af30d3b714076e4c52f90e1c2ef116546561fddca87b12e7eb47275f113",
+  "payload_digest": "blake3:585b3849155782057a540a7aa61992e480a26c6aa8983f1e464bfc6acbe821cf",
+  "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA8obcut3oMZaJ7iU+zKQBtYrNhnaaCsoLwPhQDGEInbw=\n-----END PUBLIC KEY-----",
+  "published_at": "2026-11-25T22:13:59Z",
+  "revision": 1,
+  "schema": "popit.app-package/2",
+  "signature": "jhEEIHVPKCmOtHK5OZHcnaWCfqcUDWAWs3cSd+qkAdTjPBVH0h3NvDr0eKHkbq2og4LissrG2+U5qwlBUV8vCg==",
+  "signature_algorithm": "ed25519",
+  "ui_audit": "pending"
+}

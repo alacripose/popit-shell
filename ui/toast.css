@@ -958,7 +958,6 @@ html[data-motion-profile="sweep"] .settings { animation-name: settings-sweep; }
 @keyframes settings-fold { from { opacity: 0; transform: translateY(-6px) scaleY(0.94); transform-origin: top; } to { opacity: 1; transform: none; } }
 @keyframes settings-snap { from { opacity: 0; transform: translateY(-2px) scale(0.992); } 72% { opacity: 1; } to { opacity: 1; transform: none; } }
 @keyframes settings-sweep { from { opacity: 0; transform: translateX(6px); } to { opacity: 1; transform: none; } }
-.toast[data-motion="reduced"] *, .toast[data-motion="reduced"] *::before, .toast[data-motion="reduced"] *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 .voice-heard.harness b[data-state="live"] { color: var(--green); }
 .voice-heard.harness b[data-state="refused"] { color: var(--rose); }
 .voice-heard.harness b[data-state="waiting"] { color: var(--brass-lit); }
@@ -1135,4 +1134,137 @@ html[data-motion-profile="sweep"] .settings { animation-name: settings-sweep; }
   .settings-row button { min-height: 32px; }
   .dpi-range { height: 28px; }
   .dpi-range::-webkit-slider-thumb { width: 18px; height: 18px; margin-top: -7px; }
+}
+
+/* The settings package window is this page in window mode: the desk`s own panel, its own
+   motion and its own logic, filling the frame the dialin window provides (drag, resize, drop).
+   Nothing here re-authors the panel; it only stops the desk surfaces showing beside it. */
+body[data-window-mode="settings"] .tabs,
+body[data-window-mode="settings"] .body,
+body[data-window-mode="settings"] .live {
+  display: none;
+}
+body[data-window-mode="settings"] .settings {
+  position: static !important;
+  top: auto;
+  right: auto;
+  width: auto;
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 14px 16px 16px;
+  overflow: auto;
+  animation: none;
+}
+/* The window is the frame"s bar and the settings panel, nothing else: the desk"s surfaces are
+   not part of this window, including the springboard drawer it embeds. */
+body[data-window-mode="settings"] .toast > *:not(.bar):not(#settings-panel) {
+  display: none;
+}
+
+/* The prose app is this page in its prose-window mode: the same bar and frame, and the prose
+   panel as the body. Nothing here re-authors the window; it hides the desk surfaces and lays
+   out the rows the shell's receipts provide. */
+body[data-window-mode="prose"] .tabs,
+body[data-window-mode="prose"] .body,
+body[data-window-mode="prose"] .live,
+body[data-window-mode="prose"] .settings,
+body[data-window-mode="prose"] .springboard {
+  display: none;
+}
+body[data-window-mode="prose"] .toast > *:not(.bar):not(#prose-panel) {
+  display: none;
+}
+body[data-window-mode="prose"] #prose-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 14px 16px 16px;
+  overflow: auto;
+}
+.prose-head, .prose-row {
+  display: grid;
+  grid-template-columns: minmax(96px, 1.1fr) minmax(84px, 1fr) minmax(70px, .8fr)
+                         minmax(90px, 1fr) 54px 46px minmax(96px, 1fr) 62px;
+  gap: 6px;
+  align-items: center;
+  font: 12px/1.4 "IBM Plex Mono", monospace;
+}
+.prose-head { color: var(--muted, #8d8a80); text-transform: uppercase; letter-spacing: .08em; }
+.prose-row { padding: 4px 0; border-bottom: 1px solid var(--rule, rgba(255,255,255,.08)); }
+.prose-row[data-refused="true"] .prose-phase { color: var(--bad, #e2765f); }
+.prose-name { font-weight: 600; }
+.prose-bar { position: relative; height: 5px; background: var(--rule, rgba(255,255,255,.1)); }
+.prose-bar i { position: absolute; inset: 0 auto 0 0; background: var(--brass-lit, #f0c454); }
+.prose-spinner {
+  width: 11px; height: 11px; margin-right: 5px; border-radius: 50%;
+  border: 2px solid var(--rule, rgba(255,255,255,.14));
+  border-top-color: var(--brass-lit, #f0c454);
+  display: inline-block; vertical-align: -2px;
+  animation: prose-spin .9s linear infinite;
+}
+@keyframes prose-spin { to { transform: rotate(360deg); } }
+.prose-row a { color: var(--brass-lit, #f0c454); }
+
+/* Narrow windows: the bar and the tab strip wrap before they clip a control, and the signed
+   identity names its own truncation instead of pushing the window wider than its frame. These
+   are the baseline sheet`s rules, so every window that wears it inherits the same behaviour. */
+@media (max-width: 560px) {
+  /* A window narrower than the desk's own frame fits its frame: the frame shrinks, it does not
+     push the page wider than the window the shell delivered. */
+  .toast { width: auto; max-width: 100%; min-width: 0; }
+  .bar { flex-wrap: wrap; row-gap: 6px; max-width: 100%; }
+  .bar > .icon, .bar > button, .bar > a { flex: 0 0 auto; }
+  .bar .identity, .bar .status {
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .tabs { overflow-x: auto; scrollbar-width: thin; }
+  .tabs::-webkit-scrollbar { height: 6px; }
+  .tabs > button { flex: 0 0 auto; }
+}
+.package-identity {
+  min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* The contour overlay paints inside the surface it belongs to: its stroke margin must not
+   widen the window or push the page past its frame. */
+.contour-material {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.contour-material svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* The window fills the page it is delivered in. With CSS zoom the layout box is narrower than
+   the viewport, and an absolutely positioned window anchored to the viewport would paint past
+   its own page; anchoring it to the body keeps the frame and the page the same box. */
+body {
+  position: relative;
+}
+
+/* The SpringBoard frame is shown only after its own package has painted: a frame that has not
+   reported ready stays hidden, so the window never shows a half-applied page. */
+#springboard-frame[data-pending="true"] {
+  visibility: hidden;
+}
+
+/* A window whose package does not verify keeps its bar and its refusal, and draws nothing else:
+   an app that cannot verify cannot wear the family contour or the settings package's theme. */
+/* A refused window loses its app body, never its own controls: the grips and the bar are the
+   window's, and a window you cannot resize or close is a worse refusal than the page it hid. */
+body[data-package-refused] .toast > *:not(.bar):not(.grip) {
+  visibility: hidden;
+}
+
+/* A window is hidden while it waits for the settings package: an app that has not received the
+   package's theme and contour has nothing it is allowed to draw. */
+body[data-window-state="pending"] .toast,
+body[data-window-state="pending"] .springboard {
+  visibility: hidden;
 }

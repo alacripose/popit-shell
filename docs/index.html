@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>popit-shell on Debian 13</title>
 <meta name="description" content="This machine scores the repository 10 in band red">
-<meta name="openlock-build" content="3ae7a2d285">
+<meta name="openlock-build" content="0247c445ba">
 <style>
   :root {
     --paper: #d9c9a6;
@@ -118,7 +118,7 @@
       </article>
       <article class="card surface" data-contour="card">
         <h3>The gate</h3>
-        <p>The gate runs 35 checks, first is family-look-pinned</p>
+        <p>The gate runs 74 checks, first is family-look-pinned</p>
       </article>
     </div>
   </section>
@@ -135,11 +135,11 @@
         <tr><td>Profile</td><td>8 cubics</td></tr>
         <tr><td>Surfaces</td><td>4 draw the one corner</td></tr>
         <tr><td>Machine</td><td>Debian 13 CUA v2.7.3</td></tr>
-        <tr><td>Gate checks</td><td>35 named</td></tr>
+        <tr><td>Gate checks</td><td>74 named</td></tr>
         <tr><td>Stars and axes</td><td>6 over 9</td></tr>
         <tr><td>Machine score</td><td>10 in band red</td></tr>
       </table>
-      <p class="caption">The reading is 33e1f372c205 over three routes</p>
+      <p class="caption">The reading is b3ae7bfdc65e over three routes</p>
     </div>
   </section>
 
@@ -181,7 +181,7 @@ python shell.py</pre>
 <script type="module">
   // The assets are named by their own bytes, so a page and the module it asks for cannot be from
   // two different builds: a fresh page never pairs with a module an old visit left in the cache.
-  import { loadContour, fillContours } from "./contour.js?v=343b9a8699";
+  import { loadContour, fillContours } from "./contour.js?v=3b495f8b5e";
   await loadContour("./contour.json?v=b6d678b1c3");
   fillContours(document);
   // Every surface is measured again when its box changes, exactly as the shell does it.

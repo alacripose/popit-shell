@@ -396,10 +396,11 @@ def main() -> int:
         status, apps_body, _ = get(port, "/api/toast/apps")
         apps = json.loads(apps_body) if status == 200 else {}
         check("app-packages-signed", status == 200
-              and apps.get("schema") == "popit.app-packages/1"
+              and apps.get("schema") == toast_app.app_package.STATE_SCHEMA
               and apps.get("publisher") == "popit-publisher"
               and all(row.get("verified") for row in apps.get("apps", {}).values())
-              and len(apps.get("apps") or {}) == 3,
+              and len(apps.get("apps") or {}) == len(toast_app.app_package.APPS)
+              and "ide" not in (apps.get("apps") or {}),
               "every served surface is a signed app package")
         status, one_body, _ = get(port, "/api/toast/apps/springboard")
         spring = json.loads(one_body) if status == 200 else {}

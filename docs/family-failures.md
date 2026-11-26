@@ -1,6 +1,6 @@
 # Family failures, swept from the ledgers and the hypergrilling documents
 
-`popit.family-failures/1` · 2026-11-25T18:05:25+00:00 · 168 rows · 49 named codes · 4 projects
+`popit.family-failures/1` · 2026-11-25T18:13:06+00:00 · 168 rows · 49 named codes · 4 projects
 
 ## Sources read
 

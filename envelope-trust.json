@@ -1,0 +1,11 @@
+{
+  "schema": "popit.envelope-trust/1",
+  "keys": [
+    {
+      "name": "Popit settings publisher",
+      "fingerprint": "blake3:3ad3d78bd1d3fad12171d5cc00df93052f72d86f665d1178da30664e28a2ab51",
+      "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA8obcut3oMZaJ7iU+zKQBtYrNhnaaCsoLwPhQDGEInbw=\n-----END PUBLIC KEY-----",
+      "added_at": "2026-11-25T22:21:10Z"
+    }
+  ]
+}

@@ -1,5 +1,4 @@
 # Kept probe: what the notification area answers about its own icons.
-#
 # The bar needs the tray's real icons (Steam persistent, Discord's call state), not a
 # redrawing of them. This probe asks two questions and writes the answers to stdout:
 #   1. is Explorer's bar auto-hidden (StuckRects3 Settings), and where is the window;

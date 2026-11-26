@@ -1,0 +1,19 @@
+{
+  "counts": {
+    "all": 10547,
+    "conditional": 1,
+    "doc-sentence": 32,
+    "em-dash": 586,
+    "phrase": 557,
+    "punctuation": 3501,
+    "sentence-budget": 747,
+    "sentences": 885,
+    "structure": 449,
+    "ui-budget": 2675,
+    "voice": 48,
+    "word": 1066
+  },
+  "root": "F:\\Documents\\popit-shell",
+  "schema": "popit.prose-baseline/1",
+  "visible": 20601
+}

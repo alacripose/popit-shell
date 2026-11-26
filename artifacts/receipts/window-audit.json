@@ -1,0 +1,58 @@
+{
+  "schema": "popit.window-audit/1",
+  "at": "2026-11-25T20:12:13+00:00",
+  "checks": [
+    {
+      "check": "popit-surface",
+      "ok": true,
+      "detail": "port 60589"
+    },
+    {
+      "check": "report-schema",
+      "ok": true,
+      "detail": "3 rows"
+    },
+    {
+      "check": "window-measured-dialin",
+      "ok": true,
+      "detail": "passed \u00b7 app-dialin@97 \u00b7 360x664 \u00b7 no refusal \u00b7 at 2026-11-25T20:11:35Z"
+    },
+    {
+      "check": "window-measured-settings",
+      "ok": true,
+      "detail": "passed \u00b7 app-settings@88 \u00b7 360x664 \u00b7 no refusal \u00b7 at 2026-11-25T20:11:40Z"
+    },
+    {
+      "check": "window-measured-springboard",
+      "ok": true,
+      "detail": "passed \u00b7 app-springboard@67 \u00b7 347x574 \u00b7 no refusal \u00b7 at 2026-11-25T20:11:49Z"
+    },
+    {
+      "check": "store-rejects-bridge",
+      "ok": true,
+      "detail": "foreign bridge: app-kind-foreign"
+    },
+    {
+      "check": "springboard-hidden-until-painted",
+      "ok": true,
+      "detail": "{\"pending\": \"true\", \"src\": \"http://127.0.0.1:5207/phone.html?uiaudit=1&app=springboard\", \"origin\": \"http://127.0.0.1:5207\", \"painted\": false"
+    },
+    {
+      "check": "springboard-frame-is-the-signed-package",
+      "ok": true,
+      "detail": "frame app-springboard@67+blake3:c0656b6bbf989604281062e99b212995bfc3440c4dc4b48ca8693a58e3f42014 \u00b7 theme popit-settings@275 vs package app-springboard@67+blake3:c0656b6bbf989604281062e99b212995bfc3440c4dc4b48ca8693a58e3f42014"
+    },
+    {
+      "check": "springboard-is-the-only-launcher",
+      "ok": true,
+      "detail": "1 frame(s), 0 extra launcher(s)"
+    },
+    {
+      "check": "springboard-revealed-after-paint",
+      "ok": true,
+      "detail": "{\"pending\": \"false\", \"ready\": \"true\", \"src\": \"http://127.0.0.1:5207/phone.html?uiaudit=1&app=springboard\", \"origin\": \"http://127.0.0.1:5207\""
+    }
+  ],
+  "passed": 10,
+  "failed": 0
+}

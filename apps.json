@@ -1,0 +1,15 @@
+{
+  "apps": {
+    "dialin": {
+      "digest": "blake3:1da40af30d3b714076e4c52f90e1c2ef116546561fddca87b12e7eb47275f113",
+      "driver": "",
+      "identity": "app-dialin@1+blake3:1da40af30d3b714076e4c52f90e1c2ef116546561fddca87b12e7eb47275f113",
+      "package": "packages\\app-dialin@1",
+      "payload_digest": "blake3:585b3849155782057a540a7aa61992e480a26c6aa8983f1e464bfc6acbe821cf",
+      "published_at": "2026-11-25T22:13:59Z",
+      "revision": 1,
+      "ui_audit": "pending"
+    }
+  },
+  "schema": "popit.app-packages/2"
+}

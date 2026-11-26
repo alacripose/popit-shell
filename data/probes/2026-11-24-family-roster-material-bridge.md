@@ -7,12 +7,12 @@ the clipped raster material/blend layer and motion, not a corner-size selector.
 
 ## Sources
 
-- `C:/Users/ala/Documents/portal-shell/internal/theme/roster.go` — family
+- `<home>/Documents/portal-shell/internal/theme/roster.go` — family
   schemes, registers, Popit suite, Deadlock, Alpha, Holo, Material, iOS,
   TouchWiz and simulator legacy.
-- `C:/Users/ala/Documents/openlock_modern/docs/design/FAMILY-BRAND-SYNTHESIS.md`
+- `<home>/Documents/openlock_modern/docs/design/FAMILY-BRAND-SYNTHESIS.md`
   and `family-design-tokens.json` — family precedence and web/kiosk provenance.
-- `C:/Users/ala/Documents/popit_base/references/POPIT-AUDIT.md` —
+- `<home>/Documents/popit_base/references/POPIT-AUDIT.md` —
   LBP1 glossy/static, LBP2 flat/animated, LBP3 translucent/folded; corner
   radius is a weak identifier.
 - `F:/Documents/popit-blender/design/popit-pairs.json` — all 37 player pairs.

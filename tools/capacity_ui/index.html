@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Popit capacity audit</title>
+<style>
+  :root { --ground: #0c0e11; --ink: #e7e3d8; --muted: #8d8a80; --gold: #f0c454;
+          --edge: #23262b; --bad: #e2765f; }
+  body { margin: 0; background: var(--ground); color: var(--ink);
+         font: 14px/1.5 "Archivo", "Segoe UI", sans-serif; }
+  header { border-bottom: 1px solid var(--edge); padding: 18px 22px; }
+  h1 { margin: 0; font-size: 15px; letter-spacing: .14em; text-transform: uppercase; }
+  .mark { color: var(--gold); }
+  main { padding: 18px 22px 40px; }
+  .state { display: inline-block; padding: 2px 8px; border: 1px solid var(--edge);
+           font-family: "IBM Plex Mono", monospace; font-size: 12px; }
+  .state.refused { color: var(--bad); border-color: var(--bad); }
+  .state.acknowledged { color: var(--gold); border-color: var(--gold); }
+  table { border-collapse: collapse; width: 100%; margin-top: 14px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--edge);
+           vertical-align: top; font-size: 13px; }
+  th { color: var(--muted); font-weight: 500; text-transform: uppercase;
+       letter-spacing: .1em; font-size: 11px; }
+  code { font-family: "IBM Plex Mono", monospace; color: var(--muted); }
+</style>
+</head>
+<body data-popit="capacity-audit">
+<header>
+  <h1><span class="mark">&#9671;</span> capacity audit &middot;
+      <span id="capacity-state">reading</span></h1>
+</header>
+<main>
+  <p>Work cut for context, capacity or session length is refused unless the record names
+     the unit that still owes it. <code id="receipt-path">artifacts/receipts/capacity.json</code></p>
+  <table id="excuse-table">
+    <thead><tr><th>state</th><th>record</th><th>excerpt</th><th>unit</th></tr></thead>
+    <tbody><tr><td colspan="4">reading&hellip;</td></tr></tbody>
+  </table>
+</main>
+<script>
+fetch("/report.json").then((reply) => reply.json()).then((body) => {
+  const state = document.getElementById("capacity-state");
+  state.textContent = body.refused ? `refused ${body.refused}` : "clean";
+  state.className = "state " + (body.refused ? "refused" : "acknowledged");
+  const rows = body.rows || [];
+  const tbody = document.querySelector("#excuse-table tbody");
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="4">no capacity excuse in the decision records</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map((row) =>
+    `<tr><td><span class="state ${row.state}">${row.state}</span></td>` +
+    `<td><code>${row.file}:${row.line}</code></td>` +
+    `<td>${row.excerpt.replace(/[<>&]/g, (c) => ({"<": "&lt;", ">": "&gt;", "&": "&amp;"}[c]))}</td>` +
+    `<td>${row.unit || "&mdash;"}</td></tr>`).join("");
+});
+</script>
+</body>
+</html>

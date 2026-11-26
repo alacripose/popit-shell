@@ -26,6 +26,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 UI = ROOT / "ui"
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+import app_package  # noqa: E402 - the package contract this gate reads
 CONTOUR = ROOT / "contour.json"
 SHAPE_AUTHORITY = UI / "contour.js"
 
@@ -372,8 +375,12 @@ def toast_refusals() -> None:
         "springboard-is-the-phone-home",
         "the SpringBoard frame loads the existing phone home, and its apps hand back",
         'id="springboard"' in board_html
-        and 'data-src="/phone.html"' in board_html
+        # The home is the phone page the family already serves, requested as the window's own
+        # delivery: a bare /phone.html is refused, so the frame names itself embedded.
+        and 'data-src="/phone.html?embedded=1"' in board_html
         and 'id="app-grid"' not in board_html
+        # The desk's surfaces and the settings engine moved into the shared module, so the
+        # function is looked up where it now lives, not weakened.
         and "function setSurface" in board_js
         and 'data.source !== "popit-springboard"' in board_js
         and '/api/toast/apps' in phone_js
@@ -439,6 +446,135 @@ def toast_refusals() -> None:
         f"baseline {baseline.get('profile')} {baseline_model} "
         f"{('sha256 ' + digest[:12] + ' matches the pin') if model_present else ('weights are local (gitignored), pin ' + pin[:12] + ' declared')}; "
         f"below baseline {below_baseline or 'none'}; unpinned {unpinned or 'none'}",
+    )
+
+
+BAR_CONTROLS = ("settings", "pin", "close")
+
+
+def bar_control_refusals() -> None:
+    """The bar belongs to the shell and is closed: no app package may add a control to it.
+
+    The retired IDE lived as a button in the window's own furniture: a package's control in
+    the shell's bar, which could only be removed by editing the desk and made the app look
+    like part of the window. The bar's controls are pinned here, a chip or a hosted surface
+    inside a bar or status region is refused, and the signed payload may not name controls.
+    """
+    html = (UI / "toast.html").read_text(encoding="utf-8")
+    match = re.search(r'(?s)<header[^>]*data-region="bar"[^>]*>(.*?)</header>', html)
+    if not match:
+        refuse("bar-region-absent", "ui/toast.html", 'no header carries data-region="bar"')
+        return
+    bar = match.group(1)
+    found = re.findall(r'<button[^>]*id="([^"]+)"', bar)
+    extra = [name for name in found if name not in BAR_CONTROLS]
+    missing = [name for name in BAR_CONTROLS if name not in found]
+    check(
+        "bar-controls-pinned",
+        "the bar carries only the shell's own settings, pin and close controls",
+        not extra and not missing,
+        "ui/toast.html",
+        f"extra {extra or 'none'}; missing {missing or 'none'}",
+    )
+    check(
+        "bar-no-app-surface",
+        "no chip, app button or hosted surface sits in the window's bar",
+        "chip" not in bar and "iframe" not in bar and "ide" not in bar.lower(),
+        "ui/toast.html",
+        "an app package injected a control into the window's bar",
+    )
+    nav = re.search(r'(?s)<nav[^>]*data-region="status"[^>]*>(.*?)</nav>', html)
+    if nav:
+        strip = nav.group(1)
+        check(
+            "status-strip-does-not-launch-an-app",
+            "the status strip names state; it does not launch an app",
+            "iframe" not in strip
+            and not re.search(r'<button[^>]*class="[^"]*\bchip\b', strip)
+            and not re.search(r"<button[^>]*>\s*(?:IDE|BRIDGE|SPRINGBOARD)\s*</button>", strip, re.I),
+            "ui/toast.html",
+            "an app was given a control in the status strip",
+        )
+
+
+FRESHNESS_FAMILIES = ("landing", "ci", "audits", "failures", "ledgers", "refusals",
+                      "packages", "tiles")
+
+
+def freshness_register() -> None:
+    """Landing, ci, audits, failures, ledgers, refusals, packages and tiles are measured.
+
+    `tools/freshness.py probe` is the driver's work list: it reads the Popit page over
+    loopback, writes `artifacts/receipts/freshness.json`, and names the act that clears
+    every stale row. The gate reads that receipt, so a register that stops covering a
+    family and a family that has gone stale are both refused here by name.
+    """
+    source_path = ROOT / "tools" / "freshness.py"
+    source = source_path.read_text(encoding="utf-8") if source_path.is_file() else ""
+    receipt = ROOT / "artifacts" / "receipts" / "freshness.json"
+    body: dict = {}
+    if receipt.is_file():
+        try:
+            body = json.loads(receipt.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            body = {}
+    covered = {entry.get("family") for entry in body.get("rows") or []}
+    check(
+        "freshness-register-covers-the-family",
+        "landing, ci, audits, failures, ledgers, refusals, packages and tiles are rows",
+        'data-popit="freshness"' in source
+        and all(f'"{family}"' in source for family in FRESHNESS_FAMILIES)
+        and body.get("schema") == "popit.freshness/1"
+        and set(FRESHNESS_FAMILIES) <= covered,
+        "tools/freshness.py",
+        f"covered {sorted(covered) or 'nothing'} from the receipt",
+    )
+    stale = [entry.get("code") for entry in body.get("rows") or []
+             if entry.get("state") == "stale"]
+    check(
+        "freshness-no-stale-rows",
+        "a stale landing, audit, receipt, ledger, refusal, package or tile is a driver act",
+        bool(body) and not stale,
+        "artifacts/receipts/freshness.json",
+        f"stale: {', '.join(stale) or 'none'}",
+    )
+
+
+def capacity_audit_checks() -> None:
+    """Work cut for context, capacity or session length is refused by name.
+
+    The owner's rule: an assistant that stops or shrinks a unit because the conversation is
+    long, the context is nearly full or the work is assumed not to fit has to have that
+    reason found and refused by the harness. `tools/capacity_audit.py` reads the decision
+    records (authority rows, probes, docs), refuses every excuse it has not been told the
+    owed unit for, and serves the reading on its own Popit page; this reads its receipt.
+    """
+    source_path = ROOT / "tools" / "capacity_audit.py"
+    source = source_path.read_text(encoding="utf-8") if source_path.is_file() else ""
+    receipt = ROOT / "artifacts" / "receipts" / "capacity.json"
+    body: dict = {}
+    if receipt.is_file():
+        try:
+            body = json.loads(receipt.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            body = {}
+    check(
+        "capacity-audit-covers-the-records",
+        "the capacity audit scans authority rows, probes and docs and serves its reading",
+        'data-popit="capacity-audit"' in source
+        and body.get("schema") == "popit.capacity/1"
+        and set(body.get("scanned") or []) == {"authority", "probes", "docs"},
+        "tools/capacity_audit.py",
+        f"scanned {body.get('scanned') or 'nothing'} from {receipt.name}",
+    )
+    refused = [f"{row.get('file')}:{row.get('line')}" for row in body.get("rows") or []
+               if row.get("state") == "refused"]
+    check(
+        "no-unacked-capacity-excuse",
+        "a capacity excuse is refused unless the record names the unit that still owes it",
+        bool(body) and not refused,
+        "artifacts/receipts/capacity.json",
+        f"refused: {', '.join(refused) or 'none'}",
     )
 
 
@@ -553,7 +689,11 @@ def settings_package_checks() -> None:
             "settings_package.py",
             f"untrusted={refused or 'accepted'} unsigned={stripped or 'accepted'}",
         )
-        device = published.get("device") or {}
+        # The device report is delivered live with the package, not signed into its bytes: the
+        # signed payload names the document and a digest, and the readings a window receives are
+        # the shell's current ones.
+        device = ((published.get("delivery") or {}).get("device")
+                  or published.get("device") or {})
         check(
             "settings-device-report",
             "the package owns an honestly measured device report",
@@ -820,6 +960,9 @@ def main(argv: list[str]) -> int:
     family_look_pin()
     landing_pin()
     toast_refusals()
+    bar_control_refusals()
+    freshness_register()
+    capacity_audit_checks()
     settings_package_checks()
 
     authority = sources.get("ui/contour.js", "")
@@ -829,6 +972,423 @@ def main(argv: list[str]) -> int:
         authority.count("export function contourPath") == 1,
         "ui/contour.js",
         "contourPath must be defined once",
+    )
+
+    # The settings package is the mutable window base: layout travels with the theme in the
+    # same signed document, and the apps read it rather than owning their own numbers.
+    package_src = (ROOT / "settings_package.py").read_text(encoding="utf-8", errors="replace")
+    package_js = sources.get("ui/package.js", "")
+    settings_html = sources.get("ui/settings.html", "")
+    settings_css = sources.get("ui/settings.css", "")
+    check(
+        "settings-carries-layout",
+        "the settings package publishes the layout every app derives",
+        all(token in package_src for token in ("LAYOUT_APPS", '"layout"', "settings-layout"))
+        and "--popit-columns" in package_js and "layout || {}" in package_js,
+        "settings_package.py",
+        "layout must be signed with the theme",
+    )
+    settings_window = sources.get("ui/toast.html", "")
+    app_src = (ROOT / "app_package.py").read_text(encoding="utf-8", errors="replace")
+    check(
+        "settings-category-rail",
+        "settings has a scrolling rail and a page per category",
+        # The settings window is the panel the desk draws, and its surface list is that panel's:
+        # one tab and one pane per family surface, on a rail that scrolls.
+        settings_window.count("data-settings-tab-choice=") >= 2
+        and settings_window.count("data-settings-pane=") >= 2
+        and "overflow" in sources.get("ui/toast.css", "")
+        and "var(--popit-" in sources.get("ui/toast.css", ""),
+        "ui/settings.html",
+        "every category needs a page on a scrollable rail",
+    )
+    check(
+        "apps-are-authored-packages",
+        "an app payload declares what it adds and derives",
+        all(token in app_src for token in ('APP_SCHEMA = "popit.app/2"', "app-legacy",
+                                           "app-not-authored", "app-window-incomplete",
+                                           '"derives": DERIVES', '"authored": authored',
+                                           'REGION_CONTRACT = ("bar", "status", "body", "foot")'))
+        and app_src.count('"kind":') >= 3 and app_src.count('"pages":') >= 3,
+        "app_package.py",
+        "a files-only or thin-page payload must be refused",
+    )
+    regions = ("bar", "status", "body", "foot")
+    thin = [name for name in ("ui/toast.html", "ui/settings.html", "ui/phone.html")
+            if not all(f'data-region="{region}"' in sources.get(name, "") for region in regions)]
+    check(
+        "every-window-carries-the-family-regions",
+        "a window is bar, status, body and foot",
+        not thin,
+        "ui/toast.html",
+        f"missing regions in {', '.join(thin) or 'none'}",
+    )
+    check(
+        "mutable-package-kinds-are-the-reference-forms",
+        "a mutable package is a window (dialin, settings, prose) or the phone home, never a surface",
+        'KINDS = ("window", "phone")' in app_src
+        and 'FOREIGN: dict[str, str] = {"bridge": "window page"}' in app_src
+        and '"kind": "surface"' not in app_src
+        and "app-kind-foreign" in app_src
+        and app_src.count("\"kind\": \"window\"") == 3
+        and app_src.count("\"kind\": \"phone\"") == 1,
+        "app_package.py",
+        "a hosted surface was being signed as a package kind of its own",
+    )
+    # The desk is the settings window's own page: its palette and motion ARE the baseline's,
+    # and no other window may copy them.
+    copied = [name for name in ("ui/bridge.css", "ui/phone.css", "ui/settings.css")
+              if re.search(r"--primary:\s*#|@keyframes", sources.get(name, ""))]
+    check(
+        "dialin-reads-the-settings-formats",
+        "the desk takes its visual and motion formats from the signed settings package",
+        "contour-theme.css" in sources.get("ui/toast.html", "")
+        and 'attach("dialin"' in sources.get("ui/toast.js", "")
+        and 'data-window="popit-settings-package"' in sources.get("ui/toast.html", "")
+        and not copied
+        and "ide:" not in sources.get("ui/package.js", "")
+        and "data-motion=\"" not in sources.get("ui/toast.html", ""),
+        "ui/toast.html",
+        "a window kept its own copy of the palette or motion: "
+        + (", ".join(copied) or "none"),
+    )
+    # Project convention from 2026-11-25: every app package subscribes to the signed settings
+    # app instead of carrying a private theme, and signs every asset it loads, so bringing in
+    # a feature or a dependency keeps signing properly.
+    # The bridge is a foreign window page, not a package: only the packages that are signed
+    # subscribe. A page that is listed as foreign cannot stand in for one of them.
+    subscribed = all(
+        f'attach("{name}"' in (UI / script).read_text(encoding="utf-8")
+        for name, script in (("dialin", "toast.js"), ("settings", "settings.js"),
+                             ("springboard", "phone.js")))
+    bridged = ("app_package.FOREIGN" in app_src or 'FOREIGN: dict[str, str] = {"bridge": "window page"}' in app_src)
+    check(
+        "packages-subscribe-the-settings-app",
+        "every app attaches to the settings app and declares every asset it loads",
+        subscribed and "app-not-subscribed" in app_src
+        and "app-dependency-undeclared" in app_src,
+        "app_package.py",
+        "an app kept a private theme or an asset the package does not sign",
+    )
+    # The settings app package is the floating settings window: every other window is built
+    # from it, and the SpringBoard's settings tile opens it itself.
+    phone_js = (UI / "phone.js").read_text(encoding="utf-8")
+    sheets = ("contour-theme.css", "package.js", "contour.js")
+    derived = all(
+        all(sheet in app_package.APPS[name]["files"] for sheet in sheets)
+        and "/contour-theme.css" in (UI / app_package.APPS[name]["entry"]).read_text(encoding="utf-8")
+        for name in ("dialin", "settings")) and bridged
+    app_base_src = (ROOT / "app_base.py").read_text(encoding="utf-8") \
+        if (ROOT / "app_base.py").is_file() else ""
+    chrome_pages = ("toast.html", "settings.html")
+    own_chrome = [page for page in ("phone.html", "settings.html")
+                  if "@keyframes" in sources.get(f"ui/{page}", "")]
+    check(
+        "chrome-comes-from-the-settings-window",
+        "the chrome, the motion and how buttons look are the settings window's provision",
+        "--popit-" in sources.get("ui/toast.css", "")
+        and all("/contour-theme.css" in sources.get(f"ui/{page}", "") for page in chrome_pages)
+        and not own_chrome
+        and "app-chrome-handrolled" in app_src,
+        "ui/toast.css",
+        "a window painted its own chrome or a button look of its own: "
+        + (", ".join(own_chrome) or "none"),
+    )
+    check(
+        "no-handrolled-window-pages",
+        "a window package is the settings window's page, never a page of its own",
+        'raise Refused("app-handrolled-window"' in app_src
+        and "baseline_entry" in app_src
+        and 'FOREIGN: dict[str, str] = {"bridge": "window page"}' in app_src,
+        "app_package.py",
+        "a hand-rolled window page could be signed as a package",
+    )
+    check(
+        "packages-are-mutated-subscriptions",
+        "an app package is a mutated signed subscription, never a plain derivation",
+        'SCHEMA = "popit.app-base/1"' in app_base_src
+        and "app-not-mutated" in app_base_src
+        and "app-base-stale" in app_base_src
+        and "import app_base" in app_src
+        and 'app_base.subscription(self.settings, name, spec' in app_src
+        and "app_base.check(body.get(\"base\")" in app_src,
+        "app_base.py",
+        "a package could be signed without a current mutated subscription",
+    )
+    # Delivery is the settings window's delivery: every app names the window it is delivered
+    # in, and the shell opens each app in its own named window through one helper — no app is
+    # navigated into, and none is special-cased into the settings window.
+    delivered = {
+        "dialin": "popit-settings-package",
+        "settings": "popit-settings-package",
+    }
+    # The contour is drawn by the window's own script from the measured path, so a window that
+    # fails to load it looks exactly like a refused package. The settings window therefore reads
+    # its package first, refuses by name, and only then draws the contour.
+    desk_js = sources.get("ui/toast.js", "")
+    check(
+        "window-contour-implies-a-verified-package",
+        "a window draws the contour only after its package is delivered, and names a refusal",
+        'attach("dialin"' in desk_js
+        and 'get("window") === "settings"' in desk_js
+        and 'dataset.windowMode = "settings"' in desk_js
+        and 'body[data-window-mode="settings"]' in sources.get("ui/toast.css", "")
+        and "app-not-delivered-as-window" in app_src,
+        "ui/toast.js",
+        "the settings window is the desk's own page, or a copy of it was served",
+    )
+    check(
+        "apps-deliver-windows-like-the-settings-window",
+        "every app is served as its own page and opened in its own named window",
+        derived and "app-not-delivered-as-window" in app_src
+        and all(f'data-window="{window}"' in sources.get(f"ui/{page}", "")
+                for (name, window), page in zip(delivered.items(), chrome_pages))
+        # Every tile opens in the window that delivered the SpringBoard, the way the desk
+        # does: no popup, and no second window holding a copy of a surface.
+        and "location.assign(route)" in phone_js
+        and "window.open" not in phone_js
+        and 'data.app === "settings"' in desk_js
+        and 'data.app === "bridge"' in desk_js
+        # The settings tile opens the settings app package's window, never the package
+        # document page that names its revision.
+        and 'settings: "/toast.html?window=settings"' in phone_js
+        and 'settings: "/settings.html"' not in phone_js,
+        "ui/phone.js",
+        "an app did not name its delivered window, or the shell special-cased one app",
+    )
+    check(
+        "no-app-bar-control",
+        "a package payload cannot add a control to the shell's bar",
+        "BAR_CONTROL_KEYS = (\"bar_controls\", \"chrome\", \"controls\")" in app_src
+        and 'raise Refused("app-bar-control"' in app_src,
+        "app_package.py",
+        "a package that names bar controls is refused, not signed",
+    )
+    store_path = ROOT / "docs" / "app-store.json"
+    store = {}
+    try:
+        store = json.loads(store_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        store = {}
+    listed = {str(row.get("name")) for row in store.get("apps") or [] if isinstance(row, dict)}
+    check(
+        "app-store-lists-only-standard-packages",
+        "the landing-page store carries signed window and phone packages only",
+        store.get("schema") == "popit.app-store/1"
+        and store.get("kinds") == ["window", "phone"]
+        and listed == {"dialin", "settings", "springboard"}
+        and "ide" not in listed
+        # A window page is rejected from the store by name, the same rejection the IDE got.
+        and {str(row.get("name")) for row in store.get("refused") or []
+             if isinstance(row, dict)} == {"bridge"},
+        "docs/app-store.json",
+        f"lists {sorted(listed) or 'nothing'}",
+    )
+    # Family prose is one program, one rule set and an external document per project. The rules
+    # are imported from portal-shell's checker, so this project cannot drift into its own bans.
+    prose_src = (ROOT / "tools" / "prose_family.py").read_text(encoding="utf-8") \
+        if (ROOT / "tools" / "prose_family.py").is_file() else ""
+    prose_page = (ROOT / "tools" / "prose_ui" / "index.html").read_text(encoding="utf-8") \
+        if (ROOT / "tools" / "prose_ui" / "index.html").is_file() else ""
+    prose_index = ROOT / "docs" / "prose" / "index.html"
+    prose_rows = list((ROOT / "docs" / "prose").glob("*/index.html")) \
+        if (ROOT / "docs" / "prose").is_dir() else []
+    check(
+        "prose-program-reads-the-family-rules",
+        "the prose program imports the family checker and carries no ban list of its own",
+        "spec_from_file_location" in prose_src and "FAMILY_CHECKER" in prose_src
+        and "WORDS = (" not in prose_src and "PHRASES = (" not in prose_src
+        and all(f'"{phase}"' in prose_src for phase in ("inventory", "driver", "docs", "verify")),
+        "tools/prose_family.py",
+        "the prose program kept a private copy of the rules or lost a phase",
+    )
+    check(
+        "prose-program-renders-every-family-document",
+        "every family project has an external prose document, and the index links them",
+        prose_index.is_file() and 'id="family-index"' in prose_index.read_text(encoding="utf-8")
+        and len(prose_rows) >= 6
+        and all('data-doc="prose"' in row.read_text(encoding="utf-8") for row in prose_rows),
+        "docs/prose",
+        f"{len(prose_rows)} project document(s)",
+    )
+    check(
+        "prose-driver-fact-is-asked-not-assumed",
+        "which projects the box has staged is read over the bridge, and a miss is named",
+        "STAGED_ROOT" in prose_src and "prose-not-staged" in prose_src
+        and "driver-unreachable" in prose_src and '"run", "--"' in prose_src
+        and "subprocess.run" in prose_src,
+        "tools/prose_family.py",
+        "the prose program assumed the driver's staging state",
+    )
+    app_src_now = (ROOT / "app_package.py").read_text(encoding="utf-8")
+    toast_html = sources.get("ui/toast.html", "")
+    toast_js = sources.get("ui/toast.js", "")
+    phone_js_now = sources.get("ui/phone.js", "")
+    css_now = sources.get("ui/toast.css", "")
+    check(
+        "prose-app-is-a-signed-window",
+        "prose is a package delivered in the settings window, not a page of its own",
+        '"prose": {' in app_src_now and '"kind": "window"' in app_src_now
+        and '"entry": "toast.html"' in app_src_now
+        and 'attach("prose"' in toast_js
+        and 'id="prose-panel"' in toast_html
+        and 'body[data-window-mode="prose"]' in css_now,
+        "app_package.py",
+        "the prose surface is not the settings window with a prose body",
+    )
+    check(
+        "prose-app-is-tiled-and-measured",
+        "the SpringBoard carries its tile and the window audit opens its window",
+        "prose: { label:" in phone_js_now
+        and 'prose: "/toast.html?window=prose"' in phone_js_now
+        and '"prose": "/toast.html?window=prose&uiaudit=1&app=prose"' in (ROOT / "toast.py").read_text(encoding="utf-8")
+        and 'popitProse' in toast_js and 'prose-spin' in css_now,
+        "ui/phone.js",
+        "the prose window is not tiled, not audited, or has no spinner",
+    )
+    toast_src_now = (ROOT / "toast.py").read_text(encoding="utf-8")
+    # The family's prose ratchet: the shared checker writes a receipt naming every project's
+    # counts, and the gate refuses a receipt that is stale or that records a regression.
+    family_receipt = ROOT / "artifacts" / "receipts" / "prose-ratchet.json"
+    family_body: dict = {}
+    try:
+        family_body = json.loads(family_receipt.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        family_body = {}
+    checker_now = Path(r"F:\Documents\portal-shell\tools\ui_prose.py")
+    fresh_enough = (family_receipt.is_file() and checker_now.is_file()
+                    and family_receipt.stat().st_mtime >= checker_now.stat().st_mtime)
+    check(
+        "family-prose-ratchet",
+        "every family project is held by its own prose ratchet, none regressed",
+        bool(family_body) and int(family_body.get("checked") or 0) >= 11
+        and int(family_body.get("regressed") or 0) == 0 and fresh_enough,
+        "artifacts/receipts/prose-ratchet.json",
+        "the family prose ratchet is missing, stale, or a project regressed",
+    )
+    check(
+        "app-windows-are-delivered-over-https",
+        "every window route loads the TLS origin; bare http is a refusal, not a fallback",
+        'WINDOW_ORIGIN = {"base": "", "note": ""}' in toast_src_now
+        and "window-not-secure" in toast_src_now
+        and 'fallback-loopback' not in toast_src_now
+        and 'view.load(QUrl(f"http://127.0.0.1:{server.server_port}' not in toast_src_now,
+        "toast.py",
+        "a window is still delivered over the loopback http twin",
+    )
+    check(
+        "springboard-has-no-standalone-page",
+        "the home renders only inside the agent window; a bare page is refused by server and page",
+        "springboard-standalone-refused" in toast_src_now
+        and 'window.parent === window' in phone_js_now
+        and 'standalone-refusal' in phone_js_now
+        and 'embedded=1' in sources.get("ui/toast.html", "")
+        and 'phone.html?embedded=1' in toast_js,
+        "toast.py",
+        "the fake SpringBoard can still be rendered as a page of its own",
+    )
+    check(
+        "home-carries-no-invented-copy",
+        "the home draws names, states and identities; no hero copy and no tile descriptions",
+        "A room that answers." not in sources.get("ui/phone.html", "")
+        and "Tap a signed app" not in sources.get("ui/phone.html", "")
+        and 'class="hero-copy"' not in sources.get("ui/phone.html", "")
+        and 'id="home-hint"' not in sources.get("ui/phone.html", "")
+        and "sub:" not in phone_js_now
+        and "tile-sub" not in phone_js_now,
+        "ui/phone.html",
+        "invented copy came back onto the SpringBoard",
+    )
+    check(
+        "no-window-is-served-over-bare-http",
+        "the window origin is TLS or nothing: no http twin survives as a fallback",
+        "http://127.0.0.1:{loopback_port}/toast.html" not in toast_src_now
+        and '"window-not-secure"' in toast_src_now
+        and 'https-not-bound' not in toast_src_now
+        and 'https-no-host' not in toast_src_now,
+        "toast.py",
+        "a window can still be delivered over bare http",
+    )
+    check(
+        "a-refused-window-keeps-its-grips",
+        "a refusal hides the app body, never the window's own bar and resize grips",
+        ":not(.bar):not(.grip)" in sources.get("ui/toast.css", "")
+        and 'class="grip' in sources.get("ui/toast.html", ""),
+        "ui/toast.css",
+        "a refused window has no way to be resized",
+    )
+    check(
+        "a-window-theme-is-the-settings-package",
+        "no window paints before the settings package names its theme, frame and material",
+        "__popitThemeAuthor" in toast_js
+        and "settings-theme-unknown" in toast_js
+        and 'dataset.windowState = "refused"' in toast_js
+        and 'window.__popitThemeAuthor' in toast_js
+        and "__popitPackageStyle" in sources.get("ui/package.js", ""),
+        "ui/toast.js",
+        "a window can still paint its own default theme before the package arrives",
+    )
+    check(
+        "the-home-is-the-fallback",
+        "a package window that cannot verify shows the SpringBoard, never a bare themed bar",
+        "function showHome()" in toast_js
+        and 'if (app !== "springboard") setSurface("springboard")' in toast_js
+        and "delete document.body.dataset.windowMode" in toast_js
+        and 'if (data.app === "springboard") setSurface("springboard")' in toast_js,
+        "ui/toast.js",
+        "a refused window can still resolve to a bar with no frame and no resize",
+    )
+    check(
+        "app-tiles-prove-their-launch",
+        "an icon frame verifies only with the launch it opens and a measured window",
+        'LAUNCH_RULE =' in app_src_now
+        and 'def launch_proof(' in app_src_now
+        and 'app-tile-without-launch' in app_src_now
+        and 'app-tile-unproven-launch' in phone_js_now
+        and 'row.launch_proof.ok' in phone_js_now
+        and 'function launchFor(' in phone_js_now
+        and 'ui_audit' not in phone_js_now,
+        "app_package.py",
+        "a tile is signed without proving the window it launches",
+    )
+    check(
+        "prose-surface-is-not-a-page",
+        "the prose engine is headless: no server, no port, no page of its own",
+        not (ROOT / "tools" / "prose_ui").exists()
+        and "HTTPServer" not in prose_src and "ThreadingHTTPServer" not in prose_src
+        and 'def probe(' in prose_src and "/api/toast/prose/doc/" in prose_src
+        and 'popit.prose-probe/1' in prose_src,
+        "tools/prose_family.py",
+        "the prose surface went back to being a hand-rolled page beside the client",
+    )
+    theme_css = sources.get("ui/contour-theme.css", "")
+    check(
+        "scrollbars-are-themed",
+        "no app shows a browser-default scrollbar",
+        "scrollbar-color" in theme_css and "::-webkit-scrollbar-thumb" in theme_css
+        and "var(--popit-ground" in theme_css,
+        "ui/contour-theme.css",
+        "the theme sheet must paint every window's scrollbars",
+    )
+    check(
+        "window-ground-is-the-published-ground",
+        "a window ground is derived, not the raw deep role",
+        "--popit-ground" in sources.get("ui/package.js", "")
+        and "groundFrom" in sources.get("ui/package.js", "")
+        # The ground is the theme sheet's to paint from the published ground role; a window
+        # that painted the raw deep role would read as a hole rather than a surface.
+        and "var(--popit-ground" in sources.get("ui/contour-theme.css", "")
+        and "--popit-deep" not in sources.get("ui/toast.html", ""),
+        "ui/package.js",
+        "an app painting the raw deep role stops reading as a window",
+    )
+    check(
+        "surfaces-read-the-layout",
+        "an app's frame comes from the published layout",
+        all("var(--popit-" in sources.get(name, "") for name in
+            ("ui/toast.css", "ui/phone.css", "ui/contour-theme.css")),
+        "ui/settings.css",
+        "a hard-coded frame does not derive from settings",
     )
 
     for line in CHECKS:

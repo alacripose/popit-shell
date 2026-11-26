@@ -1,0 +1,141 @@
+{
+  "schema": "popit.freshness/1",
+  "generated_at": "2026-11-25T21:39:19Z",
+  "shell": "http://127.0.0.1:5207",
+  "families": [
+    "landing",
+    "ci",
+    "audits",
+    "failures",
+    "ledgers",
+    "refusals",
+    "packages",
+    "tiles",
+    "prose"
+  ],
+  "rows": [
+    {
+      "family": "landing",
+      "code": "landing-page",
+      "state": "fresh",
+      "subject": "docs/index.html",
+      "detail": "landing page is the machine's reading of the pinned look",
+      "act": "python tools/landing.py"
+    },
+    {
+      "family": "ci",
+      "code": "ci-workflow",
+      "state": "fresh",
+      "subject": ".github\\workflows\\ci.yml",
+      "detail": "a workflow publishes or checks this project",
+      "act": "python tools/gate.py && push the workflow's own run"
+    },
+    {
+      "family": "ci",
+      "code": "ci-workflow",
+      "state": "fresh",
+      "subject": ".github\\workflows\\release.yml",
+      "detail": "a workflow publishes or checks this project",
+      "act": "python tools/gate.py && push the workflow's own run"
+    },
+    {
+      "family": "audits",
+      "code": "audit-dialin",
+      "state": "fresh",
+      "subject": "app-dialin",
+      "detail": "ui_audit passed",
+      "act": "cua driver: audit dialin (?uiaudit=1&app=dialin) and republish"
+    },
+    {
+      "family": "audits",
+      "code": "audit-prose",
+      "state": "fresh",
+      "subject": "app-prose",
+      "detail": "ui_audit passed",
+      "act": "cua driver: audit prose (?uiaudit=1&app=prose) and republish"
+    },
+    {
+      "family": "audits",
+      "code": "audit-settings",
+      "state": "fresh",
+      "subject": "app-settings",
+      "detail": "ui_audit passed",
+      "act": "cua driver: audit settings (?uiaudit=1&app=settings) and republish"
+    },
+    {
+      "family": "audits",
+      "code": "audit-springboard",
+      "state": "fresh",
+      "subject": "app-springboard",
+      "detail": "ui_audit passed",
+      "act": "cua driver: audit springboard (?uiaudit=1&app=springboard) and republish"
+    },
+    {
+      "family": "failures",
+      "code": "probe-receipt-newer",
+      "state": "fresh",
+      "subject": "runlogs\\toast\\envelope-trust.json",
+      "detail": "newest receipt envelope-trust.json is newer than the surfaces",
+      "act": "python tools/app_package_probe.py && python tools/toast_probe.py"
+    },
+    {
+      "family": "ledgers",
+      "code": "ledger-newest-row",
+      "state": "fresh",
+      "subject": "logs\\authority\\2026-11-26-service-worker-never-serves-pages-as-scripts.jsonl",
+      "detail": "newest authority row is -1 day(s) old",
+      "act": "append the next unit's authority row under logs/authority/"
+    },
+    {
+      "family": "refusals",
+      "code": "store-refusals-current",
+      "state": "fresh",
+      "subject": "docs/app-store.json",
+      "detail": "store ['app-kind-foreign'] vs registry ['app-kind-foreign']",
+      "act": "python tools/app_store.py"
+    },
+    {
+      "family": "packages",
+      "code": "store-packages-current",
+      "state": "fresh",
+      "subject": "docs/app-store.json",
+      "detail": "stale identities: none",
+      "act": "python tools/app_store.py"
+    },
+    {
+      "family": "tiles",
+      "code": "tiles-are-derived",
+      "state": "fresh",
+      "subject": "ui/phone.js",
+      "detail": "tiles paint the joined identity from the registry at load",
+      "act": "keep the SpringBoard reading /api/toast/apps; do not store tile identities"
+    },
+    {
+      "family": "packages",
+      "code": "dialin-rebuild",
+      "state": "fresh",
+      "subject": "ui/toast.html",
+      "detail": "desk app-dialin@108+blake3:41e27959d75ce7542a46f72d73f0d07c4619527189cd1be0ffea764cbec18a1a on entry toast.html (settings app-settings@99+blake3:a1a51a78e5d884cf9091e3411ce3aa8511f039923e8295b1039d374fd5bdd8c5); served page 18115B panel=True contour=True window=True",
+      "act": "re-sign the desk from the settings package and serve the window page"
+    },
+    {
+      "family": "prose",
+      "code": "prose-documents-current",
+      "state": "fresh",
+      "subject": "docs/prose/index.html",
+      "detail": "receipt 11 of 11 project(s); newer than the family checker",
+      "act": "python tools/prose_family.py report && python tools/prose_family.py probe"
+    },
+    {
+      "family": "prose",
+      "code": "prose-corpus",
+      "state": "blocked",
+      "subject": "/srv/scratch/prose-staging",
+      "detail": "corpus ingest corpus-write-permission; PermissionError: [Errno 13] Permission denied: '/opt/cua-driver/artifacts/corpus/corpus.jsonl'",
+      "act": "cua driver: ingest the staged prose profile into /opt/cua-driver/artifacts/corpus"
+    }
+  ],
+  "stale": 0,
+  "driver_acts": [],
+  "live": true
+}

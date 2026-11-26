@@ -35,7 +35,7 @@ surface, a contract, five needs and a life state that the agent carries into a c
 | `life-steps` | `cua_civilian.steps_for` | A life decision becomes a declared marker or body step |
 
 The C9 module is loaded from the family checkout, not copied into this repository. The
-adapter looks for `C:/Users/ala/Documents/openlock_modern/tools/cua_civilian.py` first and
+adapter looks for `<home>/Documents/openlock_modern/tools/cua_civilian.py` first and
 then `F:/Documents/openlock_modern/tools/cua_civilian.py`.
 
 ## Decisions

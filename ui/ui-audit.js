@@ -61,8 +61,18 @@ function decorativeOverflow(el) {
   return Math.max(extra, 0);
 }
 
+// A surface that scales itself with CSS zoom reports the body's layout box in unzoomed pixels
+// while its scroll extent is painted at the scale: the body's client width has to be compared
+// at the same scale or a page that fits reads as 30px clipped.
+function pageZoom(doc) {
+  const html = Number(getComputedStyle(doc.documentElement).zoom) || 1;
+  const body = Number(getComputedStyle(doc.body).zoom) || 1;
+  return html * body;
+}
+
 function clipped(doc) {
   const findings = [];
+  const zoom = pageZoom(doc);
   for (const el of doc.querySelectorAll("*")) {
     if (!visible(el)) continue;
     const style = getComputedStyle(el);
@@ -70,11 +80,12 @@ function clipped(doc) {
     if (!locked) continue;
     // A declared ellipsis is the page naming its own truncation, not content it lost.
     if (style.textOverflow === "ellipsis") continue;
-    if (el.scrollWidth <= el.clientWidth + 2 + decorativeOverflow(el)) continue;
+    const client = el === doc.body ? el.clientWidth * zoom : el.clientWidth;
+    if (el.scrollWidth <= client + 2 + decorativeOverflow(el)) continue;
     const text = (el.textContent || "").trim();
     if (text.length < 2) continue;
     if (el.closest(".messages, #messages, .stream-words")) continue;
-    findings.push({ code: "ui-clipped", detail: `${label(el)} hides ${el.scrollWidth - el.clientWidth}px of "${text.slice(0, 24)}"` });
+    findings.push({ code: "ui-clipped", detail: `${label(el)} hides ${Math.round(el.scrollWidth - client)}px of "${text.slice(0, 24)}"` });
   }
   return findings.slice(0, 12);
 }
@@ -84,7 +95,9 @@ function clipped(doc) {
 // window wider than its table) may overflow.
 function xOverflow(doc) {
   const root = doc.scrollingElement || doc.documentElement;
-  const overflow = root.scrollWidth - root.clientWidth;
+  // A zoomed surface reports its scroll extent at the painted scale and its client box at the
+  // layout scale; compared raw, a phone that fits reads as overflowing sideways.
+  const overflow = root.scrollWidth - Math.round(root.clientWidth * pageZoom(doc));
   if (overflow <= 2 || window.innerWidth > 480) return [];
   return [{ code: "ui-x-overflow", detail: `${overflow}px past the phone's width` }];
 }
@@ -93,7 +106,7 @@ function xLocked(doc) {
   const root = doc.scrollingElement || doc.documentElement;
   const overflowX = getComputedStyle(root).overflowX;
   const bodyX = getComputedStyle(doc.body).overflowX;
-  const overflow = root.scrollWidth - root.clientWidth;
+  const overflow = root.scrollWidth - Math.round(root.clientWidth * pageZoom(doc));
   if (overflow <= 2) return [];
   if (overflowX !== "visible" && overflowX !== "auto" && overflowX !== "scroll") {
     return [{ code: "ui-x-locked", detail: `${overflow}px cannot be reached (html overflow-x: ${overflowX}, body: ${bodyX})` }];
@@ -119,6 +132,9 @@ export function auditSurface(doc = document) {
 
 export async function reportAudit(app, endpoint = "/api/toast/ui-audit") {
   const report = auditSurface();
+  // The page names the app it is being measured as: one page can be two packages (the desk's
+  // page is the settings window too), and the measurement has to land on the one asked for.
+  if (app) report.app = app;
   const body = JSON.stringify({ app: app || report.app, report });
   try {
     const reply = await fetch(endpoint, {

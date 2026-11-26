@@ -12,6 +12,7 @@ import json
 import re
 import shlex
 import threading
+import time
 
 import debian_view
 
@@ -117,20 +118,34 @@ class DebianMind:
             "-H " + shlex.quote("Content-Type: application/json") +
             " -d " + shlex.quote(body)
         )
-        try:
-            result = debian_view._ssh(remote, timeout=timeout)
-        except Exception as error:
-            raise Refused("mind-transport", str(error)) from error
-        if result.returncode != 0:
-            raise Refused("mind-transport", (result.stderr or "").strip()[:300])
-        raw = (result.stdout or "").strip()
-        try:
-            reply = json.loads(raw)
-        except json.JSONDecodeError as error:
-            raise Refused("mind-bad-json", raw[:300]) from error
-        if reply.get("error"):
-            raise Refused("mind-refused", str(reply["error"])[:300])
-        return reply
+        # The Debian box is shared: a loaded 1060 can close a connection mid-answer or
+        # return nothing at all. A read-only chat call is safe to repeat, so a transport
+        # refusal is retried with backoff before it becomes the turn's result.
+        last = ""
+        for attempt in range(3):
+            try:
+                result = debian_view._ssh(remote, timeout=timeout)
+            except Exception as error:
+                last = str(error)[:300]
+                time.sleep(0.6 * (attempt + 1))
+                continue
+            if result.returncode != 0:
+                last = (result.stderr or "").strip()[:300] or f"ssh exited {result.returncode}"
+                time.sleep(0.6 * (attempt + 1))
+                continue
+            raw = (result.stdout or "").strip()
+            if not raw:
+                last = "ollama returned an empty reply"
+                time.sleep(0.8 * (attempt + 1))
+                continue
+            try:
+                reply = json.loads(raw)
+            except json.JSONDecodeError as error:
+                raise Refused("mind-bad-json", raw[:300]) from error
+            if reply.get("error"):
+                raise Refused("mind-refused", str(reply["error"])[:300])
+            return reply
+        raise Refused("mind-transport", (last or "no attempt reached ollama")[:300])
 
     def _run_tool(self, call: dict) -> dict:
         function = call.get("function") or {}
@@ -147,8 +162,10 @@ class DebianMind:
                                                  "detail": "no CUA fleet is attached"}}
             action = dict(args or {})
             try:
+                # Ask the toast to wait for the receipt: a task id is not an outcome, and
+                # the model must read what the driver actually measured.
                 row = self.cua({"driver": str(action.pop("driver", "") or "cua-2"),
-                                "actions": [action], "announce": True})
+                                "actions": [action], "announce": True, "wait": 12})
             except Exception as error:
                 return {"ok": False, "tool": "cua_task",
                         "refused": {"code": "cua-refused", "detail": str(error)[:240]}}

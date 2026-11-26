@@ -254,6 +254,10 @@ export function auditSurfaces(root) {
       (style.borderTopWidth && style.borderTopWidth !== "0px");
     if (!paints) return;
     if (element.hasAttribute("data-contour")) return;
+    // The material and the frame are the contour's own layers, created inside a surface by
+    // clipToContour. They are not independent surfaces, so the audit does not refuse them.
+    if (element.classList.contains("contour-material")
+        || element.classList.contains("contour-frame")) return;
     if (element === document.documentElement || element === document.body) return;
     if (refuse(element, "surface-not-nine-slice")) refused += 1;
   });

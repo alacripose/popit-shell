@@ -1,0 +1,61 @@
+{
+  "schema": "popit.prose-probe/1",
+  "at": "2026-11-25T20:52:06Z",
+  "checks": [
+    {
+      "check": "popit-surface",
+      "ok": true,
+      "detail": "port 5221"
+    },
+    {
+      "check": "page-spinner",
+      "ok": true,
+      "detail": "a running phase shows a spinner"
+    },
+    {
+      "check": "page-progress-bar",
+      "ok": true,
+      "detail": "the page polls its own progress and paints a bar per project"
+    },
+    {
+      "check": "progress-starts-moving",
+      "ok": true,
+      "detail": "0 busy, 11 queued of 11 at the first read"
+    },
+    {
+      "check": "progress-every-project",
+      "ok": true,
+      "detail": "11 row(s) for 11 project(s)"
+    },
+    {
+      "check": "progress-reaches-a-state",
+      "ok": true,
+      "detail": "deadlock-model-forge=passed, popit-shell=passed, portal-shell=passed, brass-meridian=passed, mc3-client13=passed, db-mc-indev=passed, ala-system=passed, alacripose-landing=passed, AWA3D=passed, income-engine=passed, laya-cua-agent=passed"
+    },
+    {
+      "check": "driver-answer-recorded",
+      "ok": true,
+      "detail": "read: 12 project(s) staged"
+    },
+    {
+      "check": "report-schema",
+      "ok": true,
+      "detail": "11 passed, 0 refused"
+    },
+    {
+      "check": "documents-are-visible",
+      "ok": true,
+      "detail": "11 of 11 project document(s) served and on disk"
+    },
+    {
+      "check": "family-index-document",
+      "ok": true,
+      "detail": "5318 bytes"
+    }
+  ],
+  "passed": 10,
+  "failed": 0,
+  "port": 5221,
+  "busy_at_start": 0,
+  "receipt": "F:\\Documents\\popit-shell\\artifacts\\receipts\\prose-family.json"
+}

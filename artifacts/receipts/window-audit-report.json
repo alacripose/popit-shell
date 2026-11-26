@@ -1,0 +1,42 @@
+{
+  "schema": "popit.window-audit/1",
+  "generated_at": "2026-11-25T20:11:33+00:00",
+  "shell": "http://127.0.0.1:5207",
+  "rows": [
+    {
+      "app": "dialin",
+      "state": "passed",
+      "detail": "passed \u00b7 app-dialin@97 \u00b7 360x924 \u00b7 no refusal",
+      "audit": "passed",
+      "revision": 97,
+      "at": "2026-11-25T20:09:55Z",
+      "findings": 0,
+      "refusal": "",
+      "act": "open /dialin in the delivered window with ?uiaudit=1&app=dialin"
+    },
+    {
+      "app": "settings",
+      "state": "passed",
+      "detail": "passed \u00b7 app-settings@88 \u00b7 360x481 \u00b7 no refusal",
+      "audit": "passed",
+      "revision": 88,
+      "at": "2026-11-25T20:10:01Z",
+      "findings": 0,
+      "refusal": "",
+      "act": "open /settings in the delivered window with ?uiaudit=1&app=settings"
+    },
+    {
+      "app": "springboard",
+      "state": "passed",
+      "detail": "passed \u00b7 app-springboard@67 \u00b7 347x574 \u00b7 no refusal",
+      "audit": "passed",
+      "revision": 67,
+      "at": "2026-11-25T20:10:21Z",
+      "findings": 0,
+      "refusal": "",
+      "act": "open /springboard in the delivered window with ?uiaudit=1&app=springboard"
+    }
+  ],
+  "refused": [],
+  "live": true
+}

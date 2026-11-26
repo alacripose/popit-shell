@@ -1,4 +1,6 @@
-const CACHE = "popit-shell-v1";
+// Bumped when the window's own script changes: the window now refuses to draw until its package
+// verifies, and a cached page would keep drawing the old way.
+const CACHE = "popit-shell-v10";
 const SHELL = ["/", "/toast.html", "/toast.css", "/toast.js", "/contour.js", "/contour.json", "/manifest.webmanifest", "/popit-icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -18,7 +20,12 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   if (url.pathname.startsWith("/api/")) return;
+  // A cached asset is still served offline; the shell document is only a navigation's
+  // fallback. A module answered with HTML is a window without its contour.
   event.respondWith(
-    fetch(request).catch(() => caches.match(request).then((hit) => hit || caches.match("/")))
+    fetch(request).catch(() => caches.match(request).then((hit) => {
+      if (hit) return hit;
+      return request.mode === "navigate" ? caches.match("/") : Response.error();
+    }))
   );
 });

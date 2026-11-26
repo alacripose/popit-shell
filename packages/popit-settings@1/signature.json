@@ -1,0 +1,11 @@
+{
+  "digest": "blake3:83258a436e6cbc111e424e8786f51522a8ef9ff084b9b858e13cf32c65879e81",
+  "identity": "popit-settings@1+blake3:83258a436e6cbc111e424e8786f51522a8ef9ff084b9b858e13cf32c65879e81",
+  "payload_digest": "blake3:979416101f4094b29b2f4c06f576c16fb2e400b304e0d3ef415a21c14226cd41",
+  "public_key": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA8obcut3oMZaJ7iU+zKQBtYrNhnaaCsoLwPhQDGEInbw=\n-----END PUBLIC KEY-----",
+  "published_at": "2026-11-25T22:12:21Z",
+  "revision": 1,
+  "schema": "popit.settings/1",
+  "signature": "WsmFhETk4E9bjZIh2MqzL/NDEQm5beKZ4f/o1cuNPVgcrrPstJxNMynknYJax5XahkoFAXEFLGQOeF7jsAeBBg==",
+  "signature_algorithm": "ed25519"
+}

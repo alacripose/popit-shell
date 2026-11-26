@@ -8,6 +8,28 @@
  * client writes from the settings document.
  */
 
+/* A window's ground and its scrollbars are the family's, not the browser's. One rule here
+   paints every app: a default scrollbar is an unthemed surface, and the gate refuses it. */
+html {
+  background: var(--popit-ground, #0c0e11);
+}
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--popit-primary, #b08d57) var(--popit-ground, #0c0e11);
+}
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track {
+  background: var(--popit-ground, #0c0e11);
+  border-left: 1px solid color-mix(in srgb, var(--popit-primary, #b08d57) 28%, transparent);
+}
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--popit-primary, #b08d57) 72%, #000000),
+    var(--popit-primary, #b08d57) 48%,
+    color-mix(in srgb, var(--popit-primary, #b08d57) 80%, #ffffff));
+}
+*::-webkit-scrollbar-thumb:hover { background: var(--popit-ink, #e8e2d4); }
+
 /* The contour SVG is a child of every clipped surface. Without this it is a flex child
    with the window's height, which pushes the header and every reading below the viewport. */
 .contour-frame {

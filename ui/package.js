@@ -32,7 +32,7 @@ const HEX = /^#[0-9a-f]{3,8}$/i;
 const MIN_LAYOUT = 400;
 // The floor each surface needs before its control rows collide. The SpringBoard is a phone
 // layout and reflows at 320; the desk holds a document table and needs 400.
-const LAYOUT_FLOOR = { springboard: 320, dialin: 400, settings: 360 };
+const LAYOUT_FLOOR = { springboard: 320, dialin: 400, settings: 360, bridge: 400 };
 
 export function scaleFor(dpi, viewport = window.innerWidth || MIN_LAYOUT,
   floor = MIN_LAYOUT) {
@@ -41,8 +41,33 @@ export function scaleFor(dpi, viewport = window.innerWidth || MIN_LAYOUT,
   return Math.min(wanted, Math.max(1, viewport / floor));
 }
 
+// groundFrom keeps a palette's hue and caps its light, so every window reads as a window
+// while still being painted from the published role.
+function groundFrom(hex) {
+  const match = /^#([0-9a-f]{6})$/i.exec(String(hex || "").trim());
+  if (!match) return "";
+  const value = parseInt(match[1], 16);
+  const rgb = [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+  const max = Math.max(...rgb, 1);
+  const factor = Math.min(1, 44 / max);
+  return "#" + rgb.map((part) => Math.round(part * factor)
+    .toString(16).padStart(2, "0")).join("");
+}
+
 export function applyTheme(doc, root = document.documentElement) {
   const theme = doc.theme || {};
+  // The settings package is the author of this window's appearance: once its document has been
+  // applied, the window is allowed to draw, and a later local repaint is a repaint of that same
+  // authored surface rather than a second, independent look.
+  window.__popitThemeAuthor = true;
+  // The style a window is held to is checked after it has been applied, in paintTheme: this
+  // function is what applies it, so comparing here read the previous paint and refused a window
+  // for a look it had not yet worn.
+  window.__popitPackageStyle = { theme: String(theme.theme || ""), frame: theme.frame || "",
+                                material: theme.material || "", motion: theme.motion || "" };
+  document.documentElement.dataset.settingsTheme = String(theme.theme || "");
+  delete document.body.dataset.packageRefused;
+  document.body.dataset.windowState = "ready";
   if (theme.frame) root.dataset.contourFrame = theme.frame;
   if (theme.material) root.dataset.material = theme.material;
   if (theme.motion) root.dataset.motionProfile = theme.motion;
@@ -52,6 +77,23 @@ export function applyTheme(doc, root = document.documentElement) {
   for (const [role, name] of Object.entries(ROLE_VARS)) {
     const value = String(colors[role] || "").trim();
     if (HEX.test(value)) root.style.setProperty(name, value);
+  }
+  // A window ground keeps the palette's hue but never its lightness: `deep` can be a
+  // saturated blue, and a whole window painted in it stops reading as a window.
+  const ground = groundFrom(colors.deep);
+  if (ground) root.style.setProperty("--popit-ground", ground);
+  // Layout is the settings package's too. Each app reads its own columns, gutter,
+  // padding, rail width and density from the published document, so a layout change is
+  // one signed revision and every window derives it instead of hard-coding a frame.
+  // The app document carries the settings under `theme`; the layout lives there with the
+  // frame and material, so one signed document answers both questions.
+  const layout = ((doc.theme || {}).layout || doc.layout || {})[doc.app] || null;
+  if (layout) {
+    root.dataset.density = String(layout.density || "regular");
+    root.style.setProperty("--popit-columns", String(layout.columns || 1));
+    root.style.setProperty("--popit-gutter", `${Number(layout.gutter) || 0}px`);
+    root.style.setProperty("--popit-pad", `${Number(layout.pad) || 0}px`);
+    root.style.setProperty("--popit-rail", `${Number(layout.rail) || 0}px`);
   }
   // DPI is a scale, not a number a page remembers: the published value zooms the surface
   // itself, so the desk, the SpringBoard and the phone browser all scale from one setting.
@@ -64,21 +106,28 @@ export function applyTheme(doc, root = document.documentElement) {
     const hostZoom = root.dataset.hostZoom === "true";
     const scale = scaleFor(dpi, window.innerWidth, LAYOUT_FLOOR[doc.app] || MIN_LAYOUT);
     if (!embedded && !hostZoom) {
-      // Zoom paints the page larger without shrinking its layout box, so a fixed window
-      // would clip its right edge. Narrowing the box by the same factor makes the desk
-      // reflow to what the scaled window actually shows.
+      // CSS zoom narrows the layout box by the same factor as it paints, so the surface
+      // reflows to what the scaled window shows without a second width compensation (which
+      // made the page report a narrower box than it painted).
       root.style.zoom = String(scale);
-      root.style.width = `${(100 / scale).toFixed(4)}%`;
     }
     root.dataset.scale = String(Number(scale.toFixed(3)));
     root.dataset.dpi = String(Math.round(dpi));
   }
 }
 
+// A window's identity is drawn shortened: the app, its revision and the first eight characters of
+// the digest. A full blake3 digest in a foot strip is a wall of hex, not a name.
+function shortIdentity(identity) {
+  const match = /^(\S+@\d+)\+blake3:([0-9a-f]{8})/.exec(String(identity || ""));
+  return match ? `${match[1]}+${match[2]}` : String(identity || "");
+}
+
 function name(node, doc) {
   if (!node) return;
   const theme = doc.theme_identity ? ` · theme ${doc.theme_identity.split("+")[0]}` : "";
-  node.textContent = `${doc.identity}${theme}`;
+  node.textContent = `${shortIdentity(doc.identity)}${theme}`;
+  node.dataset.identity = String(doc.identity || "");
   node.dataset.verified = "true";
   node.title = `${doc.app} · ${doc.signature_algorithm} · publisher ${doc.theme_verifier}`;
 }
