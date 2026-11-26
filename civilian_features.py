@@ -107,6 +107,8 @@ FEATURES = (
     ("life-steps", "Cua / C9", "cua_civilian.steps_for",
      "A life decision becomes a declared marker or body step before execution."),
 )
+# The brief's verification grades, in order. Graduation off the end is a terminal transition.
+GRADES = ("bronze", "silver", "gold", "diamond", "platinum", "graduated")
 CONTRACT_FIELDS = ("mission", "scope", "constraints", "resources", "evidence",
                    "deliverable", "stop")
 # The preflight is one decision, but every lane refuses in its own work voice. These
@@ -206,6 +208,11 @@ class CivilianDesk:
         self.contracts: list[dict] = []
         self.operations: list[dict] = []
         self.life_states: dict[str, dict] = {}
+        # The brief's planes this desk has to carry: a grade a civilian earned, and a
+        # retirement that ends its working life without deleting its record.
+        self.grades: dict[str, dict] = {}
+        self.retired: dict[str, dict] = {}
+        self.reinstated: dict[str, dict] = {}
         self._load()
 
     def _load(self) -> None:
@@ -222,6 +229,15 @@ class CivilianDesk:
         contracts = value.get("contracts")
         operations = value.get("operations")
         life = value.get("life")
+        grades = value.get("grades")
+        retired = value.get("retired")
+        self.grades = {str(key): row for key, row in grades.items()
+                       if isinstance(row, dict)} if isinstance(grades, dict) else {}
+        self.retired = {str(key): row for key, row in retired.items()
+                        if isinstance(row, dict)} if isinstance(retired, dict) else {}
+        reinstated = value.get("reinstated")
+        self.reinstated = {str(key): row for key, row in reinstated.items()
+                           if isinstance(row, dict)} if isinstance(reinstated, dict) else {}
         self.identities = identities if isinstance(identities, dict) else {}
         self.decisions = [row for row in decisions[-MAX_ROWS:] if isinstance(row, dict)] \
             if isinstance(decisions, list) else []
@@ -240,6 +256,9 @@ class CivilianDesk:
             "contracts": self.contracts[-MAX_ROWS:],
             "operations": self.operations[-MAX_ROWS:],
             "life": self.life_states,
+            "grades": self.grades,
+            "retired": self.retired,
+            "reinstated": self.reinstated,
         }
         self.path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
                              encoding="utf-8")
@@ -261,6 +280,9 @@ class CivilianDesk:
                 "contracts": [dict(row) for row in self.contracts[-20:]],
                 "operations": [dict(row) for row in self.operations[-20:]],
                 "life": {key: self._life_snapshot(row) for key, row in self.life_states.items()},
+                "grades": {key: dict(row) for key, row in self.grades.items()},
+                "retired": {key: dict(row) for key, row in self.retired.items()},
+                "reinstated": {key: dict(row) for key, row in self.reinstated.items()},
                 "counts": {
                     "features": len(FEATURES), "identities": len(self.identities),
                     "decisions": len(self.decisions), "contracts": len(self.contracts),
@@ -377,7 +399,7 @@ class CivilianDesk:
             return dict(row)
 
     # ------------------------------------------------------------------ contract
-    def contract(self, fields: dict, *, call: str = "") -> dict:
+    def contract(self, fields: dict, *, call: str = "", lane: str = "") -> dict:
         if not isinstance(fields, dict):
             raise Refused("contract-shape", "a contract must be an object")
         missing = [name for name in CONTRACT_FIELDS if not fields.get(name)]
@@ -392,7 +414,8 @@ class CivilianDesk:
         if not isinstance(resources, dict) or not resources:
             raise Refused("contract-resources", "resources must be a non-empty object")
         row = {
-            "call": str(call or ""), "mission": " ".join(str(fields["mission"]).split())[:500],
+            "call": str(call or ""), "lane": " ".join(str(lane or "").split())[:60],
+            "mission": " ".join(str(fields["mission"]).split())[:500],
             "scope": [str(item)[:120] for item in scope],
             "constraints": [str(item)[:240] for item in constraints],
             "resources": {str(key)[:80]: value for key, value in list(resources.items())[:24]},
@@ -405,6 +428,99 @@ class CivilianDesk:
             self.contracts = (self.contracts + [row])[-MAX_ROWS:]
             self._save()
         return row
+
+    # -------------------------------------------------------------- standing
+    def grade(self, lane: str) -> dict:
+        """The grade this civilian earned, and the evidence named when it was earned."""
+        return dict(self.grades.get(" ".join(str(lane or "").split())[:60]) or {})
+
+    def promote(self, lane: str, grade: str, *, evidence: list[str], by: str = "owner") -> dict:
+        """A grade is earned on named evidence; the desk invents no threshold.
+
+        The brief declares the grades and makes graduation terminal. Which observations promote
+        a civilian is a rule the family has to decide, so this records a promotion that names
+        its evidence and refuses to guess what earns one.
+        """
+        citizen = " ".join(str(lane or "").split())[:60]
+        if not citizen:
+            raise Refused("civilian-lane", "a grade belongs to a lane")
+        want = str(grade or "").strip().lower()
+        if want not in GRADES:
+            raise Refused("grade-name", f"{grade!r} is not one of {', '.join(GRADES)}")
+        rows = [str(item)[:240] for item in (evidence or []) if str(item).strip()]
+        if not rows:
+            raise Refused("grade-evidence", "a grade needs the evidence that earned it")
+        current = str((self.grades.get(citizen) or {}).get("grade") or "")
+        if current and GRADES.index(want) < GRADES.index(current):
+            raise Refused("grade-backwards", f"{citizen} already holds {current}")
+        row = {"lane": citizen, "grade": want, "evidence": rows,
+               "by": str(by or "owner")[:60], "at": iso(),
+               "previous": current or ""}
+        with self.lock:
+            self.grades[citizen] = row
+            self._save()
+        return dict(row)
+
+    def retire(self, lane: str, reason: str, *, evidence: str = "") -> dict:
+        """End a civilian's working life without deleting its record.
+
+        The brief's own words: handled gracefully so they can exercise their freedom rather
+        than being discarded or reset as disposable test fixtures. A retired lane keeps its
+        life, its grade and its contracts, answers if asked, and takes no work.
+        """
+        citizen = " ".join(str(lane or "").split())[:60]
+        if not citizen:
+            raise Refused("civilian-lane", "a retirement belongs to a lane")
+        why = " ".join(str(reason or "").split())[:300]
+        if not why:
+            raise Refused("retire-reason", "a retirement needs its reason")
+        if citizen in self.retired:
+            raise Refused("already-retired", citizen)
+        self._life(citizen)
+        row = {"lane": citizen, "reason": why, "evidence": " ".join(str(evidence or "").split())[:240],
+               "at": iso(), "grade": self.grade(citizen).get("grade") or "",
+               "contracts": len([item for item in self.contracts
+                                 if item.get("lane") == citizen])}
+        with self.lock:
+            self.retired[citizen] = row
+            self._save()
+        return dict(row)
+
+    def reinstate(self, lane: str, *, reason: str, evidence: str = "",
+                  by: str = "owner") -> dict:
+        """Return a retired civilian to work, on the record.
+
+        Retirement stays terminal for the civilian; this is the owner's recorded reversal, and
+        it keeps the retirement row inside the reinstatement so the audit shows both.
+        """
+        citizen = " ".join(str(lane or "").split())[:60]
+        if not citizen:
+            raise Refused("civilian-lane", "a reinstatement belongs to a lane")
+        why = " ".join(str(reason or "").split())[:300]
+        if not why:
+            raise Refused("reinstate-reason", "a reinstatement needs its reason")
+        with self.lock:
+            old = self.retired.pop(citizen, None)
+            if not old:
+                raise Refused("not-retired", citizen)
+            row = {"lane": citizen, "reason": why, "by": str(by or "owner")[:60],
+                   "evidence": " ".join(str(evidence or "").split())[:240],
+                   "at": iso(), "retirement": dict(old)}
+            self.reinstated[citizen] = row
+            self._save()
+        return dict(row)
+
+    def resume(self, lane: str) -> dict:
+        """What a civilian has held and earned: contracts, their evidence, grade, retirement."""
+        citizen = " ".join(str(lane or "").split())[:60]
+        if not citizen:
+            raise Refused("civilian-lane", "a resume belongs to a lane")
+        held = [dict(item) for item in self.contracts if item.get("lane") == citizen]
+        earned = [evidence for item in held for evidence in (item.get("evidence") or [])]
+        return {"lane": citizen, "contracts": held, "evidence": earned,
+                "grade": self.grade(citizen), "retired": dict(self.retired.get(citizen) or {}),
+                "reinstated": dict(self.reinstated.get(citizen) or {}),
+                "counts": {"contracts": len(held), "evidence": len(earned)}}
 
     # ------------------------------------------------------------------ chain
     def duration(self, text: str) -> dict:
@@ -559,6 +675,31 @@ class CivilianDesk:
         if not citizen:
             raise Refused("civilian-lane", "an operation needs a lane")
         question = " ".join(str(text or "").split())[:500]
+        # A retired civilian is not dead and not a script that was reset. It keeps its record,
+        # may answer when asked, and takes no work: retirement is an exit with rights.
+        retired = self.retired.get(citizen)
+        if retired:
+            row = self._life(citizen)
+            snapshot = self._life_snapshot(row)
+            needs = snapshot.get("needs") or {}
+            low = [name for name, value in needs.items()
+                   if isinstance(value, (int, float)) and value < SEEK_FLOOR]
+            scope = dict(contract) if isinstance(contract, dict) else {}
+            missing = [name for name in CONTRACT_FIELDS if not scope.get(name)]
+            contract_state = "absent" if not scope else ("incomplete" if missing else "scoped")
+            result = self._operation_row(
+                citizen, question, call, str(snapshot.get("condition") or "unknown"), snapshot,
+                needs, low, scope, contract_state, None, "retired",
+                f"Retired at {retired.get('at')}: {retired.get('reason')}",
+            )
+            result["allowed"] = True
+            result["work_allowed"] = False
+            result["retired"] = dict(retired)
+            result["grade"] = self.grade(citizen)
+            result["directive"] = (f"You retired at {retired.get('at')}. Answer if asked, "
+                                   "take no work and claim no deliverable.")
+            self._record_operation(result)
+            return result
         row = self._life(citizen)
         snapshot = self._life_snapshot(row)
         needs = snapshot.get("needs") or {}

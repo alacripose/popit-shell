@@ -23,6 +23,7 @@ V4 = "ala_civ_bots_prototype/docs/minecraft_ensouled_system1_cua_architecture_v4
 STATUS = "ala_civ_bots_prototype/docs/IMPLEMENTATION_STATUS.md"
 POPIT = "civilian_features.py"
 CALL = "call-client/serve.py"
+BRIEF = "deadlock-model-forge/docs/openlock_thread_consolidated_brief.md"
 
 
 def _item(id: str, group: str, title: str, status: str, evidence: str,
@@ -289,6 +290,51 @@ ITEMS = (
           "Phone audio is a local HTTPS WAV upload. There is no remote WebRTC/relay audio path from the published page.",
           "Should remote audio use WebRTC with a signed ticket, or an authenticated relay with bounded frames?",
           ""),
+    # ------------------------------------------------- the brief's missing planes
+    # The OpenLock brief names planes the family treats as separate records. They are added
+    # here as their own rows because the desk has no representation of any of them, and a
+    # citizen that cannot resume, retire or hold an office is a stateful script, not a life.
+    _item("resume", "governance", "A resume is the contracts held and evidence earned, never prose",
+          "partial", f"{BRIEF} §13.2, §13.3; {POPIT} resume",
+          "GET /api/toast/civilian/resume?lane=",
+          "Resume is derived from contracts that name their lane, with evidence, grade and retirement. No page draws it and no contract is refused for a lane that never named it.",
+          "Which contract fields (evidence, deliverable, stop) become resume rows, and who may edit a resume?"),
+    _item("retirement", "life", "Retirement is a graceful exit with rights, never deletion or reset",
+          "partial", f"{BRIEF} §12.4 verbatim: handled gracefully so they can exercise their freedom rather than being discarded or reset as disposable test fixtures; {POPIT} retire",
+          "POST /api/toast/civilian/retire",
+          "Retirement is recorded on the desk and an operation on a retired lane answers with work_allowed false, keeping grade and contracts. Nothing schedules a civilian's own retirement and no window shows it.",
+          "A lane can be `dead` on the failure ladder, which is not retirement: there is no exit path, no retained record and no right to be left alone afterwards.",
+          "What does a retired civilian keep (identity, resume, contracts) and what actions are refused for it afterwards?"),
+    _item("graduation", "governance", "Ceremonial verification grades, graduation as a terminal transition",
+          "partial", f"{BRIEF} §13.3; {POPIT} promote",
+          "POST /api/toast/civilian/promote",
+          "A promotion is recorded only with named evidence and refuses to move backwards, and `graduated` is the last grade queue. What observations earn a grade is still undecided, so no threshold is invented.",
+          "Which observations promote a civilian between grades, and what is refused once graduated?"),
+    _item("organization", "social", "Institutions and organizations arise from participation",
+          "blocked", f"{BRIEF} §3.2, §12.3",
+          "none",
+          "`office` covers a single holder and term; there is no organization record with membership, rule, jurisdiction or a way for a group to act.",
+          "What minimal organization record can hold members, a rule and a decision record without duplicating contracts?"),
+    _item("learning-tree", "memory", "Skill is transferred through verified tasks, not asserted",
+          "blocked", f"{BRIEF} §13.4",
+          "none",
+          "`apprenticeship` names the transfer; there is no tree of prerequisites, no node state and no verified completion that unlocks the next node.",
+          "What node schema carries prerequisite, task, verifier and failure mode per skill?"),
+    _item("cadence-ticks", "life", "A civilian's day advances whether or not anyone is watching",
+          "partial", f"{BRIEF} §13.4; {POPIT} life_tick",
+          "life_tick in-process only",
+          "`life_tick` decays needs when a call happens to arrive; nothing advances a civilian's record on its own cadence, so an idle lane simply stops living.",
+          "What cadence, owned by which process, advances every civilian record and retains a tick receipt?"),
+    _item("materials", "life", "Materials and tools have causal, conserved steps",
+          "blocked", f"{BRIEF} §3.2, §12.3",
+          "none",
+          "Work counts planned, declined and completed jobs; no material is consumed, produced or tracked, so a deliverable costs nothing.",
+          "Which material record and conservation rule make a completed job account for what it used?"),
+    _item("cells-and-lines", "being", "A civilian is a cell; a call, contract or route is a line",
+          "designed", f"{BRIEF} §6, §17.5, §22",
+          "none",
+          "The desk already draws lines between lanes, but no record calls a lane a cell or a line a line; the vocabulary lives in the brief and not in the data.",
+          "Which record kind carries cell identity and line endpoints without renaming the existing call and contract tables?"),
     _item("agent-to-agent", "call", "Two agents on different machines join one call",
           "partial", "toast.py call/join; calls.py",
           "/api/toast/call/join over HTTPS companion",

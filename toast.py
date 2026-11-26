@@ -1564,6 +1564,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/toast/civilian/life":
             lane = (parse_qs(urlsplit(self.path).query).get("lane") or [""])[0]
             return self.json({"ok": True, "life": toast.civilians.life_state(lane)})
+        if path == "/api/toast/civilian/resume":
+            # What a civilian has held and earned: the brief's resume plane, read by lane.
+            lane = (parse_qs(urlsplit(self.path).query).get("lane") or [""])[0]
+            return self.json({"ok": True, "resume": toast.civilians.resume(lane)})
         if path == "/api/toast/events":
             # Lightspeed transport: one persistent same-origin stream instead of a
             # one-second poll between the owner's voice and the toast surface.
@@ -1854,6 +1858,41 @@ class Handler(BaseHTTPRequestHandler):
                     raise civilian_features.Refused("civilian-decision", "decision must be an object")
                 life = toast.civilians.life_apply(str(body.get("lane") or ""), decision)
                 return self.json({"ok": True, "life": life})
+            if path == "/api/toast/civilian/retire":
+                row = toast.civilians.retire(str(body.get("lane") or ""),
+                                             str(body.get("reason") or ""),
+                                             evidence=str(body.get("evidence") or ""))
+                toast.archive.add(
+                    "event", f"civilian retired · {row['lane']} · {row['reason']}",
+                    role="civilian", lane=row["lane"], grade=row.get("grade") or "",
+                    evidence=row.get("evidence") or "",
+                )
+                return self.json({"ok": True, "retired": row})
+            if path == "/api/toast/civilian/reinstate":
+                row = toast.civilians.reinstate(
+                    str(body.get("lane") or ""),
+                    reason=str(body.get("reason") or ""),
+                    evidence=str(body.get("evidence") or ""),
+                    by=str(body.get("by") or "owner"),
+                )
+                toast.archive.add(
+                    "event", f"civilian reinstated · {row['lane']} · {row['reason']}",
+                    role="civilian", lane=row["lane"], retirement=row.get("retirement") or {},
+                )
+                return self.json({"ok": True, "reinstated": row})
+            if path == "/api/toast/civilian/promote":
+                evidence = body.get("evidence")
+                row = toast.civilians.promote(
+                    str(body.get("lane") or ""), str(body.get("grade") or ""),
+                    evidence=evidence if isinstance(evidence, list) else [],
+                    by=str(body.get("by") or "owner"),
+                )
+                toast.archive.add(
+                    "event", f"civilian grade · {row['lane']} · {row['grade']}",
+                    role="civilian", lane=row["lane"], grade=row["grade"],
+                    evidence=row.get("evidence") or [],
+                )
+                return self.json({"ok": True, "grade": row})
             if path == "/api/toast/civilian/life/steps":
                 decision = body.get("decision")
                 if not isinstance(decision, dict):

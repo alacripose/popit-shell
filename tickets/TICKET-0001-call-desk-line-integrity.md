@@ -63,8 +63,10 @@ Read as two properties of one line:
 
 ## What is not met yet
 
-- `A1`–`A4` are coded and compile, and the probe has not yet run against a desk that loaded the new
-  route: the shell restart is in flight. Until that run exists, this ticket stays **open**.
+- `A1`–`A4` are measured on the live desk: `tools/hangup_probe.py` reports **8 passed, 0 failed** —
+  `probe-line-opened call-1795658383-45`, `hangup-is-accepted`, `hangup-is-marked`,
+  `callback-dialled call-1795658384-46`, `callback-does-not-chain`, 2 hang-up rows, 1 callback row,
+  and `no-wish-close-on-hangup`. Its surface probe is **6 passed, 0 failed**.
 - `A6` measured the roster fallback only. The carried-number case is measured directly
   (`+1 (415) 555-0132` → `5550132`, source `call`), not yet through a phone that sends a number.
 - The inbound phone surface still carries no caller number, so an owner's inbound call has nothing

@@ -1,11 +1,50 @@
 {
   "schema": "popit.hangup-probe/1",
-  "at": "2026-11-26T01:49:34+00:00",
+  "at": "2026-11-26T01:59:39+00:00",
+  "line": "call-1795658383-45",
+  "cleared": 0,
+  "callback": "call-1795658384-46",
   "checks": [
     {
       "check": "probe-line-opened",
-      "ok": false,
-      "detail": "{'code': 'call-open', 'detail': 'call-1795657775-43'}"
+      "ok": true,
+      "detail": "call-1795658383-45"
+    },
+    {
+      "check": "hangup-is-accepted",
+      "ok": true,
+      "detail": "hangup field True"
+    },
+    {
+      "check": "hangup-is-marked",
+      "ok": true,
+      "detail": "hangup field True"
+    },
+    {
+      "check": "callback-dialled",
+      "ok": true,
+      "detail": "call-1795658384-46"
+    },
+    {
+      "check": "callback-does-not-chain",
+      "ok": true,
+      "detail": "second hang-up returned None"
+    },
+    {
+      "check": "hangup-row-archived",
+      "ok": true,
+      "detail": "2 hang-up row(s)"
+    },
+    {
+      "check": "callback-row-archived",
+      "ok": true,
+      "detail": "1 callback row(s)"
+    },
+    {
+      "check": "no-wish-close-on-hangup",
+      "ok": true,
+      "detail": "the hang-up did not read as completed work"
     }
-  ]
+  ],
+  "failures": []
 }
