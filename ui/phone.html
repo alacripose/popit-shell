@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Popit" />
-  <title>Popit Springboard</title>
+  <title>Springboard</title>
   <link rel="manifest" href="/phone-manifest.webmanifest" />
   <link rel="icon" href="/popit-icon-512.png" type="image/png" />
   <link rel="apple-touch-icon" href="/popit-icon-512.png" />
@@ -51,17 +51,16 @@
       <section class="screen view" id="voice-screen" aria-labelledby="voice-title" hidden>
         <div class="view-head">
           <div>
-            <p class="eyebrow">PHONE VOICE</p>
-            <h2 id="voice-title">Talk to the room</h2>
+            <h2 id="voice-title">Voice</h2>
           </div>
           <span class="secure-pill" id="voice-secure" data-contour="card">secure</span>
         </div>
         <div class="voice-stage">
           <div class="voice-orb" id="voice-orb" data-contour="card"><span></span><span></span><span></span></div>
-          <p id="voice-status">Press start, then speak normally. The clip is transcribed on this machine and placed in the archive.</p>
+          <p id="voice-status">Press start, then speak normally.</p>
           <div class="voice-actions">
-            <button class="voice-button" type="button" id="voice-start" data-contour="card">START VOICE</button>
-            <button class="voice-button quiet" type="button" id="voice-stop" data-contour="card" disabled>STOP &amp; SEND</button>
+            <button class="voice-button" type="button" id="voice-start" data-contour="card">Start voice</button>
+            <button class="voice-button quiet" type="button" id="voice-stop" data-contour="card" disabled>Stop and send</button>
           </div>
           <p class="voice-timer" id="voice-timer">00:00</p>
           <div class="transcript" id="transcript" aria-live="polite" data-contour="card"></div>
@@ -71,20 +70,19 @@
       <section class="screen view" id="agents-screen" aria-labelledby="agents-title" hidden>
         <div class="view-head">
           <div>
-            <p class="eyebrow">EXTERNAL LINES</p>
-            <h2 id="agents-title">Verified agents</h2>
+            <h2 id="agents-title">Agents</h2>
           </div>
           <span class="secure-pill" id="agents-secure" data-contour="card">secure</span>
         </div>
         <div class="agent-tools">
-          <button class="agent-button primary" id="agent-invite" type="button" data-contour="card">INVITE AGENT</button>
-          <button class="agent-button" id="agent-refresh" type="button" data-contour="card">REFRESH</button>
+          <button class="agent-button primary" id="agent-invite" type="button" data-contour="card">Invite</button>
+          <button class="agent-button" id="agent-refresh" type="button" data-contour="card">Refresh</button>
         </div>
         <div class="enrollment" id="enrollment" hidden data-contour="window">
-          <p class="eyebrow">ONE-TIME CODE · TEN MINUTES</p>
+          <p class="eyebrow">One-time code</p>
           <pre id="enrollment-code"></pre>
           <p id="enrollment-expiry"></p>
-          <button class="agent-button" id="enrollment-dismiss" type="button" data-contour="card">DONE</button>
+          <button class="agent-button" id="enrollment-dismiss" type="button" data-contour="card">Done</button>
         </div>
         <div class="agent-list" id="agent-list" aria-live="polite"></div>
       </section>
@@ -98,21 +96,21 @@
   </div>
 
   <section class="call-sheet" id="call-sheet" hidden data-contour="window" aria-live="assertive" aria-labelledby="call-name">
-    <p class="eyebrow" id="call-eyebrow">INCOMING EXTERNAL LINE</p>
+    <p class="eyebrow" id="call-eyebrow">Incoming line</p>
     <h2 id="call-name">Agent</h2>
     <p id="call-line">POPIT-0000-0</p>
     <p id="call-number">no declared number</p>
     <p id="call-request" hidden></p>
-    <p id="call-status">A verified agent is ringing this phone.</p>
+    <p id="call-status">Ringing.</p>
     <div class="call-actions">
-      <button class="agent-button primary" id="call-share" type="button" data-contour="card" hidden>SHARE &amp; ANSWER</button>
-      <button class="agent-button primary" id="call-accept" type="button" data-contour="card">ACCEPT</button>
-      <button class="agent-button danger" id="call-decline" type="button" data-contour="card">DECLINE</button>
-      <button class="agent-button danger" id="call-hangup" type="button" data-contour="card" hidden>HANG UP</button>
+      <button class="agent-button primary" id="call-share" type="button" data-contour="card" hidden>Share and answer</button>
+      <button class="agent-button primary" id="call-accept" type="button" data-contour="card">Accept</button>
+      <button class="agent-button danger" id="call-decline" type="button" data-contour="card">Decline</button>
+      <button class="agent-button danger" id="call-hangup" type="button" data-contour="card" hidden>Hang up</button>
     </div>
     <audio id="call-audio" autoplay playsinline></audio>
   </section>
-  <noscript>Popit needs JavaScript for the live room.</noscript>
+  <noscript>Popit needs JavaScript.</noscript>
   <script type="module" src="/ui-audit.js"></script>
   <script type="module" src="/phone.js"></script>
   <script type="module" src="/phone-calls.js"></script>

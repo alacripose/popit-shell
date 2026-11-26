@@ -1,0 +1,23 @@
+{
+  "schema": "popit.prose-requests/1",
+  "note": "The words this desk was asked to carry. A drawn label outside this list was written by an editor, not asked for by the owner, and the family checker refuses it by name.",
+  "requests": [
+    { "text": "Popit", "where": "the shell's own name" },
+    { "text": "DialIn", "where": "the owner's name for the call desk" },
+    { "text": "Springboard", "where": "the owner's name for the tile surface" },
+    { "text": "Civilians", "where": "the owner's name for the lanes' life desk" },
+    { "text": "Axis", "where": "the owner's name for the camera service" },
+    { "text": "Commons", "where": "the lane that addresses every live lane" },
+    { "text": "Session Archive", "where": "the owner's name for the file index window" },
+    { "text": "Settings", "where": "the header control" },
+    { "text": "Pin", "where": "the header control" },
+    { "text": "Close", "where": "the header control" },
+    { "text": "Call", "where": "a participant control" },
+    { "text": "End", "where": "a participant control" },
+    { "text": "Answer", "where": "the incoming line control" },
+    { "text": "Hang up", "where": "the owner's word for closing a line" },
+    { "text": "Call back", "where": "the owner's word for a returned call" },
+    { "text": "Windows", "where": "the live window list" },
+    { "text": "Shell", "where": "the shell's own probe row" }
+  ]
+}

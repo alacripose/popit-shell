@@ -1627,7 +1627,7 @@ function renderParticipants(state) {
     if (row.kind !== "human") {
       const call = document.createElement("button");
       call.type = "button";
-      call.textContent = "☎";
+      call.textContent = "Call";
       call.disabled = activeNames.has(row.name);
       call.title = `Call ${row.name}`;
       call.setAttribute("aria-label", `Call ${row.name}`);
@@ -1637,7 +1637,7 @@ function renderParticipants(state) {
       });
       const end = document.createElement("button");
       end.type = "button";
-      end.textContent = "✕";
+      end.textContent = "End";
       end.disabled = !activeNames.has(row.name);
       end.title = `End ${row.name}'s call`;
       end.setAttribute("aria-label", `End ${row.name}'s call`);

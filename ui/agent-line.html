@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#071113" />
-  <title>Popit Agent Line</title>
+  <title>Agent line</title>
   <link rel="stylesheet" href="/phone.css" />
   <link rel="stylesheet" href="/agent-line.css" />
 </head>
@@ -13,29 +13,27 @@
     <header class="topbar">
       <span class="mark" aria-hidden="true">◇</span>
       <div class="brand">
-        <span class="brand-kicker">POPIT EXTERNAL</span>
-        <strong>AGENT LINE</strong>
+        <strong>Agent line</strong>
       </div>
       <span class="secure-pill" id="agent-secure" data-contour="card">checking</span>
     </header>
 
     <main>
       <section class="agent-panel" aria-labelledby="agent-title">
-        <p class="eyebrow">ENROLL · VERIFY · CALL</p>
-        <h1 id="agent-title">A signed line into the phone.</h1>
-        <p class="hint">The owner gives you a one-time code. Your Ed25519 private key stays in this browser. The host stores only your public key, a Popit line id and a scratch workspace.</p>
+        <h1 id="agent-title">Agent line</h1>
+        <p class="hint">The owner gives you a one-time code.</p>
 
         <label>Agent name<input id="agent-name" value="External agent" maxlength="60" autocomplete="off" /></label>
         <label>One-time code<input id="agent-code" maxlength="200" autocomplete="one-time-code" placeholder="paste the owner's code" /></label>
         <label>Agent endpoint<input id="agent-endpoint" type="url" value="https://agent.example/mcp" maxlength="500" /></label>
         <div class="agent-actions">
-          <button class="agent-button" id="agent-identity" type="button" data-contour="card">NEW IDENTITY</button>
-          <button class="agent-button primary" id="agent-enroll" type="button" data-contour="card">ENROLL</button>
-          <button class="agent-button primary" id="agent-call" type="button" data-contour="card" disabled>CALL PHONE</button>
-          <button class="agent-button danger" id="agent-end" type="button" data-contour="card" disabled>END</button>
+          <button class="agent-button" id="agent-identity" type="button" data-contour="card">New identity</button>
+          <button class="agent-button primary" id="agent-enroll" type="button" data-contour="card">Enroll</button>
+          <button class="agent-button primary" id="agent-call" type="button" data-contour="card" disabled>Call phone</button>
+          <button class="agent-button danger" id="agent-end" type="button" data-contour="card" disabled>End</button>
         </div>
 
-        <p id="agent-status">Generate an identity, then enroll with the owner's code.</p>
+        <p id="agent-status">No identity yet.</p>
         <p id="agent-contact" class="agent-contact"></p>
         <audio id="agent-audio" autoplay playsinline controls></audio>
         <pre id="agent-log" class="agent-log" aria-live="polite"></pre>
@@ -43,7 +41,7 @@
     </main>
 
     <footer class="foot">
-      <span>POPIT AGENT LINE · WEBRTC</span>
+
       <span id="agent-clock">--:--</span>
     </footer>
   </div>
