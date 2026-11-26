@@ -217,12 +217,11 @@ body[data-secure="false"] .composer button { opacity: 0.45; }
 .voice-orb.recording span { background: var(--gold-bright); }
 #voice-status { color: var(--muted); font-size: 13px; line-height: 1.5; max-width: 34ch; min-height: 40px; }
 .voice-actions { display: flex; gap: 9px; margin: 16px 0 7px; }
-.voice-button { color: #062321; font-size: 10px; font-weight: 800; letter-spacing: 0.12em; padding: 12px 17px; cursor: pointer; }
+.voice-button { color: #062321; font-size: 10px; font-weight: 800; letter-spacing: 0.12em; padding: var(--control-padding); }
 .voice-button::before { background: var(--teal); border: 1px solid rgba(54,214,192,0.5); }
 .voice-button.quiet { color: var(--paper); }
 .voice-button.quiet::before { background: rgba(255,255,255,0.04); border: 1px solid var(--line); }
 .voice-button:disabled { opacity: 0.35; cursor: not-allowed; }
-.voice-button:not(:disabled):active { transform: scale(0.96); }
 .voice-timer { margin: 5px 0 0; color: var(--gold); font-size: 11px; letter-spacing: 0.16em; font-variant-numeric: tabular-nums; }
 .transcript { margin-top: 17px; width: 100%; padding: 13px; min-height: 50px; text-align: left; color: var(--paper); font-size: 13px; line-height: 1.5; }
 .transcript::before { background: rgba(255,255,255,0.025); border: 1px solid var(--line); }
@@ -246,12 +245,11 @@ html[data-motion-profile="fold"] .screen:not([hidden]) { animation-name: motion-
 html[data-motion-profile="snap"] .screen:not([hidden]) { animation-name: motion-snap; animation-duration: 140ms; }
 html[data-motion-profile="sweep"] .screen:not([hidden]) { animation-name: motion-sweep; }
 .agent-tools { display: flex; gap: 8px; margin: 12px 0; }
-.agent-button { color: var(--paper); padding: 10px 13px; font-size: 9px; font-weight: 800; letter-spacing: 0.12em; cursor: pointer; }
+.agent-button { color: var(--paper); padding: var(--control-padding); font-size: 9px; font-weight: 800; letter-spacing: 0.12em; }
 .agent-button::before { background: rgba(255,255,255,0.04); border: 1px solid var(--line); }
 .agent-button.primary { color: #062321; }
 .agent-button.primary::before { background: var(--teal); border: 1px solid rgba(54,214,192,0.5); }
 .agent-button.danger { color: var(--warn); }
-.agent-button:active { transform: scale(0.96); }
 .agent-button:disabled { opacity: 0.35; cursor: not-allowed; }
 .enrollment { margin: 0 0 13px; padding: 12px; }
 .enrollment::before { background: rgba(217,168,95,0.07); border: 1px solid rgba(217,168,95,0.34); }

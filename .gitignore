@@ -14,3 +14,6 @@ settings.key
 # A prose inventory is a scan dump. It records home paths and whatever a skill document
 # quoted, so it is regenerated on the machine that scans instead of being committed.
 docs/prose/*/inventory.json
+# The family ratchet receipt is the same kind of dump at family scale: every project's strings,
+# home paths and LAN addresses. The gate reads it from the machine that ran the pass.
+artifacts/receipts/prose-ratchet.json

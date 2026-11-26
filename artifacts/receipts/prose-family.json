@@ -1,6 +1,6 @@
 {
   "schema": "popit.prose-family/1",
-  "at": "2026-11-26T02:05:40Z",
+  "at": "2026-11-26T03:09:13Z",
   "checker": "F:\\Documents\\portal-shell\\tools\\ui_prose.py",
   "rules": {
     "sentence_words": 18,
@@ -114,8 +114,8 @@
       "stage": "already-staged",
       "doc": "F:\\Documents\\popit-shell\\docs\\prose\\deadlock-model-forge\\index.html",
       "doc_url": "/api/toast/prose/doc/deadlock-model-forge",
-      "started": "2026-11-26T02:05:11Z",
-      "finished": "2026-11-26T02:05:23Z",
+      "started": "2026-11-26T03:08:49Z",
+      "finished": "2026-11-26T03:09:00Z",
       "refusal": null
     },
     {
@@ -125,9 +125,9 @@
       "phase": "passed",
       "percent": 100,
       "busy": false,
-      "visible": 1740,
-      "hits": 747,
-      "files": 101,
+      "visible": 1739,
+      "hits": 741,
+      "files": 104,
       "trees": [
         "ui",
         "tools",
@@ -136,19 +136,19 @@
         "requirements.txt"
       ],
       "extractors": {
-        "css": 9,
+        "css": 10,
         "html": 14,
-        "js": 18,
+        "js": 19,
         "json": 6,
-        "py": 27,
+        "py": 28,
         "md": 10
       },
       "rules": {
-        "ui-budget": 162,
-        "punctuation": 147,
-        "structure": 128,
+        "ui-budget": 161,
+        "punctuation": 145,
+        "structure": 127,
         "em-dash": 106,
-        "sentences": 66,
+        "sentences": 64,
         "doc-sentence": 60,
         "sentence-budget": 40,
         "word": 33,
@@ -161,8 +161,8 @@
       "stage": "already-staged",
       "doc": "F:\\Documents\\popit-shell\\docs\\prose\\popit-shell\\index.html",
       "doc_url": "/api/toast/prose/doc/popit-shell",
-      "started": "2026-11-26T02:05:11Z",
-      "finished": "2026-11-26T02:05:14Z",
+      "started": "2026-11-26T03:08:49Z",
+      "finished": "2026-11-26T03:08:52Z",
       "refusal": null
     },
     {
@@ -172,8 +172,8 @@
       "phase": "passed",
       "percent": 100,
       "busy": false,
-      "visible": 1528,
-      "hits": 852,
+      "visible": 1533,
+      "hits": 853,
       "files": 99,
       "trees": [
         "internal",
@@ -198,7 +198,7 @@
       "rules": {
         "tell": 250,
         "ui-budget": 139,
-        "structure": 106,
+        "structure": 107,
         "punctuation": 103,
         "sentence-budget": 60,
         "word": 58,
@@ -214,8 +214,8 @@
       "stage": "already-staged",
       "doc": "F:\\Documents\\popit-shell\\docs\\prose\\portal-shell\\index.html",
       "doc_url": "/api/toast/prose/doc/portal-shell",
-      "started": "2026-11-26T02:05:11Z",
-      "finished": "2026-11-26T02:05:14Z",
+      "started": "2026-11-26T03:08:49Z",
+      "finished": "2026-11-26T03:08:52Z",
       "refusal": null
     },
     {
@@ -267,8 +267,8 @@
       "stage": "already-staged",
       "doc": "F:\\Documents\\popit-shell\\docs\\prose\\brass-meridian\\index.html",
       "doc_url": "/api/toast/prose/doc/brass-meridian",
-      "started": "2026-11-26T02:05:11Z",
-      "finished": "2026-11-26T02:05:14Z",
+      "started": "2026-11-26T03:08:49Z",
+      "finished": "2026-11-26T03:08:52Z",
       "refusal": null
     },
     {
@@ -311,8 +311,8 @@
       "stage": "already-staged",
       "doc": "F:\\Documents\\popit-shell\\docs\\prose\\mc3-client13\\index.html",
       "doc_url": "/api/toast/prose/doc/mc3-client13",
-      "started": "2026-11-26T02:05:11Z",
-      "finished": "2026-11-26T02:05:24Z",
+      "started": "2026-11-26T03:08:49Z",
+      "finished": "2026-11-26T03:09:01Z",
       "refusal": null
     },
     {
@@ -365,8 +365,8 @@
       "stage": "already-staged",
       "doc": "F:\\Documents\\popit-shell\\docs\\prose\\db-mc-indev\\index.html",
       "doc_url": "/api/toast/prose/doc/db-mc-indev",
-      "started": "2026-11-26T02:05:11Z",
-      "finished": "2026-11-26T02:05:38Z",
+      "started": "2026-11-26T03:08:49Z",
+      "finished": "2026-11-26T03:09:12Z",
       "refusal": null
     },
     {
@@ -415,8 +415,8 @@
       "stage": "already-staged",
       "doc": "F:\\Documents\\popit-shell\\docs\\prose\\ala-system\\index.html",
       "doc_url": "/api/toast/prose/doc/ala-system",
-      "started": "2026-11-26T02:05:11Z",
-      "finished": "2026-11-26T02:05:35Z",
+      "started": "2026-11-26T03:08:49Z",
+      "finished": "2026-11-26T03:09:11Z",
       "refusal": null
     },
     {
@@ -457,8 +457,8 @@
       "stage": "already-staged",
       "doc": "F:\\Documents\\popit-shell\\docs\\prose\\alacripose-landing\\index.html",
       "doc_url": "/api/toast/prose/doc/alacripose-landing",
-      "started": "2026-11-26T02:05:11Z",
-      "finished": "2026-11-26T02:05:24Z",
+      "started": "2026-11-26T03:08:49Z",
+      "finished": "2026-11-26T03:09:01Z",
       "refusal": null
     },
     {
@@ -507,8 +507,8 @@
       "stage": "already-staged",
       "doc": "F:\\Documents\\popit-shell\\docs\\prose\\AWA3D\\index.html",
       "doc_url": "/api/toast/prose/doc/AWA3D",
-      "started": "2026-11-26T02:05:11Z",
-      "finished": "2026-11-26T02:05:40Z",
+      "started": "2026-11-26T03:08:49Z",
+      "finished": "2026-11-26T03:09:13Z",
       "refusal": null
     },
     {
@@ -552,8 +552,8 @@
       "stage": "already-staged",
       "doc": "F:\\Documents\\popit-shell\\docs\\prose\\income-engine\\index.html",
       "doc_url": "/api/toast/prose/doc/income-engine",
-      "started": "2026-11-26T02:05:11Z",
-      "finished": "2026-11-26T02:05:39Z",
+      "started": "2026-11-26T03:08:49Z",
+      "finished": "2026-11-26T03:09:12Z",
       "refusal": null
     },
     {
@@ -588,8 +588,8 @@
       "stage": "already-staged",
       "doc": "F:\\Documents\\popit-shell\\docs\\prose\\laya-cua-agent\\index.html",
       "doc_url": "/api/toast/prose/doc/laya-cua-agent",
-      "started": "2026-11-26T02:05:11Z",
-      "finished": "2026-11-26T02:05:39Z",
+      "started": "2026-11-26T03:08:49Z",
+      "finished": "2026-11-26T03:09:12Z",
       "refusal": null
     }
   ],

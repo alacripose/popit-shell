@@ -251,6 +251,27 @@ def read_sources() -> dict[str, str]:
     }
 
 
+def controls_pin() -> None:
+    """The family's buttons are the baseline's: a sheet that authors its own is a refusal.
+
+    The owner's rule is that no app may diverge from the settings window's material and motion
+    choices in motion, function or padding. `app_base.CONTROLS` carries those as a pinned record
+    and `/controls.css` serves them; this leg reads every app sheet and page for a button that
+    still sets its own, so the pin is enforced by the gate rather than by memory.
+    """
+    import tools.controls_audit as controls_audit  # noqa: PLC0415 - a leg, loaded when read
+
+    findings = []
+    for path in sorted((ROOT / "ui").glob("*.css")):
+        findings.extend(controls_audit.audit_sheet(path))
+    findings.extend(controls_audit.audit_pages())
+    for row in findings:
+        refuse(row["code"], f"{row['file']}:{row['line']}",
+               f"{row['selector']} {row['prop']}={row['value']}")
+    check("controls-pinned", "every app button paints from the pinned baseline",
+          not findings, "ui/*.css", "a local button padding, height or motion")
+
+
 def toast_refusals() -> None:
     """The toast is a window, not a scrolling page: its frame and voice controls are pinned."""
     css = (UI / "toast.css").read_text(encoding="utf-8")
@@ -449,7 +470,9 @@ def toast_refusals() -> None:
     )
 
 
-BAR_CONTROLS = ("settings", "pin", "close")
+# The shell's own controls. Home is one of them: the owner asked for the springboard's home in
+# the desk's bar, so the bar carries it and nothing of an app's own.
+BAR_CONTROLS = ("home", "settings", "pin", "close")
 
 
 def bar_control_refusals() -> None:
@@ -471,7 +494,7 @@ def bar_control_refusals() -> None:
     missing = [name for name in BAR_CONTROLS if name not in found]
     check(
         "bar-controls-pinned",
-        "the bar carries only the shell's own settings, pin and close controls",
+        "the bar carries only the shell's own home, settings, pin and close controls",
         not extra and not missing,
         "ui/toast.html",
         f"extra {extra or 'none'}; missing {missing or 'none'}",
@@ -960,6 +983,7 @@ def main(argv: list[str]) -> int:
     family_look_pin()
     landing_pin()
     toast_refusals()
+    controls_pin()
     bar_control_refusals()
     freshness_register()
     capacity_audit_checks()

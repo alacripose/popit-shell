@@ -72,6 +72,113 @@ def _plain(value: object) -> object:
     return list(value) if isinstance(value, (tuple, list)) else value
 
 
+# The family's control baseline. The settings window's material and motion choices are the
+# buttons every app paints with: they carry the family's pressed and hover states, its padding
+# and its motion. They were authored in ui/toast.css and lived only there, which is why each app
+# could and did drift. Pinned here, an app subscribes to them like it subscribes to the colours,
+# and a package built against a different baseline is refused instead of merely noticed.
+CONTROLS = {
+    "schema": "popit.controls/1",
+    "source": "ui/toast.css .style-option — the settings window's material and motion choices",
+    "padding": "3px",
+    "paddingTight": "1px 4px",
+    "minHeight": "29px",
+    "border": "1px solid var(--line)",
+    "background": "rgba(0, 0, 0, 0.20)",
+    "ink": "var(--text)",
+    "gap": "4px",
+    "motion": ("color var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out), "
+               "background var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-pop)"),
+    "hover": {"lift": "translateY(-1px)", "border": "var(--emphasis)",
+              "background": "rgba(255, 255, 255, 0.09)"},
+    "pressed": {"border": "var(--primary)", "background": "rgba(255, 255, 255, 0.12)",
+                "ink": "var(--title)"},
+    "focus": {"outline": "1px solid var(--emphasis)", "offset": "2px"},
+}
+# One list, used both by the served stylesheet and by the audit that reads the app sheets.
+CONTROL_SELECTORS = (".popit-button", ".style-option", ".theme-choice", ".settings-row button",
+                     ".settings-source button", ".settings-tabs button", ".planet-filter button",
+                     ".planet-readout button", ".palette-editor-head button",
+                     ".palette-library-row button", ".palette-actions button",
+                     ".palette-community button", ".agent-button", ".voice-button")
+
+
+def write_controls(ui_root) -> str:
+    """Write the pinned baseline into the app's signed file set, from the record itself.
+
+    The sheet is a served file an app declares, so it has to exist as bytes a signature covers;
+    it is never edited by hand. Its content is `controls_css()`, so the record stays the one
+    source and a page cannot subscribe to an older rendering of the buttons.
+    """
+    target = ui_root / "controls.css"
+    body = controls_css()
+    if not target.exists() or target.read_text(encoding="utf-8") != body:
+        target.write_text(body, encoding="utf-8")
+    return str(target)
+
+
+def controls_digest() -> str:
+    """The pin an app package carries: a package built against another baseline is stale."""
+    return "blake3:" + blake3(dialin.canonical_json(CONTROLS)).hexdigest()
+
+
+def controls_css() -> str:
+    """The baseline as the stylesheet apps link, generated from the pinned record."""
+    hover, pressed, focus = CONTROLS["hover"], CONTROLS["pressed"], CONTROLS["focus"]
+    selectors = ",\n".join(CONTROL_SELECTORS)
+    focus_selectors = ",\n".join(f"{name}:focus-visible" for name in CONTROL_SELECTORS)
+    hover_selectors = ",\n".join(f"{name}:hover" for name in CONTROL_SELECTORS)
+    pressed_selectors = ",\n".join(f'{name}[aria-pressed="true"]' for name in CONTROL_SELECTORS)
+    return (
+        "/* popit-controls/1 — generated from app_base.CONTROLS " + controls_digest() + "\n"
+        "   Every app links this and paints its buttons with it. A local padding, motion or\n"
+        "   pressed state on a button is divergence; the audit reads the app sheets for it. */\n"
+        ":root {\n"
+        f'  --control-padding: {CONTROLS["padding"]};\n'
+        f'  --control-padding-tight: {CONTROLS["paddingTight"]};\n'
+        f'  --control-min-height: {CONTROLS["minHeight"]};\n'
+        f'  --control-border: {CONTROLS["border"]};\n'
+        f'  --control-background: {CONTROLS["background"]};\n'
+        f'  --control-ink: {CONTROLS["ink"]};\n'
+        f'  --control-gap: {CONTROLS["gap"]};\n'
+        f'  --control-motion: {CONTROLS["motion"]};\n'
+        f'  --control-lift: {hover["lift"]};\n'
+        f'  --control-hover-border: {hover["border"]};\n'
+        f'  --control-hover-background: {hover["background"]};\n'
+        f'  --control-pressed-border: {pressed["border"]};\n'
+        f'  --control-pressed-background: {pressed["background"]};\n'
+        f'  --control-pressed-ink: {pressed["ink"]};\n'
+        "}\n"
+        f"{selectors} {{\n"
+        "  padding: var(--control-padding);\n"
+        "  min-height: var(--control-min-height);\n"
+        "  border: var(--control-border);\n"
+        "  background: var(--control-background);\n"
+        "  color: var(--control-ink);\n"
+        "  transition: var(--control-motion);\n"
+        "  cursor: pointer;\n"
+        "}\n"
+        f"{hover_selectors} {{\n"
+        "  transform: var(--control-lift);\n"
+        "  border-color: var(--control-hover-border);\n"
+        "  background: var(--control-hover-background);\n"
+        "}\n"
+        f"{pressed_selectors} {{\n"
+        "  border-color: var(--control-pressed-border);\n"
+        "  background: var(--control-pressed-background);\n"
+        "  color: var(--control-pressed-ink);\n"
+        "}\n"
+        f"{focus_selectors} {{\n"
+        f'  outline: {focus["outline"]};\n'
+        f'  outline-offset: {focus["offset"]};\n'
+        "}\n"
+        "[data-control-size=\"tight\"] { padding: var(--control-padding-tight); }\n"
+        "@media (prefers-reduced-motion: reduce) {\n"
+        f"{selectors} {{ transition: none; }}\n"
+        f"{hover_selectors} {{ transform: none; }}\n"
+        "}\n")
+
+
 def subscription(settings, name: str, spec: dict, baseline: dict) -> dict:
     """The mutated signed subscription this app package is built from.
 
@@ -90,6 +197,11 @@ def subscription(settings, name: str, spec: dict, baseline: dict) -> dict:
         "payload_digest": delivery["payload_digest"],
         "publisher": "popit-publisher",
         "fields": list(FIELDS),
+        # The control baseline is the base's provision, like its colours: an app receives the
+        # buttons it may paint with, and a package built against a different baseline is refused
+        # rather than allowed to keep a button of its own.
+        "controls": CONTROLS,
+        "controls_digest": controls_digest(),
     }
     mutations = []
     for slot in SLOTS:
@@ -168,6 +280,9 @@ def check(document: object, name: str, settings) -> dict:
                       f"{name}: the subscription does not name {BASE_PACKAGE} as its base")
     if not document.get("mutations"):
         raise Refused("app-not-mutated", f"{name}: the subscription mutates nothing")
+    if base.get("controls_digest") != controls_digest():
+        raise Refused("app-controls-stale",
+                      f"{name}: the package's control baseline is not the published one")
     body = {key: value for key, value in document.items() if key != "digest"}
     if document.get("digest") != "blake3:" + blake3(dialin.canonical_json(body)).hexdigest():
         raise Refused("app-base-digest", f"{name}: the mutation record does not recompute")

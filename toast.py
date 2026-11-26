@@ -231,6 +231,9 @@ class Toast:
         self.apps = app_package.AppPackages(
             ROOT / "runlogs" / "toast" / "apps", ROOT / "ui", settings=self.settings,
             drivers=self.fleet)
+        # The pinned control baseline is written from its record before anything is signed, so
+        # the sheet an app declares is the current rendering of the buttons it subscribes to.
+        app_base.write_controls(ROOT / "ui")
         # A surface is signed before it is served, whether this process is the shell or a
         # probe reading the same routes.
         self.apps.ensure_all()
@@ -1487,6 +1490,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.file("toast.js", "text/javascript; charset=utf-8")
         if path == "/toast.css":
             return self.file("toast.css", "text/css; charset=utf-8")
+        if path == "/controls.css":
+            # The pinned control baseline, generated from the package's own record: every app
+            # links this instead of authoring a button of its own.
+            return self.send_body(app_base.controls_css().encode("utf-8"),
+                                  "text/css; charset=utf-8")
         if path == "/settings.html":
             # The settings window is the delivered window: its own signed page, opened in its
             # own named window, and the package every app subscribes to for its look.
@@ -2763,10 +2771,13 @@ def main() -> int:
     origin, origin_note = app_window_origin(https_server, lan_bind, args.https_port,
                                             server.server_port, window_https)
     print(f"toast-origin={origin} ({origin_note})", flush=True)
-    if origin.endswith("/toast.html"):
-        WINDOW_ORIGIN.update({"base": origin[:-len("/toast.html")], "note": origin_note})
-    else:
-        WINDOW_ORIGIN.update({"base": "", "note": origin_note})
+    # The window's origin carries its build token (`?v=…`), so the base is its scheme and host,
+    # not the origin minus a path suffix: comparing the whole string left the base empty and
+    # every route act — the window audit's own route among them — refused as insecure.
+    window_parts = urlsplit(origin)
+    window_base = (f"{window_parts.scheme}://{window_parts.netloc}"
+                   if window_parts.scheme == "https" else "")
+    WINDOW_ORIGIN.update({"base": window_base, "note": origin_note})
     view.load(QUrl(origin))
 
     def show_window() -> None:

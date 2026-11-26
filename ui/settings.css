@@ -86,7 +86,7 @@ code, .data th, .tag, .count {
   gap: 10px;
 }
 
-button, .actions a {
+.actions a {
   appearance: none;
   border: 1px solid var(--brass);
   background: var(--raised);
@@ -100,7 +100,16 @@ button, .actions a {
   cursor: pointer;
 }
 
-button:hover, .actions a:hover { border-color: var(--gold); color: var(--gold); }
+/* A button in this window is the family's button: its padding, border, motion and states come
+   from the pinned baseline (/controls.css), never from this sheet. */
+button {
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.actions a:hover { border-color: var(--gold); color: var(--gold); }
 button:disabled { opacity: 0.5; cursor: default; }
 button:focus-visible, .actions a:focus-visible { outline: 1px solid var(--gold); outline-offset: 2px; }
 

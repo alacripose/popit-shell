@@ -1,0 +1,125 @@
+/* popit-controls/1 — generated from app_base.CONTROLS blake3:d0321425fc02b409579df6dbaac84e9813d633ec7603bc5b2fcaca62cbbb8d5b
+   Every app links this and paints its buttons with it. A local padding, motion or
+   pressed state on a button is divergence; the audit reads the app sheets for it. */
+:root {
+  --control-padding: 3px;
+  --control-padding-tight: 1px 4px;
+  --control-min-height: 29px;
+  --control-border: 1px solid var(--line);
+  --control-background: rgba(0, 0, 0, 0.20);
+  --control-ink: var(--text);
+  --control-gap: 4px;
+  --control-motion: color var(--t-fast) var(--ease-out), border-color var(--t-fast) var(--ease-out), background var(--t-fast) var(--ease-out), transform var(--t-fast) var(--ease-pop);
+  --control-lift: translateY(-1px);
+  --control-hover-border: var(--emphasis);
+  --control-hover-background: rgba(255, 255, 255, 0.09);
+  --control-pressed-border: var(--primary);
+  --control-pressed-background: rgba(255, 255, 255, 0.12);
+  --control-pressed-ink: var(--title);
+}
+.popit-button,
+.style-option,
+.theme-choice,
+.settings-row button,
+.settings-source button,
+.settings-tabs button,
+.planet-filter button,
+.planet-readout button,
+.palette-editor-head button,
+.palette-library-row button,
+.palette-actions button,
+.palette-community button,
+.agent-button,
+.voice-button {
+  padding: var(--control-padding);
+  min-height: var(--control-min-height);
+  border: var(--control-border);
+  background: var(--control-background);
+  color: var(--control-ink);
+  transition: var(--control-motion);
+  cursor: pointer;
+}
+.popit-button:hover,
+.style-option:hover,
+.theme-choice:hover,
+.settings-row button:hover,
+.settings-source button:hover,
+.settings-tabs button:hover,
+.planet-filter button:hover,
+.planet-readout button:hover,
+.palette-editor-head button:hover,
+.palette-library-row button:hover,
+.palette-actions button:hover,
+.palette-community button:hover,
+.agent-button:hover,
+.voice-button:hover {
+  transform: var(--control-lift);
+  border-color: var(--control-hover-border);
+  background: var(--control-hover-background);
+}
+.popit-button[aria-pressed="true"],
+.style-option[aria-pressed="true"],
+.theme-choice[aria-pressed="true"],
+.settings-row button[aria-pressed="true"],
+.settings-source button[aria-pressed="true"],
+.settings-tabs button[aria-pressed="true"],
+.planet-filter button[aria-pressed="true"],
+.planet-readout button[aria-pressed="true"],
+.palette-editor-head button[aria-pressed="true"],
+.palette-library-row button[aria-pressed="true"],
+.palette-actions button[aria-pressed="true"],
+.palette-community button[aria-pressed="true"],
+.agent-button[aria-pressed="true"],
+.voice-button[aria-pressed="true"] {
+  border-color: var(--control-pressed-border);
+  background: var(--control-pressed-background);
+  color: var(--control-pressed-ink);
+}
+.popit-button:focus-visible,
+.style-option:focus-visible,
+.theme-choice:focus-visible,
+.settings-row button:focus-visible,
+.settings-source button:focus-visible,
+.settings-tabs button:focus-visible,
+.planet-filter button:focus-visible,
+.planet-readout button:focus-visible,
+.palette-editor-head button:focus-visible,
+.palette-library-row button:focus-visible,
+.palette-actions button:focus-visible,
+.palette-community button:focus-visible,
+.agent-button:focus-visible,
+.voice-button:focus-visible {
+  outline: 1px solid var(--emphasis);
+  outline-offset: 2px;
+}
+[data-control-size="tight"] { padding: var(--control-padding-tight); }
+@media (prefers-reduced-motion: reduce) {
+.popit-button,
+.style-option,
+.theme-choice,
+.settings-row button,
+.settings-source button,
+.settings-tabs button,
+.planet-filter button,
+.planet-readout button,
+.palette-editor-head button,
+.palette-library-row button,
+.palette-actions button,
+.palette-community button,
+.agent-button,
+.voice-button { transition: none; }
+.popit-button:hover,
+.style-option:hover,
+.theme-choice:hover,
+.settings-row button:hover,
+.settings-source button:hover,
+.settings-tabs button:hover,
+.planet-filter button:hover,
+.planet-readout button:hover,
+.palette-editor-head button:hover,
+.palette-library-row button:hover,
+.palette-actions button:hover,
+.palette-community button:hover,
+.agent-button:hover,
+.voice-button:hover { transform: none; }
+}
