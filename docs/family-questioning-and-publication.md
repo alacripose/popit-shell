@@ -123,6 +123,22 @@ If compatibility is absent or cannot be safely enabled without altering history,
 
 The Git object hash is not the application's content hash. Do not replace the project's package digest, BLAKE3 integrity or Ed25519 signer with Git's repository object ID.
 
+### 2.4 Remote HTTPS desk access reuses the signed Popit surface
+
+A request for an external HTTPS connection to the desk does not authorize a second, hand-written website. The existing Popit family policy and client already define a remote desk surface:
+
+- the phone/client origin is served over the existing Popit HTTPS listener and certificate;
+- the remote desk is a separate HTTPS listener (currently documented as port 5222) behind the signed desk sign-in surface;
+- the sign-in envelope is checked against the Popit Ed25519 trust registry, requires the named desk-access capability, spends a single-use nonce and creates a secure session;
+- the tunnel helper forwards to that secure listener, not to the LAN read-only view, loopback API or an arbitrary development server;
+- the remote page remains a signed Settings-derived Popit app/window. Its contour, four regions, controls, material, motion and DPI come from the shared Settings baseline.
+
+The agent must first read the existing remote-access policy, the secure LAN phone probe and the HTTPS origin/driver ownership refusal. It then asks the existing CUA driver to expose and measure the approved path. It must not write a standalone HTML page, copy a local app into an unverified tunnel, expose a raw MCP/terminal surface, or claim that TLS alone makes the application secure.
+
+The receipt must name the public HTTPS origin, tunnel and upstream listener identities, certificate SAN/fingerprint, signed app/package identity, Settings dependency, Ed25519 trust/admission result, capability and session result, CUA driver ticket/receipt, client-render witness and exact package digest. TLS endpoint authentication, application package signing, user admission and actual client rendering remain separate claims.
+
+A new remote surface or changed authentication scope is a material security/authority decision. The evidence sweep checks whether an existing signed surface already satisfies the request; only a genuinely unresolved owner decision is escalated. A failed page or certificate check blocks exposure—it does not permit the agent to invent a new page or weaken authentication.
+
 ## 3. Shploingus Clean — current public source and release audit
 
 Repository: `alacripose/shploingus-clean`, `main`, current inspected head `c0a205d661e1fffe2cb1d9ffa0eb6f6977972724`. The GitHub repository is **public**. The current `v0.1.0` tag points to `b84331a1afe129dcebadfcbdc0ca18b833cf70c9` through an unsigned annotated tag object `b3900ae2a4e3fdfd76349129899ba9cff9bc6a2f`. That commit rewrites 59 spectra input files to preserve byte endings. It is not the current `main` head. The public release list is empty.
