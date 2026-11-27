@@ -134,7 +134,10 @@ A measurement of other bytes is not reusable. Re-signing does not turn a pending
 
 The Debian Axis is the ticket authority. Each driver declares a bounded capability set and carries an expiring attestation. The Axis issues a ticket for one driver, one action and one scope. The driver requests the ticket before acting, and reports the result for a receipt. A missing, mismatched, expired or unauthorized ticket refuses before device mutation.
 
-The current Secure Shell reference node driver exposes only `witness` and `learning-apply`. Its current implementation is not yet a general source-edit/build/test/project-development driver. Do not describe that functionality as present. The family DevKit work must add bounded project-development capabilities to the Axis and real driver implementations, with socket-level refusal tests.
+The current Secure Shell reference node driver exposes only `witness` and `learning-apply`.
+
+**The complete Axis contract is nine typed dimensions, not a star-count.** The canonical source and family provenance are mapped in `docs/family-axis-nine-part-suite.md`. The Developer Kit must read AxisKind, all nine ladders, the source-bearing coverage table and its compile/runtime totality guards as one contract. Preserve the distinction from Shploingus's five-star matrix rating and Secure Shell's six top-level receipt stars. A reduction or merger is an owner-only schema change; incidental simplification is refused as `axis-contract-reduced`.
+ Its current implementation is not yet a general source-edit/build/test/project-development driver. Do not describe that functionality as present. The family DevKit work must add bounded project-development capabilities to the Axis and real driver implementations, with socket-level refusal tests.
 
 The intended pipeline is:
 
