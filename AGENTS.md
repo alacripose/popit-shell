@@ -133,16 +133,30 @@ Forbidden MCP roles:
 
 The agent decides when to call a capability such as reading the Freebuff composer. Popit must not poll that UI on a timer and label a screenshot as an agent read. The result must contain the readable composer text (and distinguish placeholder from draft), be read-only, not steal focus, not type or submit, and return a receipt tied to the requesting agent and its active task.
 
-## 7. Work-unit completion
+## 7. External documentation and source-comment refusal
+
+The family documentation contract is `docs/family-documentation-standard.md`. It is mandatory for every language and every family project.
+
+- **No explanatory source comments or docstrings.** Do not add natural-language comments, Python docstrings, Rustdoc/TSDoc/JSDoc, section banners, TODO/FIXME/HACK prose or comments that restate code. This applies to all source blocks and all agent-authored code. The narrow machine-directive/license allowlist in the documentation standard is the only exception.
+- **Refuse before writing.** The CUA editor/patch path must parse the proposed diff and changed files before applying bytes. A new explanatory comment is `source-comment-added`; unknown directives and unsupported language syntax refuse by name. A CI scan after the write is supplemental, not permission to write first.
+- **Document outside the source.** Use external documentation under `docs/`, with generated rustdoc-shaped HTML under `docs/reference/<project>/`. Public APIs, types, routes, app surfaces and MCP tools need reference entries tied to the exact source commit and dependencies. The existing `docs/prose/<project>/` is the copy-audit report, not the complete API reference.
+- **Keep copy and reference states separate.** A generated page existing is not a clean prose result; a reference page existing is not proof its source digest is current. Report inventory completion, copy cleanliness, reference coverage and freshness as separate facts. A report with unaccepted hits cannot be labelled copy-clean.
+- **Load the required skills for their actual scope.** Declauding and Stop Slop are mandatory for external technical prose and user-facing copy. Impeccable is mandatory for Popit/frontend design work. These skills do not authorize explanatory source comments or replace the parser gate. Record loaded versions/digests and the review receipts.
+- **Migrate legacy comments with a ticket.** Read meaningful source comments as migration input, move useful contracts into external docs, remove the comment through the CUA patch path, and keep the patch probe. Delete empty narration without reproducing it. No new comments may be added while legacy cleanup is open.
+
+The complete parser coverage, allowlist, reference-page contents, skill handling, positive/negative fixtures and refusal names are in the documentation standard. There is no `--skip-comments`, prose-baseline waiver or development-only exception.
+
+## 8. Work-unit completion
 
 A unit closes only when its ticket's acceptance is met by evidence. Compile success is not package validity; package validity is not launch proof; launch proof is not a client witness; CI success is not a skipped family check; absence of a refusal is not evidence that an act occurred.
 
 A refused, unrun, unmeasured, unavailable or unwitnessed condition stays open and is named accurately.
 
-## 8. Governing sources
+## 9. Governing sources
 
 - `docs/family-development-policy.md` — family project setup and gates.
 - `docs/family-mcp-devkit.md` — Popit/Restore ownership map and MCP DevKit architecture.
+- `docs/family-documentation-standard.md` — external API/reference docs, no-source-comment policy, language-aware pre-write refusal and prose-skill requirements.
 - Secure Shell Restore: `alacripose/secure-shell-restore/docs/SECURE-SHELL-RESTORE@1.ARCHITECTURE.md`, `...IMPLEMENTATION-PLAN.md`, `...AGENT-BOOTSTRAP-API.md`, `...CUA-CIVILIAN-ACCEPTANCE.md`.
 - Secure Shell Axis: `alacripose/secure-shell/server/axis.mjs`, `server/axis-server.mjs`, `server/axis-driver.mjs`, and the associated tests.
 - Hero Retarget Workbench: its `AGENTS.md`, `AGENTS-INDEX.md`, `AGENTS-LOG.md`, project ledger and retained probes.
