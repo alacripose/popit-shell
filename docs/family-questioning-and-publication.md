@@ -10,7 +10,7 @@ The DevKit must combine the family questioning lineage instead of implementing a
 
 | Lineage | What it contributes | What it does not replace |
 |---|---|---|
-| Shploingus project Hypergrilling ledger, beginning 2026-09-29 and continuing through Round 18 (2026-10-03) | Project-specific questions, owner answers in the owner's words, evidence traces, follow-up questions, open items and supersession. | It is not the later family-wide driver search loop. |
+| Shploingus project Hypergrilling ledger, beginning 2026-09-29 and continuing through Round 24 (2026-10-04) | Project-specific questions through Round 24, owner answers in the owner's words, evidence traces, follow-up questions, open items and supersession; later code adds question filing, typed ballots and decision evaluation. | It is not the later family-wide driver search loop. |
 | Hyperskill 0.1.0 (2026-09-24) | Portable material-decision taxonomy; append-only decisions; user control; child uncertainty escalations; per-invocation high agency; safety/privacy/evidence boundaries. | It does not describe the later Restore v2 driver-deliberation and Brass Meridian's project record/reconciliation implementation. |
 | Secure Shell Restore HYPERGRILL v2 (2026-11-04) | The family research-and-deliberation loop. A CUA driver exhausts code, documents, store/package sources, external references and bounded measurements before asking the owner. | It does not itself define the complete project-specific interview and reconciliation files for each app/game. |
 | Brass Meridian Questions 6.0 (2026-11-19) | A concrete project question record: 100 stable IDs, five thematic rounds, phase labels, generated Markdown plus JSONL, then one reconciliation row per answer and a gate that verifies complete coverage. | Its 100 rows are pre-authored project questions. The generator does not itself exhaust project evidence or discover every open question. |
@@ -231,3 +231,59 @@ A successful build only closes the build work unit. It does not close the releas
 - GitHub SHA-256 support: https://github.com/orgs/community/discussions/212994 — opened 2026-11-13 and unanswered; community replies report SHA-1-only hosting. This is not an official GitHub product statement.
 - User-provided publication transcript: source evidence of the proposed private-first visibility choice and unapproved Git history rewrite; not an independently witnessed local command/result transcript.
 - Public Shploingus current release: repo visibility public; no GitHub Release object; latest tag is annotated and unsigned; latest CI/release workflows failed as stated. The local drive checkout and current runtime game were not accessed by this audit.
+
+
+## 7. Shploingus question and decision architecture — source re-audit, 2026-11-27
+
+This section corrects the earlier short description of Shploingus. Its contribution is not only a Markdown interview ledger. The project contains several later, distinct mechanisms. They are useful family design evidence, but they must not be collapsed into one generic “question agent”.
+
+### 7.1 Current authority and freshness
+
+- `docs/HYPERGRILLING.md` is an append-only project question/answer and research record. The current inspected file contains Rounds 7–24, with the latest recorded rulings dated 2026-10-04.
+- `docs/LEDGER.md` is the project decision ledger. At the inspected source it has reached C-193, with measured implementation details and outstanding limits.
+- `docs/HANDOFF.md` is explicitly marked `DocumentRole::Derived` by `crates/voxel-package/src/record.rs`; it is not authority. Its 2026-10-02 body still points at older C-84–C-100 entries and is stale against the current ledger tail. The record checker refuses an authority citation that exists only in the derived handoff.
+- `AGENTS.md` carries append-only dated conventions. Its 2026-11-20 sections require full readable agent files, supersession rather than deletion, explicit `superseded_by` in the archive, and ticketed open limits. Earlier format/connection snapshots in that file remain dated evidence and must not be mistaken for a current runtime read.
+
+The family DevKit must resolve authority by each project's declared document roles and current pins. It must not treat whichever handoff or README is easiest to read as the current authority.
+
+### 7.2 Question discovery must be state-aware
+
+Shploingus demonstrates why question-mark extraction is only candidate discovery. `Compendium::open_questions()` enumerates headings ending in `?`; the project's `tests/open_questions.rs` then records that all 27 reported items had an `**Answer` line, so the method could not establish which decisions remained unresolved. One item, H-7.10, had an answer line but also an explicit `**Status: needs information, then a ruling.` The question mark and the presence of an answer marker were each insufficient on their own.
+
+The later `tests/file_questions.rs` path reads a bounded section, extracts inline or block-quoted answer text, and uses the record's explicit `**Status:` marker to distinguish open from answered. It maps:
+- answered material to an `Answer` event, `Authority` kind and `Answered` state, preserving the answer text;
+- unresolved material to a `ChildEscalation` event, `UnresolvedAmbiguity` kind and `Unresolved` state, with no answer field.
+
+Both are development facts, not ticket transitions. A child escalation is not itself permission to ask the owner; it is a record for coordinator handling.
+
+This test also exposes parser brittleness that the family DevKit must improve rather than copy: the implementation uses a fixed 14-line section window and currently identifies the status by a literal marker. The family parser must have a declared grammar, support variable-length sections and both answer shapes, preserve exact owner wording, and refuse ambiguous, missing or conflicting state. A question is not resolved merely because some text appears below its heading.
+
+### 7.3 Filing and chain persistence are separate from proving production adoption
+
+Shploingus `crates/voxel-package/src/filing.rs` centralizes non-overwriting chain persistence and linked-record construction. The inspected tree contains `chains/workspace.chain` (about 1.53 MB). The filing test exercises linked append and readback in a scratch workspace, not a verified readback of the production chain in this audit. The chain's content and integrity were not independently checked here.
+
+The tree also contains 350 files named `logs/laya-decisions/laya-0000.musli` through `laya-0349.musli`. Their names and count do not establish that 350 valid decisions were recorded; the binary records were not decoded or reconciled in this pass. The DevKit must distinguish a file's existence from successful decode, chain inclusion, provenance, integrity verification and acceptance by the owning ledger.
+
+### 7.4 Package ballots and decision judges answer different questions
+
+Shploingus `crates/voxel-package/src/ballot.rs` defines `shploingus.ballot/1`: a package declares an artifact, claim, presenter, question kind (`choice`, `score`, or `noul`), terms and a passing floor/threshold before judgment. Invalid or incomplete ballots are refused. This is a work/artifact conformance contract, not a replacement for an owner-facing interview or the driver-led evidence search.
+
+The package decision layer in `crates/voxel-package/src/decision.rs` centralizes evaluation behind a `Decider` seam. It enumerates declared subjects, carries the instrument, whether it was reached, state and reason, and accumulates refusals instead of silently passing absent observations. `oracle.rs` supplies a deterministic structural judge plus an optional model-facing instrument seam. Calibration must beat the known-answer set's majority class; an unreachable or uncalibrated judge, a non-reading, or an unreasoned negative result is refused. Its answer is evidence, not authority.
+
+The separate clean-room U7 implementation (`clean-room/src/axis.rs`, `laya.rs`, `von.rs`; spec 009) derives its own typed question/axis/classifier contract. Its inspected stage classifier is measured on 16 known answers, with leave-one-out 0.5000 against a 0.3125 majority baseline. It explicitly does not provide a calibrated score/noul instrument, so those questions are refused as not established. It is deterministic and local, not a web-searching CUA or an owner authority. Do not merge its results into the package decision layer or treat the classifier as a general semantic judge.
+
+### 7.5 Family DevKit composition rule
+
+The family workflow therefore has five distinct stages:
+
+1. **Discover candidates** from project documents, code, tests, tickets and project-local instruments. Syntactic question extraction is a candidate index only.
+2. **Establish decision state** from the owning record's explicit state, prior answer, supersession chain and provenance. If state cannot be established, keep it unresolved and refuse to infer.
+3. **Exhaust evidence** through the attested CUA driver using Restore HYPERGRILL v2 classes (`code`, `spec`, `external`, `measure`, `owner`). Only actual owner decisions reach the owner; children return uncertainty packets to the coordinator.
+4. **Record and reconcile** each material question and answer through the project's canonical append-only record. Preserve owner wording, stable identity, source pin, dependency, supersession, actor, ticket and receipt. A scratch round-trip test is not proof that the production ledger was updated.
+5. **Evaluate work separately** with typed package ballots and calibrated project-specific decision instruments. Their results are evidence for an authorized decision; they do not grant permission, publish a release or turn an uncalibrated answer into an owner ruling.
+
+The Brass Meridian 100-question / five-by-20 structure remains a reference for stable question IDs, generated views and exhaustive reconciliation. It is not the family round size and not the search engine. The current owner-facing ceiling is at most ten material owner questions in one coherent round, with no quota.
+
+### 7.6 Limits of this source audit
+
+This was a read-only GitHub source audit. It did not decode the 350 MUSLI records, verify the production chain file, inspect the local Shploingus checkout, run Rust tests or the game, execute a CUA ticket, verify a release signature, perform a full-history secret scan, or witness a Windows/phone client. All such states remain unverified until the registered CUA driver produces their receipts.
