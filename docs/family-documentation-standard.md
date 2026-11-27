@@ -1,6 +1,6 @@
 # Family source documentation and comment policy
 
-**Status:** Proposed family-wide contract for TICKET-0009. This is a source-backed design record, not evidence that the enforcement tools or generated reference pages exist yet.
+**Status:** Proposed family-wide contract for TICKET-0010. This is a source-backed design record, not evidence that the enforcement tools or generated reference pages exist yet.
 
 ## 1. Purpose
 
