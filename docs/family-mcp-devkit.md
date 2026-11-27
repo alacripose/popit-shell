@@ -185,7 +185,15 @@ The composer read is explicitly agent-initiated. There is no shell startup poll,
 
 The active Freebuff agent invokes the MCP capability while its mission is running. The driver reads the accessible composer text, separately identifies the placeholder, returns the text and a receipt, and leaves focus, keyboard and submit state unchanged. If UI Automation cannot produce text, the operation returns a named refusal with the available non-text evidence; it must not claim that a screenshot digest is a text read. No automatic polling is permitted.
 
-### 6.4 Hard refusals
+### 6.4 Remote desk access is an existing signed app surface
+
+The family has an existing remote access path: Popit's HTTPS phone origin, remote desk listener, Ed25519 signed desk-access envelope, one-time nonce and secure session, and the CUA-managed tunnel helper. The DevKit reads `docs/family-development-policy.md`, the secure-LAN phone probe and the HTTPS-origin/driver-ownership refusal before attempting remote access.
+
+The agent must reuse the existing Popit Settings-derived window and signed access path. It must not create a standalone HTML page, its own UI framework, independent contour/chrome/buttons/motion, or bypass the AppPackages publisher, Settings dependency, Ed25519 trust, desk-access capability or sign-in session. The CUA driver measures the actual HTTPS route and visible client.
+
+The receipt binds the public origin, upstream listener and tunnel identities, certificate SAN/fingerprint, app/package identity and BLAKE3 digest, exact Settings dependency, Ed25519 publisher/trust/admission, desk-access capability, session result, CUA ticket/receipt and actual client witness. TLS, app signature, user admission and client rendering are separate facts. The source, route and public exposure scope must be recorded before opening it to the Internet.
+
+### 6.5 Hard refusals
 
 The DevKit and underlying gate must refuse, before an act:
 
@@ -195,6 +203,7 @@ The DevKit and underlying gate must refuse, before an act:
 - heredoc-based code/data/record authoring;
 - app packages without Settings dependency/subscription, four-region shell, declared assets, shared controls and passing client audit;
 - locally authored UI framework, chrome, motion, palette, contour or button system;
+- a hand-written HTTPS page, tunnel target or remote UI that bypasses the existing signed Popit desk, Settings package, AppPackages registry or CUA driver;
 - unsigned, untrusted, revoked, stale, dependency-incomplete or tampered package;
 - launchable packages with pending audit or missing client witness;
 - CI/prose/secrets/family checks that did not actually run;
@@ -362,6 +371,7 @@ No one should regenerate the materials table by enabling the bypass feature and 
 | App composition | app body is composed into Settings four-region window | app provides its own bar/status/footer, alternate frame or hidden sibling app panels |
 | Dependency closure | every loaded file is declared and signed | undeclared module, image, manifest, worker or stylesheet |
 | Client audit | exact package digest is measured in Qt/Windows and OTA phone surfaces | pending audit, stale digest, overlap, failed launch or no client witness |
+| Remote desk | existing Popit HTTPS listener/tunnel, Ed25519 desk admission, Settings-derived package and client render are independently witnessed | hand-written page, bare TLS-only claim, wrong upstream listener, missing sign-in/capability or no CUA/client receipt |
 | Axis | attested driver receives one ticket for declared action, then acts and returns receipt | unticketed, expired, wrong-action, wrong-scope, un-attested driver |
 | Authoring | patch operation is performed by ticketed CUA driver; no explanatory source comments | direct MCP write, heredoc, added comment or unknown comment syntax refused before writing |
 | Process safety | exact registered supervisor and owned process group are verified | ambiguous PID/command-line match refuses without termination |
