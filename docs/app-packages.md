@@ -87,7 +87,7 @@
 > inferred from a CI badge or a source-level check.
 >
 > This audit addendum is tied to
-> `tickets/TICKET-0009-family-mcp-devkit-refusal-first.md` and
+> `tickets/TICKET-0010-family-mcp-devkit-refusal-first.md` and
 > `data/probes/2026-11-27-popit-restore-devkit-architecture.md`. It does not claim those
 > runtime repairs have landed.
 
