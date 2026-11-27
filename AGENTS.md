@@ -157,6 +157,8 @@ The family question and publication authority is `docs/family-questioning-and-pu
 - **Secrets block exposure.** Scan the full working tree and full Git history, branches, tags, refs, submodules, LFS and release payloads before pushing/publishing. A finding or missing scan blocks publication; it does not change the repository to private as a workaround.
 - **Never rewrite Git history as a convenience.** Inspect the real local object format, compatibility mapping, remote capabilities and exact error. Search for non-destructive Git compatibility first. A format change, history rewrite, new SHA-1 mirror or forge migration is an owner decision with an original bundle, immutable ref inventory, old/new digest map and explicit signature/tag fallout.
 - **Distribution surfaces remain separate.** Public Git visibility, signed release executable, Popit signed app package, Restore package stream and actual downstream Windows/phone client access each need their own identity, signature/admission and witness.
+- **Remote HTTPS reuses the signed desk.** Read the existing secure phone/remote desk policy and probes first. Use the Settings-derived Popit app, Ed25519 desk-access admission, single-use nonce/session and CUA-managed tunnel. Never hand-roll an HTML page, UI framework, contour, controls or remote API. TLS alone is not app authentication or client proof.
+- **Do not oscillate accepted behavior.** Read prior patches, failure records and consumer tests before changing a shared function. Preserve accepted behavior outside the ticket scope, compare the full dependency closure, and require a regression ticket plus fixture before reverting or reintroducing a previously fixed behavior.
 
 ## 9. Work-unit completion
 
