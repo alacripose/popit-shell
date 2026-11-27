@@ -146,17 +146,30 @@ The family documentation contract is `docs/family-documentation-standard.md`. It
 
 The complete parser coverage, allowlist, reference-page contents, skill handling, positive/negative fixtures and refusal names are in the documentation standard. There is no `--skip-comments`, prose-baseline waiver or development-only exception.
 
-## 8. Work-unit completion
+## 8. Questioning, owner decisions and publication
+
+The family question and publication authority is `docs/family-questioning-and-publication.md`. It combines Secure Shell Restore HYPERGRILL v2, the project-owned append-only Hypergrill records, Hyperskill's material-decision control protocol and Brass Meridian's Questions 6.0 record/reconciliation shape.
+
+- **Search before asking.** An attested CUA driver exhausts the project's authorities, current code/tests, full dependency closure, family failure records, authorized drive roots, stores, relevant external specs and bounded measurements. It closes `code`, `spec`, `external` and `measure` questions itself with pins. Only `owner` decisions reach the owner.
+- **Ten-question limit.** An owner-facing turn has at most ten material unresolved questions, one coherent topic, neutral choices or concise free-form questions, evidence and consequences. Ten is a ceiling, never a quota; do not ask settled questions or present a preferred answer as default.
+- **One append-only decision record.** Questions have stable IDs, provenance and dependencies; answers are recorded verbatim as owner input; child agents return uncertainty packets to the coordinator; unanswered decisions stay open and block only dependent work. Every answer has an evidence-backed reconciliation row.
+- **Public is the family default.** Family Git projects and public releases are intended for public distribution. Do not invent private-first publication or ask the owner to repeat the standing decision. An explicitly recorded owner-approved project exception is the only override. Public visibility never waives secret, license, integrity, signing, release or client-access gates.
+- **Secrets block exposure.** Scan the full working tree and full Git history, branches, tags, refs, submodules, LFS and release payloads before pushing/publishing. A finding or missing scan blocks publication; it does not change the repository to private as a workaround.
+- **Never rewrite Git history as a convenience.** Inspect the real local object format, compatibility mapping, remote capabilities and exact error. Search for non-destructive Git compatibility first. A format change, history rewrite, new SHA-1 mirror or forge migration is an owner decision with an original bundle, immutable ref inventory, old/new digest map and explicit signature/tag fallout.
+- **Distribution surfaces remain separate.** Public Git visibility, signed release executable, Popit signed app package, Restore package stream and actual downstream Windows/phone client access each need their own identity, signature/admission and witness.
+
+## 9. Work-unit completion
 
 A unit closes only when its ticket's acceptance is met by evidence. Compile success is not package validity; package validity is not launch proof; launch proof is not a client witness; CI success is not a skipped family check; absence of a refusal is not evidence that an act occurred.
 
 A refused, unrun, unmeasured, unavailable or unwitnessed condition stays open and is named accurately.
 
-## 9. Governing sources
+## 10. Governing sources
 
 - `docs/family-development-policy.md` — family project setup and gates.
 - `docs/family-mcp-devkit.md` — Popit/Restore ownership map and MCP DevKit architecture.
 - `docs/family-documentation-standard.md` — external API/reference docs, no-source-comment policy, language-aware pre-write refusal and prose-skill requirements.
+- `docs/family-questioning-and-publication.md` — Restore v2 driver-led hypergrill, 10-question owner rounds, append-only reconciliation, public-first publishing, full-history secret checks and Git object-format decisions.
 - Secure Shell Restore: `alacripose/secure-shell-restore/docs/SECURE-SHELL-RESTORE@1.ARCHITECTURE.md`, `...IMPLEMENTATION-PLAN.md`, `...AGENT-BOOTSTRAP-API.md`, `...CUA-CIVILIAN-ACCEPTANCE.md`.
 - Secure Shell Axis: `alacripose/secure-shell/server/axis.mjs`, `server/axis-server.mjs`, `server/axis-driver.mjs`, and the associated tests.
 - Hero Retarget Workbench: its `AGENTS.md`, `AGENTS-INDEX.md`, `AGENTS-LOG.md`, project ledger and retained probes.
