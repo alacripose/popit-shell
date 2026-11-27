@@ -294,7 +294,65 @@ The Hero Retarget Workbench is an explicit acceptance example. Werewolf→Shiv a
 
 A local workaround that leaves the shared capability broken is refused. A passing slice cannot close a parent ticket while a later stage remains untested.
 
-## 9. Security and release gate matrix
+## 9. Evidence-exhausted questioning and publication
+
+The Developer Kit must implement the current family decision path, not merely use an LLM prompt saying "ask if uncertain."
+
+### 9.1 The later questioning system is missing from the Hyperskill summary
+
+The family lineage is now recorded in `docs/family-questioning-and-publication.md`:
+- Shploingus keeps a long, project-owned append-only `docs/HYPERGRILLING.md` ledger, with its own rounds and evidence traces.
+- Hyperskill 0.1.0 supplies the portable material-decision taxonomy, append-only user decisions, child escalation and explicit per-invocation authority.
+- Secure Shell Restore HYPERGRILL v2 moves the expensive question work to the CUA driver: exhaust code, documents, store/package corpus, external sources and bounded experiments; resolve `code`, `spec`, `external` and `measure`; escalate only the `owner` residue.
+- Brass Meridian's Questions 6.0 supplies the later concrete project record and reconciliation shape: 100 stable question IDs in five themed rounds, canonical source rows, generated Markdown/JSONL, one reconciliation row per answer and a gate that checks complete coverage. Its static generator is not a dynamic evidence-search engine.
+- The owner's current rule is at most ten material questions per user-facing round. This supersedes Brass Meridian's 20-question round size as a family-wide presentation limit.
+
+The DevKit composes the driver search engine with the project question record/reconciliation system. It must not copy Brass Meridian's project questions or fabricated answers into other projects.
+
+### 9.2 Runtime behavior
+
+Every task begins with hypergrill preflight. The driver searches the full current project/family dependency closure, ledgers, refusals, tickets, source docs, tests and authorized drive roots through the registered driver search tools. It uses current external sources and bounded experiments where those can settle a question.
+
+It classifies each uncertainty into `code`, `spec`, `external`, `measure` or `owner`. Machine-resolvable questions are closed with evidence receipts before any owner prompt. Child workers return uncertainty packets to the coordinator; they do not prompt the owner directly.
+
+The owner sees only material `owner` questions that remain after the sweep, in a coherent group of no more than ten. Each has a stable ID, source evidence, dependency/blocking information and neutral options. A missing answer remains open; work that depends on it does not proceed. Safe independent work may continue. The answer is recorded verbatim with `user` provenance and gets a separate evidence-backed reconciliation row. Contradictions and supersessions are explicit and append-only.
+
+### 9.3 Public-first family publication
+
+The user's standing family decision is public publication. Git repositories and public project releases default to public; agents must not introduce a private-first staging phase or ask the same public/private question repeatedly. An explicit owner-approved exception is recorded per project and is the only override.
+
+Public by default does not reduce the security gate. Before any public push or release, an attested driver must perform and record a complete current/history secret scan, including refs, branches, tags, submodules, LFS and release payloads. Findings or missing scan coverage block publication. They do not trigger a private-visibility workaround. Publication and release work then checks license/provenance, required gates, BLAKE3 package identity, Ed25519 trust, client admission, artifact signature, and downstream client access.
+
+GitHub repository visibility, Git history, executable release, Popit app-store package, Restore package stream and Windows/phone client witness are separate deliverables. One does not prove the others.
+
+### 9.4 SHA-256 Git object format is not the package digest
+
+The Freebuff transcript's automatic fast-export rewrite is not an acceptable first response. Git's hash-transition documentation describes the `compatObjectFormat=sha1` compatibility mode and bidirectional SHA-256/SHA-1 object-name mappings; when configured and supported, Git can translate pushes to a SHA-1 server without an immediate whole-history rewrite. The actual local checkout must be inspected before deciding whether it has that compatibility mapping. GitHub community discussion #212994 (opened 2026-11-13, unanswered) reports SHA-1-only hosting, but is not an official GitHub statement.
+
+The driver must inspect local repository format, Git version, compatibility format, remote object-format capability and exact server error. If no compatible non-destructive path is available, the decision to rewrite history, mirror the project or change forge is escalated to the owner. Preserve the original bundle/ref inventory and map old-to-new commit identities; enumerate signature, tag, branch, PR, CI and release fallout before any authorized migration. Git object IDs do not replace BLAKE3 package identities or Ed25519 signatures.
+
+### 9.5 Current Shploingus publication audit
+
+The public repository is `alacripose/shploingus-clean`. On the inspected source:
+- `main` is public, at `c0a205d661e1fffe2cb1d9ffa0eb6f6977972724`.
+- `v0.1.0` is an unsigned annotated tag pointing to `b84331a1afe129dcebadfcbdc0ca18b833cf70c9`, not the current main head.
+- The latest three CI runs and latest three release runs on 2026-11-27 failed. The latest logs show `voxel-model/build.rs:153` refusing because the computed spectra-source digest `8561c777…` does not match the recorded `88ed8ac7…`.
+- The failed release job stopped at executable build; packaging and GitHub Release creation were skipped. The public release listing is empty.
+- The tagged commit rewrites 59 spectra source files and says it restores byte-exact inputs; it has no demonstrated passing CI/release witness yet.
+- `voxel-package/src/signing.rs` exposes a signing interface but uses `NoSigningBackend`; project handoff says no signature has been generated or verified and no trust root/backend exists.
+- Workspace identity is SHA-256, not family BLAKE3 package identity.
+- Current CI excludes the `shploingus` and `voxel-client` test targets, and does not run `frame-cost`, a performance regression threshold or a full-history secret scan. The `frame-cost` example measures medians and FPS but prints results; it is not itself a regression gate.
+- The release workflow builds a Windows executable/ZIP and attempts a GitHub Release, but has no Ed25519 package signature, BLAKE3 release manifest or downstream client witness.
+
+This is a public-source audit, not a local-drive or running-game witness. The user's local checkout at `C:\Users\ala\Documents\shploingus-clean\` was not accessible from this session. The project's own handoff lists multiple alpha gates incomplete, so the public repository must not be described as a completed release.
+
+### 9.6 Project remediation instead of repeated local patches
+
+The DevKit must route Shploingus recovery into a project-local, Axis-ticketed CUA work plan covering repository/object-format comparison, materials input provenance and digest repair, full-history secret scan, Rust skill-policy conflict, BLAKE3/Ed25519 package backend, complete client tests, measured performance baseline/threshold, external API docs, signed tag/release and downstream Popit/Restore client access.
+
+No one should regenerate the materials table by enabling the bypass feature and then declare the gate fixed. The recovery first determines the source bytes the recorded digest is meant to represent, records current and expected digests, and runs the generator only in its explicitly ticketed regeneration path. The normal build must then run with regeneration disabled and demonstrate that the gate is restored.
+
+## 10. Security and release gate matrix
 
 | Gate | Positive case | Negative case |
 |---|---|---|
@@ -312,23 +370,30 @@ A local workaround that leaves the shared capability broken is refused. A passin
 | Source comments | changed source contains no new natural-language comment/docstring tokens | explanatory comment/docstring, unknown directive or unparsed language refuses before write |
 | Skill receipts | external prose has Declauding/Stop Slop evidence and UI work has Impeccable evidence | missing/stale skill, unreviewed prose or frontend work without the required design pass |
 | Copy state | copy gate distinguishes clean, held, inventory-complete and blocked | 741 hits displayed as a generic `passed` state |
+| Questions | Restore driver search closes machine-resolvable classes; owner receives only evidence-backed questions in 10-question maximum rounds | machine-answerable question asked of owner, missing source ignored, guessed default or silent closure |
+| Publication | public-first repo/release has full-history secret receipt, package signing and client access witness | private-first default, partial secret scan, unpublished executable or unverified package claimed as release |
+| Git object format | local format/compat map and server capability are measured before a publication plan | history rewritten automatically, tags/commits silently invalidated, object hash confused with BLAKE3 package digest |
+| Release provenance | signed tag/release manifest ties exact source SHA, BLAKE3 payload, Ed25519 signer, build and client witness | unsigned/moved tag, artifact from another commit, or failed/skipped release described as published |
+| Performance | baseline and explicit regression thresholds run in CI for declared profiles | benchmark prints FPS but no comparator/threshold or gate skips the client target |
 | Landing evidence | each app screenshot is tied to package digest, client and audit receipt | placeholder/stock screenshot, unreferenced screenshot, build-only claim |
 | Cross-project learning | matching prior failure is loaded and full dependency chain is tested | repeated issue in a different consumer without regression transfer |
 
-## 10. Migration sequence
+## 11. Migration sequence
 
-1. **Authority and mapping** — record this ownership map, update `AGENTS.md`, identify Popit/Restore schema differences and the existing Axis capabilities.
+1. **Authority, question lineage and mapping** — record Restore v2, Hyperskill, Brass Meridian's question/reconciliation shape, project Hypergrill and Popit/Restore/Axis ownership in one current standard.
 2. **Refusal boundary** — replace arbitrary `debian.command` in MCP with typed Axis requests; enforce pre-action no-heredoc and exact process identity.
-3. **Source-comment and documentation gate** — build the language-aware pre-write comment refusal, external API reference generator, skill registry/receipts and honest copy-state model.
-4. **Package conformance** — add explicit Settings dependency pins to app manifests and identity strings; make audit/launch/client witness hard preconditions to store verification.
-5. **App composition** — separate app body modules from the shared multipurpose `toast.html`, compose them into a Settings-owned shell, and centralize activation/deactivation.
-6. **MCP DevKit** — generate the typed API manifest/template from the Axis capability registry; register and build the signed DevKit app through the same app factory.
-7. **Cross-project ratchets** — ingest the family failure register, add shared regression fixtures and incremental dependency-closure tests.
-8. **Client witness** — verify the Developer Kit and every registered app in the actual Windows/Qt desk and OTA phone client; publish screenshots and receipts only when tied to the measured package digest.
+3. **Evidence-exhaustion and owner decision engine** — implement driver-led searches, material decision classification, question records, 10-question owner rounds, append-only answers and per-answer reconciliation.
+4. **Source-comment and documentation gate** — build language-aware pre-write comment refusal, external API reference generator, skill compatibility/receipts and honest copy-state model.
+5. **Publication authority and gates** — enforce public-first by default, full-history secret scan, tag/history safeguards, exact source-to-artifact provenance and downstream client access.
+6. **Package conformance** — add explicit Settings dependency pins to app manifests and identity strings; make audit/launch/client witness hard preconditions to store verification.
+7. **App composition** — separate app body modules from the shared multipurpose `toast.html`, compose them into a Settings-owned shell, and centralize activation/deactivation.
+8. **MCP DevKit** — generate the typed API manifest/template from the Axis capability registry; register and build the signed DevKit app through the same app factory.
+9. **Cross-project ratchets** — ingest the family failure register, add shared regression fixtures and incremental dependency-closure tests, including performance thresholds and release gates.
+10. **Client witness** — verify the Developer Kit and every registered app in the actual Windows/Qt desk and OTA phone client; publish screenshots and receipts only when tied to the measured package digest.
 
 Each stage is its own ticketed work unit. Later stages cannot be represented as complete because earlier documentation or static checks passed.
 
-## 11. Source references
+## 12. Source references
 
 - Secure Shell Restore architecture: `alacripose/secure-shell-restore/docs/SECURE-SHELL-RESTORE@1.ARCHITECTURE.md`
 - Restore decisions/milestones: `alacripose/secure-shell-restore/docs/SECURE-SHELL-RESTORE@1.IMPLEMENTATION-PLAN.md`
@@ -340,4 +405,6 @@ Each stage is its own ticketed work unit. Later stages cannot be represented as 
 - Family documentation and source-comment standard: `docs/family-documentation-standard.md`
 - Retained source-comment/prose/Freebuff audit: `data/probes/2026-11-27-source-comment-and-docs-gap.md`
 - Hero Retarget conventions and evidence: `alacripose/hero-retarget-workbench/AGENTS.md`, `AGENTS-INDEX.md`, `AGENTS-LOG.md`, `docs/ARCHITECTURE.md`
+- Family questioning/publication policy: `docs/family-questioning-and-publication.md`.
+- Shploingus Clean public-source and release audit: `data/probes/2026-11-27-publication-questioning-shploingus-audit.md`.
 
