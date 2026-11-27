@@ -287,3 +287,10 @@ The Brass Meridian 100-question / five-by-20 structure remains a reference for s
 ### 7.6 Limits of this source audit
 
 This was a read-only GitHub source audit. It did not decode the 350 MUSLI records, verify the production chain file, inspect the local Shploingus checkout, run Rust tests or the game, execute a CUA ticket, verify a release signature, perform a full-history secret scan, or witness a Windows/phone client. All such states remain unverified until the registered CUA driver produces their receipts.
+
+
+### 7.7 Live repository state — 2026-11-27 20:06 UTC
+
+The repository changed again during this read-only audit. Public main is now 11e8ed7627b33d2cb43ea0f17e42943c6180ac6e, which updates three stale examples (two gaia-to-flora references and one map-selection API rename). CI run 46061258010 targets this SHA and remains in progress; the Windows headless-test step is running and the release-binary step is pending. Its predecessor CI run 46060049750 on 4af354b failed on the stale flora-census import. The separate release run 46060055933 on 4af354b succeeded and published the public v0.1.0 release at 20:04:28 UTC, containing shploingus-windows-x64.zip (5,619,434 bytes). The annotated v0.1.0 tag remains unsigned and points to 4af354b, one commit behind main. The release workflow built and packaged the product but did not execute the separate headless-test step. This GitHub release does not satisfy the family's BLAKE3/Ed25519, Restore admission, secret-scan, performance or downstream client-witness requirements by itself.
+
+The complete live run IDs, tag/release evidence and limits are recorded in the retained probe. Re-query the public head, tag, Actions and release asset before another status claim; this repository is actively changing.
