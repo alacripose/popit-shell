@@ -1,6 +1,6 @@
 # Popit Shell as the Secure Shell / Restore client and app layer
 
-**Status:** design and source audit for TICKET-0009. This document records the intended ownership map and the implementation gaps found at the 2026-11-27 source baseline. It does not claim that the Developer Kit, its MCP capabilities, or the full client integration already exists.
+**Status:** design and source audit for TICKET-0010. This document records the intended ownership map and the implementation gaps found at the 2026-11-27 source baseline. It does not claim that the Developer Kit, its MCP capabilities, or the full client integration already exists.
 
 ## 1. Architectural correction
 
