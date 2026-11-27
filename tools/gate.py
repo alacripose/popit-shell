@@ -43,6 +43,7 @@ BAR_PIN = ROOT / "tools" / "bar_pin.json"
 
 REFUSALS: list[str] = []
 CHECKS: list[str] = []
+HOST_BOUND: list[str] = []
 
 
 def refuse(code: str, where: str, detail: str) -> None:
@@ -54,6 +55,17 @@ def check(code: str, label: str, ok: bool, where: str = "", detail: str = "") ->
         CHECKS.append(f"{code} {label}")
         return
     refuse(code, where or label, detail or label)
+
+
+def host_bound(code: str, label: str, reason: str) -> None:
+    """A check whose evidence never travels is refused where the evidence can be read.
+
+    The family prose sweep writes a receipt naming every project's strings, home paths and
+    addresses, so it is kept on the machine that scanned rather than committed. A host without
+    the family checkout cannot read it; the gate names that instead of failing every runner
+    over a file the repository is not allowed to carry.
+    """
+    HOST_BOUND.append(f"{code} {label}: {reason}")
 
 
 LOOP = (
@@ -1323,14 +1335,21 @@ def main(argv: list[str]) -> int:
     checker_now = Path(r"F:\Documents\portal-shell\tools\ui_prose.py")
     fresh_enough = (family_receipt.is_file() and checker_now.is_file()
                     and family_receipt.stat().st_mtime >= checker_now.stat().st_mtime)
-    check(
-        "family-prose-ratchet",
-        "every family project is held by its own prose ratchet, none regressed",
-        bool(family_body) and int(family_body.get("checked") or 0) >= 11
-        and int(family_body.get("regressed") or 0) == 0 and fresh_enough,
-        "artifacts/receipts/prose-ratchet.json",
-        "the family prose ratchet is missing, stale, or a project regressed",
-    )
+    if checker_now.is_file():
+        check(
+            "family-prose-ratchet",
+            "every family project is held by its own prose ratchet, none regressed",
+            bool(family_body) and int(family_body.get("checked") or 0) >= 11
+            and int(family_body.get("regressed") or 0) == 0 and fresh_enough,
+            "artifacts/receipts/prose-ratchet.json",
+            "the family prose ratchet is missing, stale, or a project regressed",
+        )
+    else:
+        host_bound(
+            "family-prose-ratchet",
+            "every family project is held by its own prose ratchet, none regressed",
+            "the family checkout that writes the receipt is not on this host",
+        )
     check(
         "app-windows-are-delivered-over-https",
         "every window route loads the TLS origin; bare http is a refusal, not a fallback",
@@ -1551,6 +1570,8 @@ def main(argv: list[str]) -> int:
 
     for line in CHECKS:
         print(f"[ok] {line}")
+    for line in HOST_BOUND:
+        print(f"[n/a] {line}")
     for line in REFUSALS:
         print(f"[FAIL] {line}")
     print(f"{len(CHECKS)} checks, {len(REFUSALS)} refusals")
