@@ -337,5 +337,7 @@ Each stage is its own ticketed work unit. Later stages cannot be represented as 
 - Secure Shell Axis: `alacripose/secure-shell/server/axis.mjs`, `server/axis-server.mjs`, `server/axis-driver.mjs`
 - Popit identity/signing: `dialin.py`, `envelope.py`, `settings_package.py`, `app_base.py`, `app_package.py`
 - Popit client/store: `toast.py`, `ui/package.js`, `ui/phone.js`, `tools/app_store.py`
+- Family documentation and source-comment standard: `docs/family-documentation-standard.md`
+- Retained source-comment/prose/Freebuff audit: `data/probes/2026-11-27-source-comment-and-docs-gap.md`
 - Hero Retarget conventions and evidence: `alacripose/hero-retarget-workbench/AGENTS.md`, `AGENTS-INDEX.md`, `AGENTS-LOG.md`, `docs/ARCHITECTURE.md`
 
