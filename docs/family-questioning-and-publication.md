@@ -166,6 +166,20 @@ The owner-provided local transcript identifies the drive project path, but this 
 
 The materials digest refusal is an integrity gate doing its job. The correct recovery is to identify which bytes the digest was originally computed over, inspect the exact source/provenance and line endings, determine whether the source files or generated tables changed, and then regenerate only through the recorded materials-generator operation with before/after digest and output evidence. The `materials-regeneration` feature explicitly bypasses digest verification for that build so the generator can run; that path must be ticketed and tightly isolated, then every normal build must rerun with the feature disabled and the gate restored. Repeatedly changing file endings, regenerating tables or retagging without preserving the previous digests is not an acceptable recovery.
 
+## Live follow-up — 2026-11-27 19:55 UTC
+
+The earlier snapshot below is retained as historical evidence, not presented as the current repository state. The user confirmed that Shploingus is actively being committed and is receiving GitHub app notifications. A second live GitHub API check observed:
+
+- `main` advanced to `4af354bfda3a8b294f0821b9382f887f33388a91` (commit time 19:55:18 UTC).
+- The annotated `v0.1.0` tag was updated at 19:55:21 UTC and now points to that same commit. The tag remains unsigned (`verified=false`, reason `unsigned`). This supersedes the prior observation that the tag pointed to `b84331a`; the old movement remains part of the release-history record.
+- CI run `46060049750` and release run `46060055933` both target `4af354b` and were `in_progress` at the latest check. The CI `Headless tests` step was in progress; `Release binary builds` was pending. The release job's `Build the executable` was in progress; packaging, GitHub Release creation and artifact upload were pending. No outcome is assigned while those steps are in progress.
+- The public Releases API returned an empty list at that observation time. This may change if the in-progress release workflow succeeds.
+- The new commit sets `* text=auto eol=lf` and retains `-text` exceptions for raw SPLIB07A spectra and two generated material modules. It also excludes `voxel-von` and `voxel-mcp` from the Windows headless test command because their `jigor` dependency links a preinstalled ONNX Runtime.
+- Those exclusions are a change in runner coverage, not proof that the two crates pass. Their tests must be run and witnessed on a machine with the declared ONNX Runtime install. The desktop/client test exclusions remain as before.
+- The release workflow source still builds a Windows executable/ZIP and creates a GitHub Release; it does not add a BLAKE3 release manifest, Ed25519 family package signature, Restore admission or Popit/phone client witness. A successful GitHub Release, should it occur, would not by itself prove those separate distribution contracts.
+
+This is a live snapshot, not a freeze. More commits and notifications may arrive while the repository is being worked on. Re-read the current head, tag, Actions runs and release list before making another status claim. Do not treat the user's GitHub phone notifications as a CI result; correlate each with its commit/tag/Actions state.
+
 ## 4. Required DevKit refusals for publication and questions
 
 Before any publication act, the DevKit must know:
