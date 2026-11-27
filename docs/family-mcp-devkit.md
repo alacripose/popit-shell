@@ -29,6 +29,7 @@ The Debian backend does not become the Windows window manager. It provides the a
 | Client window composition | Popit Settings/app package | `app_base.py`, `toast.py::app_page`, `ui/package.js` | The current renderer path still supplies the entire body from a shared multi-app page; not an isolated per-app body substrate yet |
 | Family project baseline | Popit + family-wide policy | `app_base.PROJECT_SETUP`, `docs/family-development-policy.md`, `tools/gate.py` | Digest is carried in app base; it is not yet a complete executable CUA work protocol |
 | MCP interface | Popit | `toast.py::Handler.mcp`, `/mcp` | Existing MCP endpoint lacks the typed family development catalogue and still exposes unrestricted `debian.command` |
+| Code/API documentation | Popit Prose worker and family checker | `tools/prose_family.py`, `docs/prose/<project>/` | Current pages are copy-audit reports, not a navigable API reference; current `passed` badge can coexist with 741 hits |
 
 ## 3. Package identity and signing: keep the lineage, close the pin gap
 
@@ -198,10 +199,87 @@ The DevKit and underlying gate must refuse, before an act:
 - launchable packages with pending audit or missing client witness;
 - CI/prose/secrets/family checks that did not actually run;
 - a repeated refusal that has no new ticketed recovery and regression fixture.
+- an explanatory source comment/docstring, unrecognized comment directive or source language with no comment parser;
+- a changed public API with no current external reference entry;
+- a prose/copy report that labels unaccepted hits as clean or conflates inventory completion with quality;
+- external prose saved without the mandatory skill and review receipts.
 
 A refusal stops the current work unit. It is not a warning followed by a less constrained workaround.
 
-## 7. Family learning: prevent recurrence, not just log it
+## 7. Documentation, comments and skills are separate controls
+
+The project needs three separate, enforced capabilities. They must not be collapsed into the current prose scanner.
+
+### 7.1 No explanatory prose in source
+
+No AI-authored explanatory comments or docstrings. That includes ordinary line/block comments, Python docstrings, Rustdoc, JSDoc/TSDoc, Go package/symbol comments, HTML/CSS comments and shell/YAML/TOML comments. A short comment, a factual comment, a helpful comment, or a comment the prose scanner ignores is still not an accepted documentation surface.
+
+Only parser-recognized machine directives and required license metadata survive, through a finite allowlist. An unexplained suppression or unknown directive is refused. TODO/FIXME/HACK prose becomes a ticket or external record, not a code annotation.
+
+The pre-write CUA editor/patch path parses the proposed diff using language-aware tokenizers. A prohibited comment is refused before the file changes. The CI/source scan is a second check. A language without a supported parser is refused until the driver adds and tests that parser. No generic regex-only parser, no skip flag and no baseline waiver.
+
+Existing comments are migrated under tickets. The driver reads their intent, writes useful behavior/contracts into external documentation, and then removes the comment. Repeated narration and AI filler are deleted. A touched file cannot gain comments while the legacy migration is still open.
+
+### 7.2 External reference pages replace source comments
+
+The current Popit prose worker already renders `docs/prose/<project>/index.html`, but this page is a copy-quality report: it lists source files, extracted strings, word budgets and prose hits. It is not the rustdoc-shaped API documentation the family requires.
+
+The new reference system is separate:
+
+- External authoring sources live in project `docs/` files.
+- Language parsers derive symbol maps, signatures, module boundaries, public API entries, dependencies, routes, tools and schemas.
+- The reference renderer publishes navigable HTML under `docs/reference/<project>/`.
+- Landing pages and the Popit Prose/DevKit surfaces link both the reference and the separate copy-audit report.
+- Every public symbol and MCP/app capability has a reference entry. Each page is pinned to the exact source commit and dependency set.
+- Descriptions cover behavior, typed inputs/results, side effects, state, invariants, security/authority, named refusals, lifecycle and tests.
+
+The tool may use source code, test evidence and schemas to derive structure. It must not generate prose by copying source comments or guessing from function names. Unproven behavior remains marked undocumented and becomes a driver work item.
+
+### 7.3 The existing prose report must stop confusing completion with cleanliness
+
+The committed Popit report at `docs/prose/popit-shell/index.html` records 1,739 drawn strings and 741 hits, yet displays a `passed` badge.
+
+The source explains this mismatch: `inventory()` records the number of hits, while `render_project()` derives its status from `job.refusal`; `verify()` checks that a generated document exists and has expected markers. A successful report-generation workflow can therefore be labelled `passed` even when the page contains hundreds of hits. The badge does not mean the prose is clean.
+
+The UI and receipt must distinguish at least:
+- `inventory_complete` — the checker read the declared sources;
+- `copy_clean` — zero unaccepted copy hits;
+- `copy_held` — one or more unaccepted hits remain;
+- `reference_current` — external API docs cover the current public symbols and match the source digest;
+- `reference_stale` — documentation no longer matches the source/dependency pins;
+- `driver_blocked` — a driver operation could not be performed.
+
+A nonzero unaccepted hit count cannot render as `copy_clean`. The word `passed` cannot be used to mean only that a page was generated.
+
+The current report contains a `comment-restates` rule row. That one rule does not establish a complete comment detector or a pre-write prohibition. The Popit `cua.py` file contains the Chromium/UI Automation explanatory comments and docstrings from the supplied example; they remain in source. The Brass Meridian `docs/PROSE.md` says code comments are not scanned, and the Workbench Python prose tool states that comments/identifiers do not count and parses source with `ast`. The precise implementation of `portal-shell/tools/ui_prose.py` was not available in the inspected public GitHub repositories, so its full coverage remains unverified.
+
+### 7.4 Mandatory prose and design skills
+
+The two prose skills and the UI-design skill have distinct scopes:
+
+| Skill | Required scope |
+|---|---|
+| Declauding | External technical prose: docs, README, tickets, PR/issue text, reports and release notes. Preserve source claims and remove model-shaped constructions. Its own instructions exclude code and quoted text. |
+| Stop Slop | External prose and user-facing copy. Check directness, specificity, sentence rhythm and predictable AI writing patterns. |
+| Impeccable | Popit/frontend design, UX review, accessibility, layout, typography, responsive behavior, motion and design-system documentation. Settings remains the only visual authority. |
+
+These skills do not replace the comment parser or generate API documentation. The source comment ban is enforced by a separate language-aware tool.
+
+The family skill registry records the skill source, version/revision, digest, installation path, compatibility and actual task invocation. Drivers load the skills from the managed family skill location. A missing or stale skill is a named preflight refusal for the prose/UI task. External prose records the skill receipts, lint result, factual-preservation diff and required independent review. UI work records its Impeccable revision and actual client measurement.
+
+### 7.5 Freebuff example as a held reproduction
+
+The owner-provided transcript shows the failure mode directly:
+
+- two source probes were created through heredocs in `/tmp`;
+- the agent used hand-run Python scripts instead of a declared CUA driver capability and work receipt;
+- source comments were added to `cua.py` to narrate Chromium's accessibility behavior;
+- the code change increased retry count and timeout values, then restarted the desk using a PID derived from `netstat`;
+- the result was probed through direct local HTTP calls rather than a visible Axis/CUA receipt.
+
+The transcript is owner-provided evidence, not an independently witnessed runtime test. The new DevKit must refuse these paths before the write or lifecycle act, and provide the missing driver capability as a ticketed implementation task rather than silently allowing an agent to improvise.
+
+## 8. Family learning: prevent recurrence, not just log it
 
 Failure records are useful only when they change what the next agent is allowed to do. The DevKit preflight must query family failures by capability and dependency closure before it issues a work request. The post-failure path must add a regression to the owning shared capability and expose it to every consuming project.
 
@@ -216,7 +294,7 @@ The Hero Retarget Workbench is an explicit acceptance example. Werewolf→Shiv a
 
 A local workaround that leaves the shared capability broken is refused. A passing slice cannot close a parent ticket while a later stage remains untested.
 
-## 8. Security and release gate matrix
+## 9. Security and release gate matrix
 
 | Gate | Positive case | Negative case |
 |---|---|---|
@@ -227,25 +305,30 @@ A local workaround that leaves the shared capability broken is refused. A passin
 | Dependency closure | every loaded file is declared and signed | undeclared module, image, manifest, worker or stylesheet |
 | Client audit | exact package digest is measured in Qt/Windows and OTA phone surfaces | pending audit, stale digest, overlap, failed launch or no client witness |
 | Axis | attested driver receives one ticket for declared action, then acts and returns receipt | unticketed, expired, wrong-action, wrong-scope, un-attested driver |
-| Authoring | patch operation is performed by ticketed CUA driver | direct MCP write or heredoc command refused before execution |
+| Authoring | patch operation is performed by ticketed CUA driver; no explanatory source comments | direct MCP write, heredoc, added comment or unknown comment syntax refused before writing |
 | Process safety | exact registered supervisor and owned process group are verified | ambiguous PID/command-line match refuses without termination |
 | Prose/secrets | actual shared family check ran, current and historical secret scans report | `[n/a]`, skipped checker, missing family checkout, history not scanned |
+| External docs | current public API symbols link to reference pages pinned to the source digest | missing symbol, stale HTML, comment-only documentation or invented API behavior |
+| Source comments | changed source contains no new natural-language comment/docstring tokens | explanatory comment/docstring, unknown directive or unparsed language refuses before write |
+| Skill receipts | external prose has Declauding/Stop Slop evidence and UI work has Impeccable evidence | missing/stale skill, unreviewed prose or frontend work without the required design pass |
+| Copy state | copy gate distinguishes clean, held, inventory-complete and blocked | 741 hits displayed as a generic `passed` state |
 | Landing evidence | each app screenshot is tied to package digest, client and audit receipt | placeholder/stock screenshot, unreferenced screenshot, build-only claim |
 | Cross-project learning | matching prior failure is loaded and full dependency chain is tested | repeated issue in a different consumer without regression transfer |
 
-## 9. Migration sequence
+## 10. Migration sequence
 
 1. **Authority and mapping** — record this ownership map, update `AGENTS.md`, identify Popit/Restore schema differences and the existing Axis capabilities.
 2. **Refusal boundary** — replace arbitrary `debian.command` in MCP with typed Axis requests; enforce pre-action no-heredoc and exact process identity.
-3. **Package conformance** — add explicit Settings dependency pins to app manifests and identity strings; make audit/launch/client witness hard preconditions to store verification.
-4. **App composition** — separate app body modules from the shared multipurpose `toast.html`, compose them into a Settings-owned shell, and centralize activation/deactivation.
-5. **MCP DevKit** — generate the typed API manifest/template from the Axis capability registry; register and build the signed DevKit app through the same app factory.
-6. **Cross-project ratchets** — ingest the family failure register, add shared regression fixtures and incremental dependency-closure tests.
-7. **Client witness** — verify the Developer Kit and every registered app in the actual Windows/Qt desk and OTA phone client; publish screenshots and receipts only when tied to the measured package digest.
+3. **Source-comment and documentation gate** — build the language-aware pre-write comment refusal, external API reference generator, skill registry/receipts and honest copy-state model.
+4. **Package conformance** — add explicit Settings dependency pins to app manifests and identity strings; make audit/launch/client witness hard preconditions to store verification.
+5. **App composition** — separate app body modules from the shared multipurpose `toast.html`, compose them into a Settings-owned shell, and centralize activation/deactivation.
+6. **MCP DevKit** — generate the typed API manifest/template from the Axis capability registry; register and build the signed DevKit app through the same app factory.
+7. **Cross-project ratchets** — ingest the family failure register, add shared regression fixtures and incremental dependency-closure tests.
+8. **Client witness** — verify the Developer Kit and every registered app in the actual Windows/Qt desk and OTA phone client; publish screenshots and receipts only when tied to the measured package digest.
 
 Each stage is its own ticketed work unit. Later stages cannot be represented as complete because earlier documentation or static checks passed.
 
-## 10. Source references
+## 11. Source references
 
 - Secure Shell Restore architecture: `alacripose/secure-shell-restore/docs/SECURE-SHELL-RESTORE@1.ARCHITECTURE.md`
 - Restore decisions/milestones: `alacripose/secure-shell-restore/docs/SECURE-SHELL-RESTORE@1.IMPLEMENTATION-PLAN.md`
