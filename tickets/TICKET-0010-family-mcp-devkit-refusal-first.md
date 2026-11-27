@@ -155,3 +155,26 @@ This is a live snapshot, not a freeze. More commits and notifications may arrive
 ## Supersession
 
 New ticket. Does not supersede TICKET-0001 through TICKET-0008.
+
+
+- **A47 — Question discovery is not unresolved-state proof.** Project question-mark headings are candidate locators only. The DevKit must parse the owning record's declared state, answer payload, actor and supersession history; answer markers and question marks cannot decide status by themselves. Missing, contradictory or ambiguous state remains unresolved and refuses completion.
+- **A48 — Canonical answer filing is typed and provenance-bound.** Answered owner decisions and child escalations use distinct event kinds/states; an unresolved record carries no answer. Both are development facts, not ticket transitions. The family writer owns append linkage, refuses overwrite, and must verify production-chain readback and integrity. A scratch test or a file count is not proof that the production ledger contains valid records.
+- **A49 — Package ballots are not owner decisions.** Artifact ballots declare the artifact, claim, accountable presenter, typed question/terms, freshness and pass floor before a judge runs. Ballot parse refusals, answer evidence and calibration remain separate from owner authority, publication approval and Axis capabilities.
+- **A50 — Decision instruments are typed, scoped and calibrated.** Keep the project decision seam separate from owner questioning and CUA research. A deterministic structural judge may report only the question it was calibrated to answer; uncalibrated, unreachable, unsupported question kinds, ties and non-readings refuse. Model output is evidence, never authority. A project-specific classifier cannot be generalized to other projects or question types without a separate known-answer set and measured calibration.
+- **A51 — Authority roles and freshness are machine-checked.** Project records identify authority versus derived documents. A handoff, README or generated summary cannot outrank a newer decision ledger or append-only question history. The DevKit checks source pins, supersession and document role before using a claim; stale summaries become named open limits/tickets rather than fresh authority.
+- **A52 — Release workflow success cannot mask CI failure or skipped coverage.** Record source SHA per CI and release run, their exact step coverage and outcomes, tag target, signature state, asset identity and downstream client admission separately. A release build may succeed while a separate test workflow fails or remains in progress. A published GitHub asset is not a family-signed Restore/Popit package or client witness.
+- **A53 — Do not overclaim binary event logs.** File presence, sequential filenames and byte counts do not prove that event records decode, verify their chain linkage, carry owner provenance or reconcile with the canonical ledger. A decoder/verifier receipt is required before such records can close a question or ticket.
+
+### Live Shploingus follow-up — 2026-11-27 20:06 UTC
+
+This supersedes the earlier 19:55 status snapshot while retaining it as historical evidence:
+
+- The main branch advanced to 11e8ed7627b33d2cb43ea0f17e42943c6180ac6e; the commit changes three examples (gaia to flora in two examples and a renamed map-selection call in the third).
+- CI run 46061258010 targets 11e8ed7 and is still in_progress; the Windows headless tests are running and the release binary build step is pending.
+- CI run 46060049750 on 4af354b completed failure because the headless-test profile compiled flora-census, which still imported the removed gaia module. The 11e8ed7 commit fixes that and two other stale examples. No new CI pass is claimed.
+- Release workflow 46060055933 on 4af354b completed success; a public GitHub Release v0.1.0 was created at 20:04:28 UTC with shploingus-windows-x64.zip (5,619,434 bytes).
+- The annotated v0.1.0 tag still points to 4af354b, is unsigned, and is now one commit behind main. The release workflow's successful product build/package did not run the separate CI headless-test step.
+- The GitHub Release does not prove a family BLAKE3 manifest, Ed25519 family package signature/trust, Restore admission, full-history secret scan, performance threshold, complete excluded-test coverage, or downstream Windows/phone client witness.
+- The expanded source audit is in docs/family-questioning-and-publication.md §7 and data/probes/2026-11-27-publication-questioning-shploingus-audit.md. Question state, chain persistence, ballots, decision instruments, stale handoffs and binary log limits are documented there with source pins.
+
+The current local checkout, production chain integrity, MUSLI log decoding, full-history secret scan, test execution beyond GitHub Actions, runtime CUA ticket/receipt and downstream clients remain unverified. The PR is still proposal/documentation only and must remain draft pending Axis/CUA execution.
