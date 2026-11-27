@@ -9,6 +9,10 @@ application is measured against. The look is written down in
 [`docs/family-look.md`](docs/family-look.md) and pinned in
 [`tools/family_look.json`](tools/family_look.json).
 
+## Family development authority
+
+Popit is the modern Windows desktop and OTA phone client/application layer of Secure Shell and Restore. Family development is governed by the [project rules](AGENTS.md), the [Restore-aligned MCP Developer Kit architecture](docs/family-mcp-devkit.md), the [questioning and publication authority](docs/family-questioning-and-publication.md), and the [external documentation/source-comment standard](docs/family-documentation-standard.md). The implementation ticket is [TICKET-0010](tickets/TICKET-0010-family-mcp-devkit-refusal-first.md); its current status and evidence are tracked separately from this README.
+
 ![The launcher above the strip](docs/hero.png)
 
 ## Run
