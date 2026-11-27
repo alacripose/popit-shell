@@ -1332,7 +1332,8 @@ def main(argv: list[str]) -> int:
         family_body = json.loads(family_receipt.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         family_body = {}
-    checker_now = Path(r"F:\Documents\portal-shell\tools\ui_prose.py")
+    # The family checkout sits beside this one, which is how every other family tool finds it.
+    checker_now = ROOT.parent / "portal-shell" / "tools" / "ui_prose.py"
     fresh_enough = (family_receipt.is_file() and checker_now.is_file()
                     and family_receipt.stat().st_mtime >= checker_now.stat().st_mtime)
     if checker_now.is_file():
