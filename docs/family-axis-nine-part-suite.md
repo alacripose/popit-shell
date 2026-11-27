@@ -20,6 +20,12 @@ In the current Shploingus source this is AxisKind::ALL, AXIS_COUNT = 9, and one 
 
 The owner's phrase **nine-star suite** is retained as a human-facing description of the full Axis suite. The canonical schema and implementation language must say **nine axes / nine ladders**, not a single nine-star score or a nine-rung ordinal. A user-facing alias must never change the typed contract.
 
+
+
+## 1.1 Terminology and one evidence limit
+
+The owner's phrase **nine-star suite** is preserved as the human-facing name for the full nine-part Axis system. However, the inspected public source does not declare a separate STAR_COUNT = 9 array. It declares AXIS_COUNT = 9 and the nine AxisKind ladders; the checked-in matrix star scale declares five, and Secure Shell's receipt star set declares six. Therefore this audit proves the full nine-dimensional Axis contract. It does **not** claim to have located a distinct nine-entry top-level receipt-star array. If that is a separate formal schema intended by the owner, its source locator remains an open evidence item; until found, do not invent its membership or equate it with the nine ladders.
+
 ## 2. The nine members and their provenance
 
 | # | Axis identifier | What it asks | Declared values | Source declared by the current coverage table |
