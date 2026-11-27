@@ -2,7 +2,7 @@
 
 ## Scope and evidence status
 
-This is a retained source-audit record for TICKET-0009. The Popit, Restore, Axis, Brass Meridian and Hero Retarget Workbench files listed below were inspected through their public GitHub source. The Freebuff sequence is the owner-provided transcript in the conversation.
+This is a retained source-audit record for TICKET-0010. The Popit, Restore, Axis, Brass Meridian and Hero Retarget Workbench files listed below were inspected through their public GitHub source. The Freebuff sequence is the owner-provided transcript in the conversation.
 
 This is not a Debian Axis/CUA driver receipt. No local file, process, Windows desk, Debian host or phone was operated in this audit. No CI run, live app witness, patch-probe execution or family ledger write is claimed.
 
