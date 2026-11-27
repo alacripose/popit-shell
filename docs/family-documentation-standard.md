@@ -121,6 +121,13 @@ The source pins inspected for this audit are:
 - Stop Slop, `hardikpandya/stop-slop/SKILL.md`, source blob `83f2032fde406e97492ec48ee05ebe46f6403109`. Its current SKILL.md does not declare a version; pin the source revision instead of inventing one.
 - Impeccable 4.11.1, `pbakaus/impeccable/plugin/skills/impeccable/SKILL.md`, source blob `3b8f11f8499e7c1412a930d0ebadb2429d3e4df9`.
 
+**Rust-skill conflict found in the live Shploingus project:** the vendored `rust-skills` include `doc-all-public` and `lint-missing-docs`, which explicitly require `///`/ `//! ` Rustdoc comments, and `unsafe-safety-comment`, which requires `// SAFETY:` comments. Those instructions are incompatible with the family source-comment rule and must not be followed as written. The family Rust adapter must preserve their underlying engineering obligations without source prose:
+- public API completeness is checked against parsed symbols and external `docs/reference/<project>/` pages rather than Rustdoc comments or `missing_docs` doc-comment linting;
+- unsafe invariants are recorded in a versioned external safety-contract file keyed to the exact symbol/source-span and source digest, with the parser proving that every unsafe block/function has a matching contract and tests. An unbound or stale unsafe contract refuses;
+- ordinary Rustdoc and explanatory comments remain prohibited. No skill's "Good" sample can override the family gate.
+
+A skill whose mandatory workflow conflicts with a recorded family invariant is marked `incompatible` until its family adapter is loaded. The DevKit may not simply announce that the skill was loaded and proceed to violate the source-comment policy.
+
 The family skill registry records source URL, version/revision, content digest, compatibility, installation path and the invocation receipt for each task. Drivers load the skills from the managed family skill directory, currently `<home>/.agents/skills/`, or the registered agent-specific path. A missing, stale or unverifiable required skill is named before the relevant prose/UI task starts.
 
 For Impeccable, the driver loads the project's actual design context before design work. The current skill's setup requires its context command, the task's relevant playbook and its craft-floor guidance immediately before a UI edit. It also requires review of the rendered result at the sizes where the interface ships. The Popit implementation must reconcile that process with the owner's Settings authority: project context and design critique are inputs to the Settings-derived app, not permission to replace its tokens, motion, contour or controls.
