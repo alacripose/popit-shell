@@ -26,3 +26,8 @@ A window claim needs a CUA capture: a JSON row that says the surface is fine is 
 | `TICKET-0003` | Every tool added here ships a Popit surface and a probe that reads that surface over loopback |
 | `TICKET-0004` | Any claim about what the desk shows is witnessed by a CUA driver capture of the window |
 | `TICKET-0005` | The Debian lane stands on its own civilian record: C9 condition, care choice and a seven-field contract, spoken from the box |
+| `TICKET-0006` | Reconcile the OpenLock brief's missing civilian planes and agent lifecycle requirements |
+| `TICKET-0007` | Pin the Settings material/motion controls as the shared button baseline |
+| `TICKET-0008` | Rebuild session archive and evidence backup as signed Settings-derived desk apps |
+| `TICKET-0009` | Read the Freebuff composer only when the active agent asks |
+| `TICKET-0010` | Deliver the refusal-first family MCP Developer Kit, source-comment prohibition and external API reference system |
