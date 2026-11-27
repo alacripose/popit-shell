@@ -125,3 +125,60 @@ The earlier snapshot below is retained as historical evidence, not presented as 
 
 This is a live snapshot, not a freeze. More commits and notifications may arrive while the repository is being worked on. Re-read the current head, tag, Actions runs and release list before making another status claim. Do not treat the user's GitHub phone notifications as a CI result; correlate each with its commit/tag/Actions state.
 
+
+
+## Question and decision implementation re-audit — 2026-11-27
+
+Inspected the live public source at Shploingus commit `4af354bfda3a8b294f0821b9382f887f33388a91` (the subsequent `11e8ed7` commit changes three examples only). The source pins and roles are:
+
+| Artifact | Source pin | Finding |
+|---|---|---|
+| `docs/HYPERGRILLING.md` | `c9806692f1606e6093980648ff49266793269c3b` | 2,636 lines; project question/answer and research record through Round 24 |
+| `docs/LEDGER.md` | `5bb76ef9014ac3bbffbf9e94afab39c3ed7d624b` | 14,301 lines; latest numbered entry C-193 |
+| `docs/HANDOFF.md` | `619ae628d52d7c953f683c43b46098b1dfd47e89` | Explicitly derived, not authority; dated 2026-10-02 and points to an older C-84–C-100 tail |
+| `crates/voxel-package/src/record.rs` | `4f5cc20857fb4b2c0669ed33fa91f5443472fe70` | Declares the handoff as the derived document and rejects anchors found only there |
+| `crates/voxel-package/tests/open_questions.rs` | `745cf9cf564b6ff74a87a564e23f1185486466b2` | Demonstrates that the question-mark heading extractor cannot classify unresolved state: all 27 candidates have an answer marker |
+| `crates/voxel-package/tests/file_questions.rs` | `bf00afe9b6a44e8eb96a90e4ed40d77c01c15ee9` | Later state-aware filing distinguishes answers from unresolved escalations using explicit Status and extracted answer text |
+| `crates/voxel-package/src/filing.rs` | `cab8d091b51eb083aa6d6cefc96a9ae66b787cb5` | Central non-overwriting append, linked records, readback and chain repair surface |
+| `crates/voxel-package/src/ballot.rs` | `02b5f88c2784786564156a4f971a496532dec2f6` | `shploingus.ballot/1`: typed work/artifact question with presenter, declared terms, age and predeclared pass floor |
+| `crates/voxel-package/src/decision.rs` | `f65fcab753ac1af3e05ba940302917c925d881f5` | Central `Decider` seam, enumerated subjects, per-subject instrument/reached/state/reason, collected refusals |
+| `crates/voxel-package/src/oracle.rs` | `34f9dd02078af965dff13210542009cb1805e3fa` | Structural judge and optional model instrument seam; calibration and unavailable/non-reading cases fail closed |
+| `clean-room/specs/009-u7-decision-layer/spec.md` | `3c8a5053660f5119d7f9e10afc5a680b5e10aac8` | Separate clean-room axis/laya/von contract; stage classifier only, with score/noul not established |
+
+### State-aware question extraction
+
+The first `Compendium::open_questions()` path treats a question-mark heading as open. Its own regression file records why that is wrong: the 27 question candidates all carry an `**Answer` marker, and a candidate such as H-7.10 has an answer marker plus `**Status: needs information, then a ruling.` The later filing test reads the bounded section, extracts inline and block-quoted answer text, and treats explicit `**Status:` as the unresolved marker.
+
+Its event mapping is deliberate:
+- answered: `EventType::Answer`, `Kind::Authority`, `RecordState::Answered`, with answer text;
+- unresolved: `EventType::ChildEscalation`, `Kind::UnresolvedAmbiguity`, `RecordState::Unresolved`, with no answer field.
+
+Both are development facts, not ticket transitions. Children do not get to ask the owner directly. This is a project-specific implementation, not yet a robust family parser: its 14-line section bound and literal Status marker need grammar-backed variable-length parsing and adversarial fixtures before reuse.
+
+### Chain and binary-log limits
+
+The inspected tree has `chains/workspace.chain` (1,532,516 bytes). The question-filing test proves linked append/readback in a scratch workspace; it does not verify the production chain's current contents or integrity. The tree also has 350 named `logs/laya-decisions/laya-0000.musli` through `laya-0349.musli` files. Their names/count do not prove their decode, provenance, chain inclusion or decision validity; the MUSLI contents were not decoded in this audit.
+
+### Separate judgment surfaces
+
+The package ballot is a work/artifact conformance contract, not an owner interview. The package decision seam evaluates declared subjects and gathers all refusals; its structural judge must beat the known-answer majority and distinguishes unreachable, uncalibrated, non-reading and negative results. The clean-room U7 classifier is a separate implementation: 16 known-answer stages, leave-one-out 0.5000 versus majority 0.3125; score/noul question sets are not established, so they refuse. Neither is a web-searching CUA and neither grants owner authority.
+
+### Consequence for family DevKit
+
+Keep candidate discovery, decision-state extraction, driver evidence exhaustion, canonical question/answer recording, per-answer reconciliation and artifact judgment as separate stages. A question mark is not an open decision; an answer marker is not proof of resolution; a generated file is not evidence exhaustion; a scratch chain round-trip is not production ledger adoption; a classifier answer is not authority.
+
+This audit did not run tests, decode MUSLI logs, verify the production chain, inspect the local drive checkout, execute CUA, or perform a secret scan.
+
+## Live Shploingus release and CI follow-up — 2026-11-27 20:06 UTC
+
+A fresh GitHub API check supersedes the 19:55 snapshot above:
+
+- `main` is now `11e8ed7627b33d2cb43ea0f17e42943c6180ac6e`, commit time 20:05:49 UTC. It fixes three stale example references: `gaia` → `flora` in `flora-census` and `face-refined`, and `mount.select_map` → `mount.map.select` in `shell-shot`.
+- CI run `46061258010` targets `11e8ed7` and remains `in_progress` at the check (20:05:59 UTC). The Windows headless-test step is running; release binary build is pending. No result is claimed.
+- The prior CI run `46060049750` on `4af354b` completed `failure` because `voxel-shapers/examples/flora-census.rs` still imported the removed `gaia` module. The 11e8ed7 patch addresses that namespace problem plus two more examples. The new CI attempt must decide whether anything else fails.
+- Release workflow `46060055933` on `4af354b` completed `success`; executable build, ZIP packaging, GitHub Release creation and artifact upload all succeeded.
+- Public Release `v0.1.0` now exists, published at 20:04:28 UTC, with `shploingus-windows-x64.zip` (5,619,434 bytes). This release is sourced from tag `v0.1.0`, whose annotated object still points to commit `4af354b`; tag verification reports `unsigned`. Current `main` is one commit ahead.
+- The successful release job builds/packages the product executable; it did not run the separate workspace headless-test workflow. Thus release success and CI test failure on the same source commit are not contradictory.
+- The release does not establish family BLAKE3 manifest/signature, Ed25519 package trust, Restore admission, complete CI coverage, performance threshold, full-history secret scan, or Popit/phone client witness.
+
+Re-query before further status claims. This audit did not access the user-visible GitHub phone notifications.
