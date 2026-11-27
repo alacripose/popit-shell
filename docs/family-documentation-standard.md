@@ -45,6 +45,12 @@ The allowlist is versioned and finite. Unknown directives, unknown comment forms
 Generated/vendor files are handled through an explicit provenance manifest and are not silently treated as project-authored source. A family driver may not add comments to generated output by hand.
 
 ### 2.3 Existing source comments
+### Legacy comments in a file being changed
+
+A legacy comment is not permission to leave the touched file in its old state. When a ticket needs to edit a file that still contains explanatory comments/docstrings, the driver first migrates the useful content to external documentation and removes the comment tokens in that file. Only then may the functional source edit proceed. The same ticket may perform both steps when its acceptance and review can distinguish them; otherwise use a separate migration ticket first.
+
+The pre-write check compares the source before and after the patch. It refuses any increase in explanatory comment tokens. A functional edit that leaves known explanatory comments in the changed file also refuses until those comments are migrated, unless the remaining token is an exact allowlisted machine directive or licensed header. An untouched legacy file elsewhere in the repository remains a tracked migration item, not an excuse to add comments in another file.
+
 
 Existing comments are migration input, not permission to add more. The family driver inventories them by repository, file, language, line, category and digest.
 
