@@ -1,6 +1,6 @@
 {
   "schema": "popit.freshness/1",
-  "generated_at": "2026-11-27T18:17:52Z",
+  "generated_at": "2026-11-27T19:11:25Z",
   "shell": "http://127.0.0.1:5207",
   "families": [
     "landing",
@@ -90,16 +90,16 @@
       "family": "failures",
       "code": "probe-receipt-newer",
       "state": "fresh",
-      "subject": "runlogs\\toast\\bridge-target.json",
-      "detail": "newest receipt bridge-target.json is newer than the surfaces",
+      "subject": "runlogs\\toast\\app-package-probe.json",
+      "detail": "newest receipt app-package-probe.json is newer than the surfaces",
       "act": "python tools/app_package_probe.py && python tools/toast_probe.py"
     },
     {
       "family": "ledgers",
       "code": "ledger-newest-row",
       "state": "fresh",
-      "subject": "logs\\authority\\2026-11-26-control-baseline.jsonl",
-      "detail": "newest authority row is 1 day(s) old",
+      "subject": "logs\\authority\\2026-11-27-composer-read-is-agent-initiated.jsonl",
+      "detail": "newest authority row is 0 day(s) old",
       "act": "append the next unit's authority row under logs/authority/"
     },
     {
@@ -131,7 +131,7 @@
       "code": "dialin-rebuild",
       "state": "fresh",
       "subject": "ui/toast.html",
-      "detail": "desk app-dialin@173+blake3:f56ec30af2a91304e2be3c65ee0fe49406d61a9cf38a5398a977394ab693c3cd on entry toast.html (settings app-settings@161+blake3:694921b330f439b34f7556cad3d80fb94cc49672c8a98309db681d0a5cef2a9f); served page 22186B panel=True contour=True window=True",
+      "detail": "desk app-dialin@175+blake3:e63f4035858d79a19a2810a5cd5c5ab302e040dc2abcdce46aee897eb4cebca5 on entry toast.html (settings app-settings@163+blake3:24255d9fc2acfd7ddab01f84d770dbec1fda76d907b36f816570d8f3f7fa36eb); served page 22186B panel=True contour=True window=True",
       "act": "re-sign the desk from the settings package and serve the window page"
     },
     {

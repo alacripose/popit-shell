@@ -296,9 +296,10 @@ class Toast:
             "window": FREEBUFF, "digest": "", "changed": False, "at": "", "age": None,
         }
         self.harness = {
-            "state": "waiting", "code": "harness-unprobed",
-            "detail": "the Freebuff harness textbox has not been probed",
-            "digest": "", "changed": False, "at": "", "typing_at": "", "age": None,
+            "state": "unread", "code": "composer-unread",
+            "detail": "no agent has read the Freebuff composer on this desk",
+            "by": "", "chars": 0, "source": "", "digest": "", "changed": False,
+            "at": "", "typing_at": "", "age": None,
         }
         self.harness_path: pathlib.Path | None = None
         self.harness_history_path: pathlib.Path | None = None
@@ -624,28 +625,6 @@ class Toast:
         self.begin_call(back, incoming=True)
         return back
 
-    def harness_fresh(self, limit: float | None = None) -> tuple[bool, str]:
-        """A reply is allowed only after the CUA textbox band was probed recently."""
-        harness = self.harness
-        if harness.get("state") != "live" or not harness.get("at"):
-            return False, str(harness.get("detail") or "the harness textbox is unprobed")
-        if not all(harness.get(key) for key in ("history_digest", "working_digest")):
-            return False, "the harness history or working area is unprobed"
-        try:
-            moment = datetime.datetime.fromisoformat(harness["at"])
-            age = (datetime.datetime.now(datetime.timezone.utc) - moment).total_seconds()
-        except ValueError:
-            return False, "the harness textbox probe time is unreadable"
-        allowed = limit if limit is not None else max(8.0, self.probe_seconds * 3.0)
-        if age > allowed:
-            return False, f"the harness textbox was last probed {int(age)}s ago"
-        return True, ""
-
-    def require_harness(self) -> None:
-        fresh, detail = self.harness_fresh()
-        if not fresh:
-            raise cua.Refused("harness-unprobed", detail)
-
     def _lane(self, name: str, stage: str, detail: str = "") -> None:
         """Publish where one civilian's processing thread actually is."""
         with self.lock:
@@ -888,7 +867,6 @@ class Toast:
                  targets: list[str] | None = None, epoch: int | None = None,
                  speak: bool = True) -> dict:
         """One addressed lane answers; the other connected lanes only hear it."""
-        self.require_harness()
         actives = self.calls.actives()
         by_name = {call["agent"]: call for call in actives}
         if targets is None:
@@ -1116,21 +1094,19 @@ class Toast:
             pass
 
     def _loop(self) -> None:
+        """The desk's own chores, and nothing that reads the owner's composer.
+
+        This used to capture Freebuff every four seconds and call the picture a probed
+        textbox. Reading the composer is the agent's decision, spent through
+        `freebuff.composer.read`; the desk supplies the capability and keeps the receipt.
+        """
         while not self._stop.wait(self.probe_seconds):
-            # A periodic failure is a row, never a dead thread: an exception here used to end
-            # the only probe loop, so the harness stayed `waiting` for the whole life of the
-            # desk and every spoken turn was refused `harness-unprobed`.
+            # Repair is periodic: a quiet stretch can be archived before the recognizer's
+            # final pass is corrected, and the owner should not restart to remove that row.
             try:
-                # Repair is also periodic: a quiet stretch can be archived before the
-                # recognizer's final pass is corrected, and the owner should not have to
-                # restart to remove that row.
                 self.archive.repair_hallucinations()
             except Exception as error:
                 self._line(f"archive repair · {str(error)[:120]}", "refused")
-            try:
-                self.run_probe()
-            except Exception as error:
-                self._line(f"chat probe · {str(error)[:120]}", "refused")
 
     def run_probe(self) -> dict:
         try:
@@ -1184,10 +1160,11 @@ class Toast:
                 self.harness_working_path = pathlib.Path(working["path"])
             complete = bool(textbox.get("digest") and history.get("digest") and working.get("digest"))
             self.harness = {
-                "state": "live" if complete else "refused",
+                "state": "captured" if complete else "refused",
                 "code": "" if complete else "harness-region-missing",
-                "detail": "Freebuff history, working area and textbox probed" if complete
-                          else "the cua-chat capture did not contain all three harness regions",
+                "detail": "a bare capture of the Freebuff bands; no agent read the composer"
+                          if complete else "the cua-chat capture did not contain all three bands",
+                "by": "", "chars": 0, "source": "image",
                 "digest": textbox.get("digest", ""), "changed": typing,
                 "delta": textbox.get("delta"), "at": shot["at"],
                 "history_digest": history.get("digest", ""),
@@ -1215,6 +1192,83 @@ class Toast:
             self.revision += 1
         return dict(self.probe)
 
+    def read_composer(self, agent: str, task: str = "") -> dict:
+        """One read of the Freebuff composer, asked for by the agent that needs it.
+
+        The desk supplies the capability and the evidence; it does not decide that the
+        composer should be read, does not run on a timer, and never focuses, types, presses
+        a key or submits. The receipt names who asked, for what, and what was actually read.
+        """
+        agent = str(agent or "").strip()[:60]
+        task = str(task or "").strip()[:120]
+        if not agent:
+            raise cua.Refused("composer-reader-unnamed",
+                              "a composer read names the agent that asked for it")
+        try:
+            shot = self.fleet.read_composer(FREEBUFF)
+        except Exception as error:
+            with self.lock:
+                self.harness = {**self.harness, "state": "refused",
+                                "code": getattr(error, "code", "composer-read-failed"),
+                                "detail": f"{agent} asked for the composer and it failed: "
+                                          f"{str(error)[:160]}",
+                                "at": iso(), "age": 0}
+                self.revision += 1
+            self._line(f"composer read · {str(error)[:120]}", "refused")
+            raise
+        reading = shot.get("reading") or {}
+        receipt = {
+            "schema": "popit.composer-read/1",
+            "agent": agent, "task": task, "at": reading.get("at") or iso(),
+            "source": reading.get("source") or "",
+            "chars": int(reading.get("chars") or 0),
+            "text": reading.get("text") or "",
+            "placeholder": reading.get("placeholder") or "",
+            "field": reading.get("name") or "",
+            "digest": reading.get("digest") or "",
+            "rect": reading.get("rect") or [],
+            "path": reading.get("image") or "",
+            "window": reading.get("window") or FREEBUFF,
+            "hwnd": reading.get("hwnd"),
+            "focus_stolen": False, "had_focus": bool(reading.get("focus")),
+            "keys_sent": list(reading.get("keys") or []),
+            "submitted": False,
+            "refusal": reading.get("refusal") or "",
+        }
+        target = ROOT / "runlogs" / "toast" / "composer-reads.jsonl"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with target.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(receipt, ensure_ascii=False) + "\n")
+        previous = str((self.harness or {}).get("digest") or "")
+        with self.lock:
+            if receipt["path"]:
+                self.harness_path = pathlib.Path(receipt["path"])
+            self.capture_path = pathlib.Path(shot["path"])
+            self.capture_ts = int(time.time() * 1000)
+            self.harness = {
+                "state": "read", "code": "", "by": agent, "task": task,
+                "detail": f"the composer was read by {agent} at {receipt['at'][11:19]}",
+                "source": receipt["source"], "chars": receipt["chars"],
+                "field": receipt["field"], "digest": receipt["digest"],
+                "changed": bool(previous and previous != receipt["digest"]),
+                "at": receipt["at"], "age": 0, "typing_at": "",
+                "width": reading.get("width") or 0, "height": reading.get("height") or 0,
+                "rect": receipt["rect"], "path": receipt["path"],
+                "focus": False, "keys": [], "submitted": False,
+            }
+            self.probe = {
+                "state": "live", "code": "", "detail": "",
+                "window": shot["window"]["title"], "hwnd": shot["window"]["hwnd"],
+                "width": shot["width"], "height": shot["height"],
+                "digest": shot["digest"],
+                "changed": bool(previous and previous != shot["digest"]),
+                "at": shot["at"], "age": 0,
+            }
+            self.revision += 1
+        self._line(f"composer read · {agent} · {receipt['chars']} chars · "
+                   f"{receipt['source']}", "ok")
+        return receipt
+
     def state(self) -> dict:
         with self.lock:
             probe = dict(self.probe)
@@ -1229,11 +1283,9 @@ class Toast:
                 try:
                     moment = datetime.datetime.fromisoformat(harness["at"])
                     age = int((datetime.datetime.now(datetime.timezone.utc) - moment).total_seconds())
+                    # The age is reported, never turned into a refusal: a shell timer does
+                    # not decide when an agent is allowed to read or to speak.
                     harness["age"] = age
-                    if harness.get("state") == "live" and age > max(8.0, self.probe_seconds * 3.0):
-                        harness["state"] = "refused"
-                        harness["code"] = "harness-unprobed"
-                        harness["detail"] = f"the Freebuff harness textbox was last probed {age}s ago"
                 except ValueError:
                     harness["age"] = None
             if self.harness_path:
@@ -2567,6 +2619,19 @@ class Handler(BaseHTTPRequestHandler):
                 "name": "toast.state", "description": "Read the full toast state.",
                 "inputSchema": {"type": "object", "properties": {}},
             },
+            {
+                "name": "freebuff.composer.read",
+                "description": ("Read the Freebuff composer on demand, as the agent that asks. "
+                                "Read-only: no focus, no keypresses, nothing submitted. Returns "
+                                "the draft text, or the composer image when text is "
+                                "unavailable. Never triggered by a timer."),
+                "inputSchema": {"type": "object", "properties": {
+                    "agent": {"type": "string",
+                              "description": "The agent asking for the read; it is the receipt."},
+                    "task": {"type": "string",
+                             "description": "What the agent is doing with the draft."}},
+                    "required": ["agent"]},
+            },
         ]
         if method == "initialize":
             return self.json({"jsonrpc": "2.0", "id": request_id, "result": {
@@ -2618,11 +2683,24 @@ class Handler(BaseHTTPRequestHandler):
                     value = toast.bridge_leave(str(args.get("session") or ""))
                 elif name == "toast.state":
                     value = toast.state()
+                elif name == "freebuff.composer.read":
+                    value = toast.read_composer(str(args.get("agent") or ""),
+                                                str(args.get("task") or ""))
                 else:
                     raise mind_bridge.Refused("mcp-tool-unknown", name)
+                content = [{"type": "text", "text": json.dumps(value, ensure_ascii=False)}]
+                # A picture is a reading only when the model can look at it: the image
+                # travels in the result, not as a path the model cannot open.
+                if isinstance(value, dict) and value.get("source") == "image" \
+                        and value.get("path"):
+                    try:
+                        data = base64.b64encode(
+                            pathlib.Path(str(value["path"])).read_bytes()).decode("ascii")
+                        content.append({"type": "image", "data": data, "mimeType": "image/png"})
+                    except OSError:
+                        pass
                 return self.json({"jsonrpc": "2.0", "id": request_id, "result": {
-                    "content": [{"type": "text",
-                                 "text": json.dumps(value, ensure_ascii=False)}],
+                    "content": content,
                     "isError": False,
                 }})
             except Exception as error:

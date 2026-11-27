@@ -292,6 +292,28 @@ def probe_isolation() -> None:
         "ui/toast.js",
         "the window has no self-report, so a reading has to touch it",
     )
+    # The owner's correction: the agent owns the decision to read its own channel. The desk
+    # supplies the capability and the receipt, never a timer that calls a picture a reading.
+    cua_now = (ROOT / "cua.py").read_text(encoding="utf-8")
+    loop_body = source.split("def _loop")[1].split("def run_probe")[0] \
+        if "def _loop" in source else ""
+    read_body = cua_now.split("def _composer_reading")[1].split("def _trim")[0] \
+        if "def _composer_reading" in cua_now else ""
+    check(
+        "composer-read-is-agent-initiated",
+        "the composer is read when an agent calls the tool, not by a shell timer",
+        bool(loop_body) and "run_probe()" not in loop_body
+        and "freebuff.composer.read" in source
+        and "freebuff.composer.read" in page
+        and '"action": "composer_read"' in cua_now
+        and "self.fleet.read_composer(FREEBUFF)" in source
+        and '"state": "read"' in source
+        and '"submitted": False' in source and '"keys": []' in source
+        and bool(read_body) and "focus(" not in read_body
+        and "type_text" not in read_body and "click(" not in read_body,
+        "cua.py",
+        "the composer is polled, or a read takes focus, sends keys or submits",
+    )
 
 
 def controls_pin() -> None:

@@ -152,6 +152,29 @@ answer under one name. `call.leave` hands the lane back. The same operations are
 MCP tools by `/mcp`; `tools/buffy_call_mcp.py` is a stdio proxy for an MCP client, with
 `call.join`, `call.turns`, `call.say` and `call.leave`.
 
+## Reading the composer is the agent's call
+
+The desk used to capture Freebuff every four seconds in a background thread and report the
+picture as a probed textbox. That was never a reading of anything an agent asked for: it said
+nothing about the draft, and it kept saying it after the mission had stopped.
+
+`/mcp` now carries `freebuff.composer.read`, which an active agent calls when it needs the
+owner's current instructions:
+
+```
+curl -X POST http://127.0.0.1:5207/mcp -H "Content-Type: application/json" -d '{
+  "jsonrpc":"2.0","id":1,"method":"tools/call",
+  "params":{"name":"freebuff.composer.read",
+            "arguments":{"agent":"Buffy","task":"the desk sign-in unit"}}}'
+```
+
+The read is UI Automation on the composer field itself, so the result carries the text rather
+than a digest. When the field's tree cannot be read it returns the composer crop as an image
+content block and says `source: image`. It never focuses the window, presses a key or submits;
+the receipt in `runlogs/toast/composer-reads.jsonl` names the agent, the task, the time, the
+field, the text, and those three negatives. The window says `read by <agent>`, and no timer
+decides that anything was read.
+
 ## The desk on the internet
 
 `python toast.py` also opens a separate listener at `https://127.0.0.1:5222/signin.html`

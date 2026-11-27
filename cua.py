@@ -43,7 +43,8 @@ MOUSEEVENTF_LEFTDOWN = 0x0002
 MOUSEEVENTF_LEFTUP = 0x0004
 MOUSEEVENTF_RIGHTDOWN = 0x0008
 MOUSEEVENTF_RIGHTUP = 0x0010
-DECLARED_ACTIONS = {"capture", "probe_chat", "focus", "move", "click", "key", "type", "wait"}
+DECLARED_ACTIONS = {"capture", "probe_chat", "composer_read", "focus", "move", "click", "key",
+                    "type", "wait"}
 # A key names one act. The fleet keeps the first task a key produced, so a bridge retry
 # after a tunnel flap reads that receipt instead of clicking a second time.
 KEY_RE = re.compile(r"^[a-z0-9][a-z0-9._:-]{7,95}$")
@@ -198,6 +199,162 @@ def _harness_regions(shot: dict) -> dict:
                          "box": list(box), "digest": digest, "delta": delta,
                          "changed": changed, "at": shot["at"]}
     return regions
+
+
+# The composer reading. Chromium builds its accessibility tree when a client asks for it,
+# so the desk can read the field's text instead of guessing from a picture. This path is
+# read-only by construction: it captures the window it already has, asks UI Automation for
+# what the composer holds, and writes one crop. It never focuses, types, clicks or submits.
+UIA: dict = {"module": None, "comtypes": None, "error": ""}
+
+
+def _uia() -> object | None:
+    """A UI Automation client for the thread that is reading.
+
+    The fleet runs each task on its own thread and COM objects belong to the apartment that
+    made them, so the client is created per read and the typelib alone is cached.
+    """
+    try:
+        import comtypes
+        import comtypes.client
+        comtypes.CoInitialize()
+        if UIA["module"] is None:
+            comtypes.client.GetModule("UIAutomationCore.dll")
+            from comtypes.gen import UIAutomationClient as module
+            UIA["module"] = module
+            UIA["comtypes"] = comtypes
+        module = UIA["module"]
+        UIA["error"] = ""
+        return comtypes.client.CreateObject(module.CUIAutomation,
+                                            interface=module.IUIAutomation)
+    except Exception as error:
+        UIA["error"] = f"{type(error).__name__}: {error}"
+        return None
+
+
+def _composer_element(app: object, hwnd: int) -> tuple | None:
+    """The composer's edit element, preferring the field that names itself a message box."""
+    module = UIA["module"]
+    root = app.ElementFromHandle(hwnd)
+    condition = app.CreateTrueCondition()
+    found: list[tuple] = []
+    # Chromium switches its renderer's accessibility tree on when a client asks, and the
+    # measured cold build is about ten seconds. A warm desk answers on the first ask.
+    for _attempt in range(18):
+        elements = root.FindAll(module.TreeScope_Descendants, condition)
+        found = []
+        for index in range(elements.Length):
+            try:
+                element = elements.GetElement(index)
+                if element.CurrentLocalizedControlType != "edit":
+                    continue
+                name = element.CurrentName or ""
+                rect = element.CurrentBoundingRectangle
+                box = [int(rect.left), int(rect.top), int(rect.right), int(rect.bottom)]
+                area = max(0, box[2] - box[0]) * max(0, box[3] - box[1])
+                found.append((name, box, area, element))
+            except Exception:
+                continue
+        named = [row for row in found if "message" in row[0].lower()]
+        if named:
+            return max(named, key=lambda row: row[2])
+        if found:
+            return max(found, key=lambda row: row[2])
+        time.sleep(0.5)  # the first request is what makes Chromium build the tree
+    return None
+
+
+def _composer_text(module: object, element: object) -> str:
+    """The field's text through the text pattern, or its value when only that is offered."""
+    comtypes = UIA["comtypes"]
+    try:
+        raw = element.GetCurrentPatternAs(module.UIA_TextPatternId,
+                                          module.IUIAutomationTextPattern._iid_)
+        pattern = comtypes.cast(raw, comtypes.POINTER(module.IUIAutomationTextPattern))
+        return pattern.DocumentRange.GetText(-1) or ""
+    except Exception:
+        pass
+    try:
+        raw = element.GetCurrentPatternAs(module.UIA_ValuePatternId,
+                                          module.IUIAutomationValuePattern._iid_)
+        pattern = comtypes.cast(raw, comtypes.POINTER(module.IUIAutomationValuePattern))
+        return pattern.CurrentValue or ""
+    except Exception:
+        return ""
+
+
+def _composer_crop(shot: dict, box: list[int]) -> tuple[str, int, int]:
+    """One crop of the region the field reports, in the capture the desk already holds."""
+    origin_x, origin_y = shot["window"]["rect"][0], shot["window"]["rect"][1]
+    with Image.open(shot["path"]) as opened:
+        image = opened.convert("RGB")
+    x0 = max(0, int(box[0]) - origin_x - 4)
+    y0 = max(0, int(box[1]) - origin_y - 4)
+    x1 = min(image.width, int(box[2]) - origin_x + 4)
+    y1 = min(image.height, int(box[3]) - origin_y + 4)
+    if x1 <= x0 or y1 <= y0:
+        return "", 0, 0
+    crop = image.crop((x0, y0, x1, y1))
+    target = CAPTURES / "harness-composer.png"
+    crop.save(target, "PNG")
+    return str(target), crop.width, crop.height
+
+
+def _composer_reading(shot: dict) -> dict:
+    """Read the composer: its text when the tree offers it, its picture when it does not."""
+    window = shot["window"]
+    reading = {"source": "image", "text": "", "chars": 0, "placeholder": "",
+               "name": "", "rect": [], "image": "", "digest": "", "width": 0,
+               "height": 0, "keys": [], "focus": False, "submitted": False,
+               "at": iso(), "window": window["title"], "hwnd": window["hwnd"],
+               "refusal": ""}
+    app = _uia()
+    if app is None:
+        reading["refusal"] = UIA["error"]
+    else:
+        try:
+            found = _composer_element(app, window["hwnd"])
+        except Exception as error:
+            found = None
+            reading["refusal"] = f"{type(error).__name__}: {error}"
+        if found is None and not reading["refusal"]:
+            reading["refusal"] = "composer-field-not-found"
+        if found is not None:
+            name, box, _area, element = found
+            reading["name"], reading["rect"] = name, box
+            try:
+                reading["placeholder"] = element.CurrentHelpText or ""
+            except Exception:
+                reading["placeholder"] = ""
+            try:
+                # Whether the field already had focus when it was read: the desk never takes it.
+                reading["focus"] = bool(element.CurrentHasKeyboardFocus)
+            except Exception:
+                reading["focus"] = False
+            text = _composer_text(UIA["module"], element)
+            # Chromium renders the placeholder into the same text: it is not the owner's draft.
+            placeholder = str(reading["placeholder"]).strip()
+            if text.strip() and text.strip() != placeholder:
+                reading["text"] = text
+    box = reading["rect"]
+    if not box:
+        region = ((shot.get("regions") or {}).get("textbox") or {}).get("box")
+        if region:
+            origin_x, origin_y = window["rect"][0], window["rect"][1]
+            box = [region[0] + origin_x, region[1] + origin_y,
+                   region[2] + origin_x, region[3] + origin_y]
+    if box:
+        path, width, height = _composer_crop(shot, box)
+        reading["image"], reading["width"], reading["height"] = path, width, height
+    if reading["text"].strip():
+        reading["source"] = "uia"
+        reading["chars"] = len(reading["text"].strip())
+        reading["digest"] = hashlib.sha256(
+            reading["text"].strip().encode("utf-8")).hexdigest()[:24]
+    elif reading["image"]:
+        reading["digest"] = hashlib.sha256(
+            pathlib.Path(reading["image"]).read_bytes()).hexdigest()[:24]
+    return reading
 
 
 def _trim(slug: str, keep: int) -> None:
@@ -478,6 +635,14 @@ class Fleet:
             shot["regions"] = _harness_regions(shot)
             shot["textbox"] = shot["regions"]["textbox"]
             return shot
+        if kind == "composer_read":
+            shot = capture_window(str(action.get("window") or "Freebuff"),
+                                  exact=bool(action.get("exact")))
+            shot["kind"] = "composer-read"
+            shot["regions"] = _harness_regions(shot)
+            shot["textbox"] = shot["regions"]["textbox"]
+            shot["reading"] = _composer_reading(shot)
+            return shot
         if kind == "focus":
             return focus(str(action.get("window") or "Freebuff"))
         if kind == "move":
@@ -500,4 +665,12 @@ class Fleet:
         receipt = self.wait(task["id"], timeout=10)
         if receipt["status"] != "done":
             raise Refused("probe-refused", json.dumps(receipt.get("refusal") or {}))
+        return receipt["results"][0]
+
+    def read_composer(self, window: str = "Freebuff: The free coding agent") -> dict:
+        """One read of the composer, submitted because an agent asked for it."""
+        task = self.submit([{"action": "composer_read", "window": window}], "cua-chat")
+        receipt = self.wait(task["id"], timeout=30)
+        if receipt["status"] != "done":
+            raise Refused("composer-read-refused", json.dumps(receipt.get("refusal") or {}))
         return receipt["results"][0]

@@ -243,25 +243,39 @@ def main() -> int:
         check("mic-declared", state.get("mic", {}).get("device") == "default capture device",
               str(state.get("mic", {}).get("device")))
 
+        state = json.loads(get(port, "/api/toast")[1])
+        check("composer-unread-until-an-agent-asks",
+              (state.get("harness") or {}).get("state") == "unread",
+              str((state.get("harness") or {}).get("code")))
         try:
-            app.ask_mind("the harness gate must run before any answer", "cua-chat")
+            app.ask_mind("the desk answers with no composer read behind it", "cua-chat")
             gate_code = "answered"
-        except cua.Refused as error:
-            gate_code = error.code
-        check("harness-unprobed-refusal", gate_code == "harness-unprobed", gate_code)
+        except Exception as error:  # a lane's own refusal is not the freshness gate
+            gate_code = str(getattr(error, "code", type(error).__name__))
+        check("answering-needs-no-freshness-gate", gate_code != "harness-unprobed", gate_code)
 
         probe = app.run_probe()
-        check("freebuff-probed", probe.get("state") == "live",
+        check("freebuff-captured", probe.get("state") == "live",
               f"{probe.get('state')} {probe.get('code', '')}")
         state = json.loads(get(port, "/api/toast")[1])
         harness = state.get("harness") or {}
         regions = harness.get("regions") or {}
-        check("harness-textbox-probed", harness.get("state") == "live"
-              and bool(harness.get("digest")) and (harness.get("height") or 0) > 0,
-              f"{harness.get('state')} {harness.get('width')}x{harness.get('height')} {harness.get('digest')}")
+        check("bare-capture-is-not-a-read", harness.get("state") == "captured",
+              f"{harness.get('state')} {harness.get('code', '')}")
         check("harness-regions-probed", all((regions.get(name) or {}).get("digest")
               for name in ("history", "working", "textbox")),
               " ".join(f"{name}={(regions.get(name) or {}).get('height')}" for name in ("history", "working", "textbox")))
+        # The agent's own read: the tool an active mission calls, never a timer.
+        receipt = app.read_composer("toast-probe", "the desk's own contract probe")
+        check("composer-read-on-request",
+              receipt.get("source") in ("uia", "image")
+              and receipt.get("submitted") is False and receipt.get("focus_stolen") is False
+              and not receipt.get("keys_sent"),
+              f"{receipt.get('source')} {receipt.get('chars')} chars")
+        harness = (json.loads(get(port, "/api/toast")[1]).get("harness") or {})
+        check("desk-names-the-reader", harness.get("state") == "read"
+              and harness.get("by") == "toast-probe",
+              f"{harness.get('state')} {harness.get('by')}")
         status, image, kind = get(port, "/api/toast/harness.png")
         check("harness-textbox-http", status == 200 and kind == "image/png" and len(image) > 1_000,
               f"{len(image)} bytes")

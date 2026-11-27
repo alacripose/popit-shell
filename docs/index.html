@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>popit-shell on Debian 13</title>
 <meta name="description" content="This machine scores the repository 10 in band red">
-<meta name="openlock-build" content="62c1460b2e">
+<meta name="openlock-build" content="6beb5ac208">
 <style>
   :root {
     --paper: #d9c9a6;
@@ -118,7 +118,7 @@
       </article>
       <article class="card surface" data-contour="card">
         <h3>The gate</h3>
-        <p>The gate runs 82 checks, first is family-look-pinned</p>
+        <p>The gate runs 83 checks, first is family-look-pinned</p>
       </article>
     </div>
   </section>
@@ -135,11 +135,11 @@
         <tr><td>Profile</td><td>8 cubics</td></tr>
         <tr><td>Surfaces</td><td>4 draw the one corner</td></tr>
         <tr><td>Machine</td><td>Debian 13 CUA v2.7.3</td></tr>
-        <tr><td>Gate checks</td><td>82 named</td></tr>
+        <tr><td>Gate checks</td><td>83 named</td></tr>
         <tr><td>Stars and axes</td><td>6 over 9</td></tr>
         <tr><td>Machine score</td><td>10 in band red</td></tr>
       </table>
-      <p class="caption">The reading is 9948063f04e7 over three routes</p>
+      <p class="caption">The reading is 04a01155ca34 over three routes</p>
     </div>
   </section>
 
@@ -149,6 +149,8 @@
       <pre>PySide6>=6.8
 Pillow>=10
 pywin32>=306
+# UI Automation, so a composer read returns the field's text instead of a picture digest.
+comtypes>=1.4
 # Every signed surface (app packages, the settings document, agent tickets) names its
 # bytes with BLAKE3, so the gate and any checkout that verifies a package need it.
 blake3>=0.4

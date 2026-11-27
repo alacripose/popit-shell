@@ -2151,7 +2151,9 @@ function renderWindows(state) {
       note: deb.detail || "display :0" },
     { source: "windows", name: "Freebuff harness", state: probe.state || "waiting",
       size: probe.width ? `${probe.width}×${probe.height}` : "—", at: probe.at || "",
-      note: harness.code || `textbox ${harness.width || "—"}×${harness.height || "—"}` },
+      note: harness.code || (harness.state === "read"
+        ? `read by ${harness.by || "agent"}`
+        : "no agent read the composer") },
   ];
   const key = rows.map((row) => `${row.name}:${row.state}:${row.size}:${row.at}`).join("|");
   if (list.dataset.key === key) return;
@@ -2184,17 +2186,21 @@ function renderHarness(state) {
   const harness = state.harness || {};
   const node = $("#harness-state");
   if (!node) return;
-  node.dataset.state = harness.state || "waiting";
-  node.textContent = harness.state === "live"
-    ? (harness.changed ? "new input" : "textbox probed")
-    : (harness.code || "unprobed");
+  node.dataset.state = harness.state || "unread";
+  // The status is evidence of an agent's read through `freebuff.composer.read`, not of a
+  // timer's screenshot: the desk never reports a read nobody asked for.
+  node.textContent = harness.state === "read"
+    ? `read by ${harness.by || "agent"}`
+    : harness.state === "captured" ? "captured, not read" : (harness.code || "unread");
   const regions = harness.regions || {};
   const boxes = Object.entries(regions).map(([name, value]) => `${name} ${value.width}×${value.height}`).join(" · ");
   node.title = [harness.detail, boxes, harness.digest].filter(Boolean).join(" · ");
-  setText("#harness-regions", "regions " + (boxes || "—"));
+  setText("#harness-regions", harness.state === "read"
+    ? `${harness.chars || 0} chars · ${harness.source || "read"}`
+    : "regions " + (boxes || "—"));
   setText("#harness-age", harness.age == null ? "" : `${harness.age}s`);
   if (harness.state === "refused" && !busy) {
-    setText("#refusal", `${harness.code || "harness-unprobed"} · ${harness.detail || ""}`.slice(0, 86));
+    setText("#refusal", `${harness.code || "composer-unread"} · ${harness.detail || ""}`.slice(0, 86));
   }
 }
 
