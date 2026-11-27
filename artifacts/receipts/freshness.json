@@ -1,6 +1,6 @@
 {
   "schema": "popit.freshness/1",
-  "generated_at": "2026-11-25T21:39:19Z",
+  "generated_at": "2026-11-27T18:14:32Z",
   "shell": "http://127.0.0.1:5207",
   "families": [
     "landing",
@@ -40,11 +40,27 @@
     },
     {
       "family": "audits",
+      "code": "audit-archive",
+      "state": "fresh",
+      "subject": "app-archive",
+      "detail": "ui_audit passed",
+      "act": "cua driver: audit archive (?uiaudit=1&app=archive) and republish"
+    },
+    {
+      "family": "audits",
       "code": "audit-dialin",
       "state": "fresh",
       "subject": "app-dialin",
       "detail": "ui_audit passed",
       "act": "cua driver: audit dialin (?uiaudit=1&app=dialin) and republish"
+    },
+    {
+      "family": "audits",
+      "code": "audit-evidence",
+      "state": "fresh",
+      "subject": "app-evidence",
+      "detail": "ui_audit passed",
+      "act": "cua driver: audit evidence (?uiaudit=1&app=evidence) and republish"
     },
     {
       "family": "audits",
@@ -74,16 +90,16 @@
       "family": "failures",
       "code": "probe-receipt-newer",
       "state": "fresh",
-      "subject": "runlogs\\toast\\envelope-trust.json",
-      "detail": "newest receipt envelope-trust.json is newer than the surfaces",
+      "subject": "runlogs\\toast\\bridge-target.json",
+      "detail": "newest receipt bridge-target.json is newer than the surfaces",
       "act": "python tools/app_package_probe.py && python tools/toast_probe.py"
     },
     {
       "family": "ledgers",
       "code": "ledger-newest-row",
       "state": "fresh",
-      "subject": "logs\\authority\\2026-11-26-service-worker-never-serves-pages-as-scripts.jsonl",
-      "detail": "newest authority row is -1 day(s) old",
+      "subject": "logs\\authority\\2026-11-26-control-baseline.jsonl",
+      "detail": "newest authority row is 1 day(s) old",
       "act": "append the next unit's authority row under logs/authority/"
     },
     {
@@ -115,7 +131,7 @@
       "code": "dialin-rebuild",
       "state": "fresh",
       "subject": "ui/toast.html",
-      "detail": "desk app-dialin@108+blake3:41e27959d75ce7542a46f72d73f0d07c4619527189cd1be0ffea764cbec18a1a on entry toast.html (settings app-settings@99+blake3:a1a51a78e5d884cf9091e3411ce3aa8511f039923e8295b1039d374fd5bdd8c5); served page 18115B panel=True contour=True window=True",
+      "detail": "desk app-dialin@173+blake3:f56ec30af2a91304e2be3c65ee0fe49406d61a9cf38a5398a977394ab693c3cd on entry toast.html (settings app-settings@161+blake3:694921b330f439b34f7556cad3d80fb94cc49672c8a98309db681d0a5cef2a9f); served page 22186B panel=True contour=True window=True",
       "act": "re-sign the desk from the settings package and serve the window page"
     },
     {

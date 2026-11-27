@@ -57,6 +57,7 @@ LEDGER_GLOBS = (
     "logs/records/*.jsonl",
     "runlogs/*.jsonl",
     "runlogs/toast/*.jsonl",
+    "runlogs/session-archive/*.jsonl",
     "runlogs/civilian-audit/*.jsonl",
     "data/*.jsonl",
 )

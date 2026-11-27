@@ -1079,17 +1079,25 @@ def main(argv: list[str]) -> int:
         "ui/toast.html",
         f"missing regions in {', '.join(thin) or 'none'}",
     )
+    # The reference forms are read from the registry itself, not from a count typed here: a
+    # window is a window (dialin, settings, prose, archive, evidence) and the home is the
+    # phone, so a new app joins the family by name instead of by editing a number.
+    windows_named = [name for name, spec in app_package.APPS.items()
+                     if spec.get("kind") == "window"]
+    phones_named = [name for name, spec in app_package.APPS.items()
+                    if spec.get("kind") == "phone"]
     check(
         "mutable-package-kinds-are-the-reference-forms",
-        "a mutable package is a window (dialin, settings, prose) or the phone home, never a surface",
+        "a mutable package is a window or the phone home; the archive apps are windows",
         'KINDS = ("window", "phone")' in app_src
         and 'FOREIGN: dict[str, str] = {"bridge": "window page"}' in app_src
         and '"kind": "surface"' not in app_src
         and "app-kind-foreign" in app_src
-        and app_src.count("\"kind\": \"window\"") == 3
-        and app_src.count("\"kind\": \"phone\"") == 1,
+        and all(spec.get("kind") in app_package.KINDS for spec in app_package.APPS.values())
+        and set(windows_named) == {"dialin", "settings", "prose", "archive", "evidence"}
+        and phones_named == ["springboard"],
         "app_package.py",
-        "a hosted surface was being signed as a package kind of its own",
+        f"windows {windows_named}, phone {phones_named}",
     )
     # The desk is the settings window's own page: its palette and motion ARE the baseline's,
     # and no other window may copy them.
@@ -1116,7 +1124,8 @@ def main(argv: list[str]) -> int:
     subscribed = all(
         f'attach("{name}"' in (UI / script).read_text(encoding="utf-8")
         for name, script in (("dialin", "toast.js"), ("settings", "settings.js"),
-                             ("springboard", "phone.js")))
+                             ("springboard", "phone.js"), ("archive", "toast.js"),
+                             ("evidence", "toast.js")))
     bridged = ("app_package.FOREIGN" in app_src or 'FOREIGN: dict[str, str] = {"bridge": "window page"}' in app_src)
     check(
         "packages-subscribe-the-settings-app",
@@ -1232,7 +1241,7 @@ def main(argv: list[str]) -> int:
         "the landing-page store carries signed window and phone packages only",
         store.get("schema") == "popit.app-store/1"
         and store.get("kinds") == ["window", "phone"]
-        and listed == {"dialin", "settings", "springboard"}
+        and listed == set(app_package.APPS)
         and "ide" not in listed
         # A window page is rejected from the store by name, the same rejection the IDE got.
         and {str(row.get("name")) for row in store.get("refused") or []
@@ -1445,6 +1454,99 @@ def main(argv: list[str]) -> int:
             ("ui/toast.css", "ui/phone.css", "ui/contour-theme.css")),
         "ui/settings.css",
         "a hard-coded frame does not derive from settings",
+    )
+
+    # The session archive and the evidence backup are the two legacy apps rebuilt as desk
+    # windows. Every check below reads the signed spec, the app's own page and script, the
+    # SpringBoard tile and the project block the payload carries.
+    desk_apps = ("archive", "evidence")
+    session_src = (ROOT / "session_archive.py").read_text(encoding="utf-8") \
+        if (ROOT / "session_archive.py").is_file() else ""
+    server_src = (ROOT / "server.py").read_text(encoding="utf-8", errors="replace")
+    archive_windows = all(
+        app_package.APPS[name]["kind"] == "window"
+        and app_package.APPS[name]["entry"] == "toast.html"
+        and app_package.APPS[name]["window"] == "popit-settings-package"
+        and f'id="{name}-panel"' in toast_html
+        and f'get("window") === "{name}"' in toast_js
+        and f'body[data-window-mode="{name}"]' in css_now
+        and f'{name}: {{ label:' in phone_js_now
+        and f'{name}: "/toast.html?window={name}"' in phone_js_now
+        and f'"{name}": "/toast.html?window={name}&uiaudit=1&app={name}"' in toast_src_now
+        for name in desk_apps)
+    check(
+        "session-archive-apps-are-desk-windows",
+        "the archive and the evidence backup are settings-window modes with their own tile and audit",
+        archive_windows,
+        "app_package.py",
+        "an archive app is not the settings window with its panel as the body",
+    )
+    try:
+        launches = {name: app_package._spec(name)["launch"] for name in desk_apps}
+        launch_form = True
+    except app_package.Refused as error:  # a tile without a launch gets no signature
+        launches, launch_form = {}, False
+        refuse("app-tile-without-launch", "app_package.py", error.detail)
+    check(
+        "archive-apps-sign-their-icon-frame",
+        "an icon frame signs only the launch that opens the window it mutates",
+        launch_form
+        and all(launch.endswith(f"window={name}") for name, launch in launches.items())
+        and 'def launch_proof(' in app_src_now
+        and 'app-tile-unproven-launch' in app_src_now
+        and 'row.launch_proof.ok' in phone_js_now,
+        "app_package.py",
+        f"launches {launches}",
+    )
+    project_ok = all(
+        spec.get("project", {}).get("ticket")
+        and (ROOT / "tickets" / f"{spec['project']['ticket']}.md").is_file()
+        and str(spec["project"].get("ledger", "")).startswith("runlogs/")
+        and (ROOT / spec["project"]["ci"]).is_file()
+        and (ROOT / spec["project"]["landing"]).is_file()
+        for spec in (app_package.APPS[name] for name in desk_apps))
+    check(
+        "archive-apps-carry-the-project-baseline",
+        "both apps are built from the settings baseline and the pinned project setup",
+        project_ok
+        and 'PROJECT_SETUP = {' in app_base_src
+        and '"PROJECT_SETUP_DIGEST"' not in app_base_src
+        and '"project_digest": project_digest()' in app_base_src
+        and 'app-project-baseline-stale' in app_base_src
+        and '"project": "popit.project-setup/1"' in app_src_now
+        and 'authored["project"]' in app_src_now
+        and (ROOT / "logs" / "authority" / "2026-11-26-session-archive-apps.jsonl").is_file(),
+        "app_base.py",
+        "an archive app carries no ticket, ledger, CI, landing page or project pin",
+    )
+    codes = ("archive-unknown-project", "archive-root-unreadable", "archive-root-absent",
+             "archive-backup-none", "archive-backup-mode", "archive-path-outside",
+             "archive-path-absent", "archive-evidence-absent", "archive-show-loopback",
+             "archive-clean-confirm", "archive-legacy-retired", "archive-evidence-unreadable")
+    check(
+        "session-archive-refusals-are-named",
+        "an act that cannot be shown is refused by name on both origins",
+        "class Refused" in session_src
+        and all(code in session_src + toast_src_now + server_src for code in codes)
+        and 'with LEDGER.open("a", encoding="utf-8")' in session_src
+        and 'secure-origin-required' in toast_src_now
+        and 'CACHE_DIRS = ("__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache")'
+        in session_src,
+        "session_archive.py",
+        "the apps act without a named refusal or outside the family cache rule",
+    )
+    check(
+        "legacy-archive-page-is-retired",
+        "the loopback archive page is gone; the desk app is the only archive",
+        not (UI / "archive.html").exists() and not (UI / "archive.js").exists()
+        and not (UI / "archive.css").exists()
+        and 'archive.html' not in toast_src_now
+        and 'archive-legacy-retired' in server_src
+        and 'archive.html' not in sources.get("ui/toast.js", "")
+        and 'desk_window = "https://127.0.0.1:5211/toast.html?window=archive"'
+        in (ROOT / "shell.py").read_text(encoding="utf-8"),
+        "ui/archive.html",
+        "a legacy archive page or a bare-http window is still served",
     )
 
     for line in CHECKS:

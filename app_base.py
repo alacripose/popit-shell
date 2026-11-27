@@ -37,6 +37,23 @@ BASE_PACKAGE = "popit-settings"
 # The settings slots an app receives through the subscription and does not re-author.
 FIELDS = ("theme", "frame", "material", "motion", "motionPreference", "dpi", "colors",
           "layout", "device")
+# The second baseline every app is built from: the family's project setup. The settings
+# window gives the app its look; this record gives its project the acts a family project
+# owes — a ticket before the change, a named refusal, its own failure row, an authority
+# ledger row, a CI job and a landing page rendered from its pins, a live driver on every
+# republish and copy read by the family prose checker. It is pinned here and carried in
+# the signed base, so a package built against an older project setup is refused.
+PROJECT_SETUP = {
+    "schema": "popit.project-setup/1",
+    "ticket": "a ticket states the requirement before the change (tickets/TICKET-NNNN-*.md)",
+    "refusal": "a refusal is named by code; an empty field is not a refusal",
+    "failure": "the program writes its own failure row; a printed pass is not a row",
+    "ledger": "runlogs/<unit>/ledger.jsonl beside logs/authority/<date>-<unit>.jsonl",
+    "ci": ".github/workflows/ci.yml runs the secrets gate, the landing page, the gate and the app probes",
+    "landing": "tools/landing.py renders docs/index.html from its pins",
+    "driver": "a republish names the live CUA driver that carried it",
+    "prose": "drawn copy is read by the family checker, imported never copied",
+}
 # The app's own slots. Each one is a mutation against the settings window's value.
 SLOTS = ("kind", "entry", "title", "summary", "pages", "adds", "hosts", "regions",
          "files", "script", "links", "body")
@@ -122,6 +139,11 @@ def controls_digest() -> str:
     return "blake3:" + blake3(dialin.canonical_json(CONTROLS)).hexdigest()
 
 
+def project_digest() -> str:
+    """The project setup pin: an app built against another setup is refused."""
+    return "blake3:" + blake3(dialin.canonical_json(PROJECT_SETUP)).hexdigest()
+
+
 def controls_css() -> str:
     """The baseline as the stylesheet apps link, generated from the pinned record."""
     hover, pressed, focus = CONTROLS["hover"], CONTROLS["pressed"], CONTROLS["focus"]
@@ -202,6 +224,10 @@ def subscription(settings, name: str, spec: dict, baseline: dict) -> dict:
         # rather than allowed to keep a button of its own.
         "controls": CONTROLS,
         "controls_digest": controls_digest(),
+        # The app's project is a family project: the setup it owes travels with the base,
+        # so the signature covers the ticket, ledger, CI, landing and prose duties too.
+        "project": PROJECT_SETUP,
+        "project_digest": project_digest(),
     }
     mutations = []
     for slot in SLOTS:
@@ -283,6 +309,9 @@ def check(document: object, name: str, settings) -> dict:
     if base.get("controls_digest") != controls_digest():
         raise Refused("app-controls-stale",
                       f"{name}: the package's control baseline is not the published one")
+    if base.get("project_digest") != project_digest():
+        raise Refused("app-project-baseline-stale",
+                      f"{name}: the package's project setup is not the published one")
     body = {key: value for key, value in document.items() if key != "digest"}
     if document.get("digest") != "blake3:" + blake3(dialin.canonical_json(body)).hexdigest():
         raise Refused("app-base-digest", f"{name}: the mutation record does not recompute")

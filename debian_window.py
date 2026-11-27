@@ -158,6 +158,13 @@ class DebianWindow:
                 process.wait(timeout=3)
             except subprocess.TimeoutExpired:
                 process.kill()
+        # Same leak as the bridge: the ssh client lives inside WSL, and terminating the
+        # Windows `wsl.exe` leaves it holding a forward. Stop this window's own forward.
+        try:
+            _wsl(f"/usr/bin/pkill -f 'ssh -N .*-R 0:{self.target_host}:{self.target_port}'",
+                 timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            pass
 
     def state_dict(self) -> dict:
         return {

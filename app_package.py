@@ -38,7 +38,8 @@ PUBLISHER = "popit-publisher"
 # surface it is, which page it enters by, what it adds to the shell and what it derives
 # from the settings package. A payload that only lists files is a legacy package and is
 # refused by name, because nothing in it says how the app joins the family.
-DERIVES = {"package": "popit-settings", "fields": ["theme", "layout", "motion", "dpi"]}
+DERIVES = {"package": "popit-settings", "fields": ["theme", "layout", "motion", "dpi"],
+           "project": "popit.project-setup/1"}
 
 # A window package is furniture, not a page: dialin has a bar, a status strip, a body and a
 # foot. An app that declares fewer regions, or whose entry page does not carry them, is
@@ -116,6 +117,50 @@ APPS = {
         "pages": ["family"],
         "adds": ["prose inventory", "per-project progress", "external document links"],
         "regions": REGIONS,
+        "files": ("toast.html", "toast.js", "toast.css", "settings.css", "package.js",
+                  "contour-theme.css", "controls.css", "contour.js", "popit-sw.js",
+                  "ui-audit.js", "chrome.js"),
+    },
+    # The session archive and the evidence backup are the two legacy apps rebuilt as desk
+    # windows. They are the settings window's own page with their body mutated, they hold the
+    # four regions, and their project block names the ticket, ledger, CI and landing page a
+    # family project owes before either may be signed.
+    "archive": {
+        "kind": "window",
+        "entry": "toast.html",
+        "window": "popit-settings-package",
+        "launch": "/toast.html?window=archive",
+        "title": "Session archive",
+        "summary": "every local drive, its projects, their files and the evidence copy",
+        "pages": ["projects", "files", "evidence"],
+        "adds": ["project index", "per-project files", "evidence state", "cache clean"],
+        "regions": REGIONS,
+        "project": {
+            "ticket": "TICKET-0008-session-archive-and-evidence-are-desk-apps",
+            "ledger": "runlogs/session-archive/ledger.jsonl",
+            "ci": ".github/workflows/ci.yml",
+            "landing": "docs/index.html",
+        },
+        "files": ("toast.html", "toast.js", "toast.css", "settings.css", "package.js",
+                  "contour-theme.css", "controls.css", "contour.js", "popit-sw.js",
+                  "ui-audit.js", "chrome.js"),
+    },
+    "evidence": {
+        "kind": "window",
+        "entry": "toast.html",
+        "window": "popit-settings-package",
+        "launch": "/toast.html?window=evidence",
+        "title": "Evidence backup",
+        "summary": "the evidence root, what each project copied, and what was recorded",
+        "pages": ["evidence", "copies", "receipts"],
+        "adds": ["evidence root state", "copy receipts", "recorded assets", "backup act"],
+        "regions": REGIONS,
+        "project": {
+            "ticket": "TICKET-0008-session-archive-and-evidence-are-desk-apps",
+            "ledger": "runlogs/session-archive/ledger.jsonl",
+            "ci": ".github/workflows/ci.yml",
+            "landing": "docs/index.html",
+        },
         "files": ("toast.html", "toast.js", "toast.css", "settings.css", "package.js",
                   "contour-theme.css", "controls.css", "contour.js", "popit-sw.js",
                   "ui-audit.js", "chrome.js"),
@@ -341,6 +386,10 @@ class AppPackages:
         authored = {key: spec[key] for key in
                     ("kind", "entry", "title", "summary", "pages", "adds", "regions")}
         authored["hosts"] = list(spec.get("hosts") or [])
+        # A family project's duties travel in the signed payload: the ticket that stated the
+        # requirement, its ledger, the CI job and the landing page rendered from its pins.
+        if spec.get("project"):
+            authored["project"] = dict(spec["project"])
         # The base is the settings package's signed delivery plus this app's mutations. A
         # package that cannot name that base is not signed: a simple derivation is what lets
         # a hand-rolled view through, so the mutation record is part of the signed payload.

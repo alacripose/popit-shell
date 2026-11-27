@@ -11,6 +11,7 @@ import datetime
 import json
 import msvcrt
 import pathlib
+import socket
 import subprocess
 import sys
 import time
@@ -22,7 +23,15 @@ LOG = ROOT / "runlogs" / "toast" / "watchdog.log"
 LOCK = ROOT / "runlogs" / "toast" / "watchdog.lock"
 API = "http://127.0.0.1:5207/api/toast"
 TOAST = ROOT / "toast.py"
-INTERVAL = 15.0
+PORT = 5207
+INTERVAL = 20.0
+# A slow answer is not a dead desk. This probe used to wait 2.5 seconds; while a call, a
+# capture or the microphone holds the desk, its status route takes three to five seconds, so
+# the watchdog called a healthy window absent, killed it and started another every forty
+# seconds. Launches belong to `tools/desk_launcher.py` now. This file replaces a desk only
+# when its port refuses connections three times in a row, never because one answer was slow.
+PROBE_TIMEOUT = 15.0
+PATIENCE = 3
 
 
 def iso() -> str:
@@ -37,11 +46,18 @@ def log(line: str) -> None:
 
 def state() -> dict | None:
     try:
-        with urllib.request.urlopen(API, timeout=2.5) as reply:
+        with urllib.request.urlopen(API, timeout=PROBE_TIMEOUT) as reply:
             value = json.loads(reply.read().decode("utf-8"))
         return value if isinstance(value, dict) else None
     except (OSError, ValueError, urllib.error.URLError):
         return None
+
+
+def port_refuses() -> bool:
+    """True only when nothing listens on the desk's port: a slow desk still owns it."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(3.0)
+        return probe.connect_ex(("127.0.0.1", PORT)) != 0
 
 
 def post(path: str, body: dict) -> dict | None:
@@ -101,6 +117,14 @@ def main() -> int:
         else:
             misses += 1
             log(f"toast API absent ({misses})")
+            if misses < PATIENCE:
+                time.sleep(5)
+                continue
+            if not port_refuses():
+                log("toast port still answers; leaving the slow desk alone")
+                misses = 0
+                time.sleep(INTERVAL)
+                continue
             if child and child.poll() is None:
                 child.terminate()
                 try:

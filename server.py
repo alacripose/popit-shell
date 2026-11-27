@@ -18,7 +18,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-import archive
 import desktop
 
 ROOT = Path(__file__).resolve().parent
@@ -79,7 +78,7 @@ def tools() -> list[dict]:
             "target": r"F:\Documents\popit-shell\toast.cmd",
             "kind": "Portal tool",
         },
-        {"label": "Session archive", "detail": "Files, evidence and cleanup across every project", "target": "archive", "kind": "Portal tool"},
+        {"label": "Session archive", "detail": "The desk app: every drive, its projects and the evidence copy", "target": "archive", "kind": "Portal tool"},
         {"label": "Reload applications", "detail": "Reads the Start Menu again", "target": "reload", "kind": "Portal tool"},
         {"label": "Close the shell", "detail": "Ends this process", "target": "quit", "kind": "Portal tool"},
     ]
@@ -222,17 +221,14 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/shell":
             self.send_body(json.dumps(shell_state()).encode("utf-8"), TYPES[".json"])
             return
-        if path == "/api/archive":
-            self.send_body(json.dumps(archive.state()).encode("utf-8"), TYPES[".json"])
-            return
-        if path == "/api/archive/files":
-            query = parse_qs(urlparse(self.path).query)
-            try:
-                body = archive.files(query.get("slug", [""])[0])
-            except (OSError, ValueError, archive.Refused) as error:
-                self.send_body(json.dumps({"ok": False, "refused": str(error)}).encode("utf-8"), TYPES[".json"], 409)
-                return
-            self.send_body(json.dumps(body).encode("utf-8"), TYPES[".json"])
+        if path.startswith("/api/archive"):
+            # The session archive and the evidence backup are desk app windows now. This server
+            # answers their old routes with the retirement, so no second control path survives
+            # beside the app the driver signs and measures.
+            self.send_body(json.dumps({"ok": False, "refused": {
+                "code": "archive-legacy-retired",
+                "detail": "the apps are /toast.html?window=archive and ?window=evidence"}}
+            ).encode("utf-8"), TYPES[".json"], 410)
             return
         if path == "/api/icon":
             query = parse_qs(urlparse(self.path).query)
@@ -313,28 +309,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/taskview":
             self.action(lambda request: desktop.task_view())
             return
-        if path == "/api/archive/backup":
-            self.action(lambda request: archive.start_backup(
-                [str(item) for item in (request.get("slugs") or ([request.get("slug")] if request.get("slug") else []))],
-                all_projects=bool(request.get("all")),
-                mode=str(request.get("mode") or "evidence"),
-            ))
-            return
-        if path == "/api/archive/clean":
-            self.action(lambda request: archive.clean(
-                str(request.get("slug", "")), bool(request.get("apply"))
-            ))
-            return
-        if path == "/api/archive/show":
-            self.action(lambda request: archive.show(
-                str(request.get("slug", "")),
-                str(request.get("which") or "project"),
-                str(request.get("path") or ""),
-            ))
-            return
-        if path == "/api/archive/rescan":
-            archive.ensure_index(force=True)
-            self.send_body(json.dumps({"ok": True, "result": "indexing"}).encode("utf-8"), TYPES[".json"])
+        if path.startswith("/api/archive/") and path != "/api/archive/toggle":
+            self.send_body(json.dumps({"ok": False, "refused": {
+                "code": "archive-legacy-retired",
+                "detail": "the apps are /toast.html?window=archive and ?window=evidence"}}
+            ).encode("utf-8"), TYPES[".json"], 410)
             return
         if path == "/api/archive/toggle":
             request_archive()
@@ -377,7 +356,7 @@ class Handler(BaseHTTPRequestHandler):
     def action(self, run) -> None:
         try:
             result = run(self.read_json())
-        except (FileNotFoundError, OSError, ValueError, archive.Refused) as error:
+        except (FileNotFoundError, OSError, ValueError) as error:
             message = json.dumps({"ok": False, "refused": str(error)}).encode("utf-8")
             self.send_body(message, TYPES[".json"], 409)
             return

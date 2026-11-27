@@ -43,19 +43,17 @@ Starting `shell.py` hides Explorer's own bar, reserves the bottom 48 px as an Ap
 keeps both true while it runs. `Start`, then `Close the shell`, releases the strip and
 shows Explorer's bar again. Drag the launcher by its header to move it.
 
-`Session archive` opens its own contoured window from the launcher's tool rows or a right
-click on the strip. It scans every local fixed or removable drive, not a hand-picked list
-of roots: projects are found at any depth by their markers, every non-project top-level
-folder and user-profile folder gets a row, and direct files at each drive or profile root
-get a loose-files row. The rows exclude one another, so the index covers every file
-outside the named OS, package, build, VCS and cache directories without counting a
-project twice. It compares those files with the evidence copy under
-`F:\Documents\_evidence-archive`. Source and record files are copied; a large asset is
-recorded by size and time when the evidence drive cannot take a full copy. The window
-names the family cache rule and removes only `__pycache__`, `.pytest_cache`,
-`.mypy_cache` and `.ruff_cache`, after a second confirmation. The index is built in the
-background and cached under `runlogs/` for an hour; `Rescan` forces a fresh walk. The
-footer names the drives that were scanned and how many directories were inspected.
+`Session archive` and `Evidence backup` are desk apps. Each is a signed window built from
+the settings package and the pinned project setup, opened from the SpringBoard or the
+launcher's tool rows. The archive walks every local fixed or removable drive, not a
+hand-picked list of roots: a project is found by its markers, a folder without one gets
+its own row, and the named OS, package, build, VCS and cache trees are excluded. The
+evidence backup compares those rows with the copy under `F:\Documents\_evidence-archive`.
+Source and record files are copied; a large asset is recorded by size and time. A clean
+lists the four family cache trees first, then removes only `__pycache__`,
+`.pytest_cache`, `.mypy_cache` and `.ruff_cache`. The index is built in the background
+and cached under `runlogs/session-archive/` for an hour. The shell's archive window shows
+the app over the desk's secure origin; a desk that is down is a named refusal.
 
 A right click belongs to the cell under it: a running window offers Activate, Minimize and
 Close, a pinned shortcut opens its target or its folder, and the strip itself offers Task
@@ -85,7 +83,7 @@ page holds however many 132 px slots fit the window row at the current width.
 | `window.py` | Frameless Qt host, masked to the contour at its own size |
 | `shell.py` | The process that owns the strip: bar window, launcher window, in-process server |
 | `desktop.py` | The Windows calls: the AppBar reservation, Explorer's bar, the window list and their icons |
-| `archive.py` | The archive window's files: project index, evidence copies, family cache rule |
+| `session_archive.py` | The two archive apps' rows: drive index, evidence copy, family cache rule, refusals |
 | `ui/` | The launcher view: plate, Find row, application column, facts column, brass scrollbars |
 | `ui/bar.*` | The bar: start, find, task view, pinned cells, paged running cells, tray, clock, show desktop |
 | `ui/archive.*` | The session archive: projects, files, evidence state, backup and clean controls |
@@ -153,6 +151,42 @@ While the harness session is attached, the local Buffy lane yields so two minds 
 answer under one name. `call.leave` hands the lane back. The same operations are exposed as
 MCP tools by `/mcp`; `tools/buffy_call_mcp.py` is a stdio proxy for an MCP client, with
 `call.join`, `call.turns`, `call.say` and `call.leave`.
+
+## The desk on the internet
+
+`python toast.py` also opens a separate listener at `https://127.0.0.1:5222/signin.html`
+(`--remote-port`, `--remote-bind`, `--no-remote`). It is not the phone's LAN origin: this is
+the surface a tunnel exposes, so it answers a browser only after sign-in. An unsigned request
+for a page is a redirect to `/signin.html`, and an unsigned request for an API route is
+refused by name (`desk-signin-required`). The loopback desk, the LAN view and the phone's own
+secure origin keep working exactly as before — the desk window never asks for a second login.
+
+Sign-in is the call's own admission, spent once for a browser session:
+
+```
+python tools/desk_signin.py keygen
+python tools/desk_signin.py trust --public runlogs/toast/desk.pem --name "Owner desk"
+python tools/desk_signin.py mint --key runlogs/toast/desk.key --out runlogs/toast/desk-package.json
+```
+
+Paste that package into `/signin.html`. The host checks the Ed25519 signature against
+`runlogs/toast/envelope-trust.json`, requires the capability `desk.access`, spends the
+envelope's single-use nonce, and sets an `HttpOnly`, `Secure`, `SameSite=Strict` session
+cookie. Sessions are stored hashed in `runlogs/toast/desk-sessions.json` and revoked with
+`python tools/desk_signin.py sessions` or `python tools/desk_signin.py revoke --all`. A browser
+that cannot hold a private key enrols once with `python tools/desk_signin.py code` — a
+single-use code good for ten minutes.
+
+Carrying that listener out:
+
+```
+python tools/desk_tunnel.py            # Cloudflare quick tunnel to https://127.0.0.1:5222
+```
+
+It prints the public `https://<name>.trycloudflare.com` origin and writes
+`runlogs/toast/desk-tunnel.json`. The public leg is Cloudflare's own certificate; the leg to
+this machine is the desk's TLS listener. A quick tunnel's name changes on every run, and the
+tunnel points at the sign-in gate, never at 5211.
 
 ## The Windows bridge
 

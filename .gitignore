@@ -17,3 +17,9 @@ docs/prose/*/inventory.json
 # The family ratchet receipt is the same kind of dump at family scale: every project's strings,
 # home paths and LAN addresses. The gate reads it from the machine that ran the pass.
 artifacts/receipts/prose-ratchet.json
+
+# The tunnel helper downloads its own binary onto this machine; it is not vendored.
+tools/bin/
+
+# The desk's live reading: window handles, titles and revisions of this machine's desk.
+state.json

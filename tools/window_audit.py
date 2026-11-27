@@ -33,7 +33,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 SHELL = "http://127.0.0.1:5207"
 # Every mutable app, audited in its own window: the prose app included, since a window signed
 # without a measured surface is a claim rather than a delivery.
-APPS = ("dialin", "settings", "springboard", "prose")
+APPS = ("dialin", "settings", "springboard", "prose", "archive", "evidence")
 # A window page is hosted by the shell, never signed as a package: the store lists it refused,
 # the same rejection the retired IDE app got.
 FOREIGN = {"bridge": "app-kind-foreign"}

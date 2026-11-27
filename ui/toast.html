@@ -33,7 +33,7 @@ window.addEventListener("error", (event) => {
     <span class="mark" aria-hidden="true">◆</span>
     <h1 id="window-name"></h1>
     <span id="status" class="status" data-contour="card" data-state="waiting">waiting</span>
-    <button id="home" class="icon" type="button" data-contour="card" data-control-size="tight" title="Springboard" aria-label="Springboard">Home</button>
+    <button id="home" class="icon home-key" type="button" data-contour="card" data-control-size="tight" title="Springboard" aria-label="Springboard"><span class="diamond" aria-hidden="true"></span></button>
     <button id="settings" class="icon" type="button" data-contour="card" data-control-size="tight" title="Popit settings · family theme, motion and size" aria-label="Settings">Settings</button>
     <button id="pin" class="icon" type="button" data-contour="card" data-control-size="tight" title="Pin above other windows" aria-label="Pin">Pin</button>
     <button id="close" class="icon" type="button" data-contour="card" data-control-size="tight" title="Close" aria-label="Close">Close</button>
@@ -160,6 +160,55 @@ window.addEventListener("error", (event) => {
         <span>reading the family…</span></div>
     </div>
     <p class="settings-note" id="prose-driver">driver —</p>
+  </section>
+
+  <!-- The session archive and the evidence backup are desk windows built from this page: the
+       settings window's bar, frame and motion, and one panel as the app's body. Their rows come
+       from the shell's own reading; the page holds no walk of its own. -->
+  <section id="archive-panel" class="session" data-contour="card" role="region"
+           aria-label="Session archive" hidden>
+    <div class="settings-head">
+      <span>Session archive</span>
+      <span id="archive-state" class="settings-register">reading</span>
+      <button id="archive-rescan" type="button" data-contour="card"
+              title="Walk every local drive again">Rescan</button>
+      <button id="archive-backup" type="button" data-contour="card"
+              title="Copy source and record files of every project">Back up all</button>
+      <button id="archive-clean" type="button" data-contour="card"
+              title="Remove the four cache trees of the selected project">Clean</button>
+      <button id="archive-close" type="button" data-contour="card" aria-label="Close the archive">×</button>
+    </div>
+    <p class="settings-note">Every local drive, the projects on it, and the evidence copy beside them.</p>
+    <div class="session-head" aria-hidden="true">
+      <span>project</span><span>files</span><span>size</span><span>cache</span>
+      <span>evidence</span><span>root</span>
+    </div>
+    <div id="session-table" class="session-table" role="table" aria-label="Projects on this machine">
+      <div class="session-row" id="session-reading"><span>reading the drives…</span></div>
+    </div>
+    <p class="settings-note" id="session-note">index —</p>
+  </section>
+
+  <section id="evidence-panel" class="session" data-contour="card" role="region"
+           aria-label="Evidence backup" hidden>
+    <div class="settings-head">
+      <span>Evidence backup</span>
+      <span id="evidence-state" class="settings-register">reading</span>
+      <button id="evidence-run" type="button" data-contour="card"
+              title="Copy every project into the evidence root">Back up all</button>
+      <button id="evidence-open" type="button" data-contour="card"
+              title="Open the evidence root">Open root</button>
+      <button id="evidence-close" type="button" data-contour="card" aria-label="Close the backup">×</button>
+    </div>
+    <p class="settings-note">Source and record files are copied; a large asset is recorded by size and time.</p>
+    <div class="session-head" aria-hidden="true">
+      <span>project</span><span>copied</span><span>recorded</span><span>size</span>
+      <span>at</span><span>state</span>
+    </div>
+    <div id="evidence-table" class="session-table" role="table" aria-label="Evidence copies">
+      <div class="session-row" id="evidence-reading"><span>reading the evidence root…</span></div>
+    </div>
+    <p class="settings-note" id="evidence-note">root —</p>
   </section>
 
   <nav class="tabs" data-contour data-region="status" aria-label="Toast surfaces">

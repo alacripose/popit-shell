@@ -26,7 +26,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import urllib.request
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 
 ROOT = pathlib.Path(__file__).resolve().parent
 UI = ROOT / "ui"
@@ -46,6 +46,15 @@ PHANTOM_HEARD = {
 WORK_ASK = re.compile(
     r"\b(work|job|task|build|fix|implement|handle|deliver|deploy)\b"
     r"|\bplease\s+(?:do|run|make|take)\b", re.I,
+)
+# An act the owner asks of the machine, not a topic to answer with words. A lane used to
+# reply "I would click it" and leave the machine nothing to process; the request is placed on
+# the machine's wish queue before the model composes anything.
+ACT_ASK = re.compile(
+    r"\b(?:click|double-click|right-click|press|tap|drag|type|scroll|hover)\b"
+    r"|\b(?:open|close|launch|focus|minimi[sz]e|maximi[sz]e)\s+"
+    r"(?:the\s+)?(?:window|app|application|installer|dialog|menu|button|tab)\b",
+    re.I,
 )
 # Lane packages, by name. Buffy is not one of them: that is the Freebuff harness's own
 # nickname for the agent on this machine, so a prompt that says "You are Buffy" makes a local
@@ -146,6 +155,7 @@ import calls as calls_mod  # noqa: E402
 import civilian_features  # noqa: E402
 import civilian_scope  # noqa: E402
 import cua  # noqa: E402
+import desk_auth  # noqa: E402
 import debian_view  # noqa: E402
 import debian_window  # noqa: E402
 import dialin  # noqa: E402
@@ -153,10 +163,15 @@ import envelope  # noqa: E402
 import external_agents  # noqa: E402
 import hosts  # noqa: E402
 import mind_bridge  # noqa: E402
+import session_archive  # noqa: E402
 import settings_package  # noqa: E402
 import app_base  # noqa: E402
 import app_package  # noqa: E402
 import voice  # noqa: E402
+
+# The remote listener's sign-in ledger: draft sessions and one-time desk codes, in the same
+# runlogs tree the phone certificate already lives in.
+DESK_STORE = desk_auth.Store(ROOT / "runlogs" / "toast")
 
 
 def iso() -> str:
@@ -215,7 +230,10 @@ class Toast:
         self.axis = axis_bridge.AxisBridge()
         self.debian = debian_view.DebianView()
         self.archive = archive_mod.Archive(ROOT / "runlogs" / "toast" / "archive.jsonl")
-        self.mind = mind_bridge.DebianMind(self.debian, archive=self.archive, cua=self.delegate)
+        # The Debian mind acts on the Debian box through that box's own CUA driver. It never
+        # receives the Windows fleet: a model on Debian must not click the owner's desktop.
+        self.mind = mind_bridge.DebianMind(self.debian, archive=self.archive,
+                                           cua=self.delegate_debian)
         self.window_token = secrets.token_urlsafe(18)
         self.window = debian_window.DebianWindow(
             target_host=hosts.lan_host(), target_port=5208, token=self.window_token,
@@ -641,6 +659,82 @@ class Toast:
         with self.lock:
             self.working = max(0, self.working - 1)
 
+    def delegate_debian(self, payload: dict) -> dict:
+        """One small act for the Debian box's own body, in the acts that box exposes.
+
+        The loop on Debian executes with the host's `xdotool` and reads the world back. Its
+        exposed acts are pointer *move* and screen capture; it has no click act. A click is
+        refused by name here, because the alternatives are a simulated click (a lie) or the
+        Windows fleet (the wrong machine).
+        """
+        actions = payload.get("actions") or []
+        action = dict(actions[0]) if actions else {}
+        kind = str(action.get("action") or "").strip().lower()
+        if kind in ("capture", "screen"):
+            row = self.axis.tool("screen.capture", {})
+        elif kind in ("move", "pointer"):
+            row = self.axis.tool("input.pointer", {"x": int(action.get("x") or 0),
+                                                    "y": int(action.get("y") or 0)})
+        elif kind == "click":
+            raise axis_bridge.Refused(
+                "click-act-absent",
+                "the Debian body exposes pointer move, screen capture and typing tasks, but "
+                "no click act; nothing was clicked here or on the owner's Windows machine")
+        elif kind in ("type", "key", "window", "focus", "windows", "list"):
+            raise axis_bridge.Refused(
+                "act-not-exposed", f"{kind} is not an act the Debian loop exposes over "
+                "/v1/tools/call; it runs windows and typed text through its own task steps")
+        else:
+            raise axis_bridge.Refused(
+                "task-tool-unknown", f"{kind or 'no action'} is not a Debian driver action")
+        return {"id": f"debian-{row['at']}", "status": "done" if row["ok"] else "refused",
+                "tool": row["tool"], "result": row["result"], "at": row["at"]}
+
+    def place_wish(self, text: str, *, intent: str = "act", agent: str = "",
+                   call: str = "", extra: dict | None = None) -> dict:
+        """Put the owner's request on the machine before any lane answers it.
+
+        The spoken answer stays the lane's; this is the request the machine can process. A
+        refusal is recorded by name, never swallowed into an answer that sounds like work.
+        """
+        payload = dict(extra or {})
+        if agent:
+            payload["lane"] = agent
+        if call:
+            payload["call"] = call
+        try:
+            row = self.axis.wish(intent, text, payload)
+        except axis_bridge.Refused as error:
+            self._line(f"wish refused · {error.code}", "refused")
+            self.archive.add("wish", f"refused · {error.code} · {error.detail}", role="wish",
+                             question=text, agent=agent, call=call, intent=intent,
+                             refused=error.as_dict())
+            return {"ok": False, "refused": error.as_dict()}
+        answer = row.get("answer") or {}
+        wish_id = ""
+        if isinstance(answer, dict):
+            wish_id = str(answer.get("task_id") or answer.get("id") or answer.get("wish")
+                          or answer.get("task") or "")
+        status = str((answer or {}).get("status") or "").lower()
+        if status not in ("accepted", "ok", "deferred"):
+            # A queue that answered "declined" did not take the request. Saying so by name is
+            # the difference between a refusal and a wish that only looks placed.
+            code = str((answer or {}).get("code") or "wish-declined")
+            detail = str((answer or {}).get("detail") or status or "no status")
+            self._line(f"wish refused · {code}", "refused")
+            self.archive.add("wish", f"refused · {code} · {detail}", role="wish",
+                             question=text, agent=agent, call=call, intent=intent,
+                             refused={"code": code, "detail": detail})
+            return {"ok": False, "wish": wish_id, "intent": intent, "answer": answer,
+                    "refused": {"code": code, "detail": detail},
+                    "queue": dict(self.axis.wish_health)}
+        label = text if len(text) <= 70 else text[:67] + "..."
+        self._line(f"wish {'· ' + wish_id + ' ' if wish_id else ''}· {label}", "ok")
+        self.archive.add("wish", text, role="wish", question=text, agent=agent, call=call,
+                         intent=intent, wish=wish_id, answer=answer)
+        return {"ok": True, "wish": wish_id, "intent": intent, "answer": answer,
+                "queue": dict(self.axis.wish_health)}
+
     def ask_axis(self, text: str, profile: str = "cua-chat") -> dict:
         row = self.axis.ask(text)
         if row.get("answer"):
@@ -809,6 +903,14 @@ class Toast:
                 return {"answer": "", "bridge": "external",
                         "call": external[0]["id"], "agent": external[0]["agent"]}
             chosen = list(by_name.values()) or [actives[0]]
+        # The machine's queue hears an act request even while the lane composes an answer.
+        # Without this, "click the Steam installer" left a transcript and an empty queue.
+        wish_row = None
+        if ACT_ASK.search(text):
+            lead = chosen[0] if chosen else (actives[0] if actives else {})
+            wish_row = self.place_wish(text, intent="act",
+                                       agent=str(lead.get("agent") or ""),
+                                       call=str(lead.get("id") or ""))
         self.begin_work()
         with self.lock:
             self.responders = [call["agent"] for call in chosen]
@@ -939,6 +1041,9 @@ class Toast:
             with self.lock:
                 self.responders = []
             self.end_work()
+        if wish_row is not None:
+            last = dict(last or {})
+            last["wish"] = wish_row
         return last
 
     def _live_ask(self, text: str, targets: list[str] | None = None,
@@ -1012,11 +1117,20 @@ class Toast:
 
     def _loop(self) -> None:
         while not self._stop.wait(self.probe_seconds):
-            # Repair is also periodic: a quiet stretch can be archived before the
-            # recognizer's final pass is corrected, and the owner should not have to
-            # restart to remove that row.
-            self.archive.repair_hallucinations()
-            self.run_probe()
+            # A periodic failure is a row, never a dead thread: an exception here used to end
+            # the only probe loop, so the harness stayed `waiting` for the whole life of the
+            # desk and every spoken turn was refused `harness-unprobed`.
+            try:
+                # Repair is also periodic: a quiet stretch can be archived before the
+                # recognizer's final pass is corrected, and the owner should not have to
+                # restart to remove that row.
+                self.archive.repair_hallucinations()
+            except Exception as error:
+                self._line(f"archive repair · {str(error)[:120]}", "refused")
+            try:
+                self.run_probe()
+            except Exception as error:
+                self._line(f"chat probe · {str(error)[:120]}", "refused")
 
     def run_probe(self) -> dict:
         try:
@@ -1309,6 +1423,10 @@ WINDOW_AUDIT_ROUTES = {
     # The prose app is the settings window's page in its prose mode, so its audit opens the
     # window the owner opens, not a page beside it.
     "prose": "/toast.html?window=prose&uiaudit=1&app=prose",
+    # The two rebuilt apps are the settings window's page in their own modes, so each audit
+    # opens the window the owner opens.
+    "archive": "/toast.html?window=archive&uiaudit=1&app=archive",
+    "evidence": "/toast.html?window=evidence&uiaudit=1&app=evidence",
     # The SpringBoard is measured as its own signed app, top level in the shell's window: never
     # by reading it through the frame it is delivered in.
     "springboard": "/phone.html?embedded=1&uiaudit=1&app=springboard",
@@ -1330,8 +1448,8 @@ WINDOW_RESULTS: dict = {}
 WINDOW_EVAL_SEQ: list[int] = [0]
 WINDOW_PROBES = ("springboard", "springboardState", "springboardTiles", "goHome",
                  "springboardAudit", "frameIntegrity",
-                 "prose", "home", "openApp", "windowClose", "windowState", "paint",
-                 "fallback", "choose")
+                 "prose", "archive", "evidence", "home", "openApp", "windowClose",
+                 "windowState", "paint", "fallback", "choose")
 
 
 def queue_window(item: tuple) -> bool:
@@ -1396,6 +1514,26 @@ def app_page(name: str, entry: str, apps) -> bytes:
 
 
 class Handler(BaseHTTPRequestHandler):
+    def setup(self) -> None:
+        """Serve TLS per connection, in this worker thread.
+
+        The listener used to be wrapped once, so the handshake ran in the accept loop: a client
+        that refused the certificate (a second renderer, a probe storm) held the loop and the
+        desk's own view could not reach the origin it is delivered from, which is how the desk
+        died. A handshake per worker thread isolates one bad client, and a short socket timeout
+        keeps a silent one from holding a thread forever.
+        """
+        context = getattr(self.server, "ssl_context", None)
+        if context is not None:
+            try:
+                self.request.settimeout(15)
+                self.request = context.wrap_socket(self.request, server_side=True)
+                self.request.settimeout(30)
+            except (ssl.SSLError, OSError) as error:
+                print(f"popit-tls handshake refused · {error.__class__.__name__}", flush=True)
+                raise
+        super().setup()
+
     server_version = "popit-toast/1"
 
     def log_message(self, fmt, *args):  # the toast log is its own file
@@ -1413,6 +1551,8 @@ class Handler(BaseHTTPRequestHandler):
         if getattr(self, "_set_archive_cookie", False):
             self.send_header("Set-Cookie",
                              f"popit_archive={self.server.archive_token}; Path=/; HttpOnly; SameSite=Strict")
+        if getattr(self, "_desk_cookie", None) is not None:
+            self.send_header("Set-Cookie", self._desk_cookie)
         self.end_headers()
         self.wfile.write(body)
 
@@ -1439,11 +1579,48 @@ class Handler(BaseHTTPRequestHandler):
     def json(self, value: object, code: int = 200) -> None:
         self.send_body(json.dumps(value).encode("utf-8"), "application/json", code)
 
+    SIGNIN_PUBLIC = ("/signin.html", "/signin.js", "/signin.css",
+                     "/api/toast/signin", "/api/toast/signout", "/api/toast/signin/state",
+                     "/popit-cert.pem", "/popit-cert.cer",
+                     "/popit-icon.svg", "/popit-icon-512.png")
+
+    def remote_allowed(self, path: str) -> bool:
+        """The remote listener answers a signed-in browser, and nothing else.
+
+        This gate belongs to the surface a tunnel exposes to the internet. The loopback desk
+        and the phone's own LAN origin are unchanged: they are the owner's own network, and
+        the desk window must keep loading without a second login.
+        """
+        if not getattr(self.server, "remote", False):
+            return True
+        if path in self.SIGNIN_PUBLIC:
+            return True
+        session = desk_auth.session_for(DESK_STORE, self.headers.get("Cookie") or "")
+        self.desk_session = session
+        return session is not None
+
+    def remote_refusal(self, path: str) -> None:
+        wants_json = (path.startswith("/api/")
+                      or "application/json" in (self.headers.get("Accept") or "")
+                      or self.headers.get("X-Popit-Desk") == "json")
+        if wants_json:
+            return self.json({"ok": False, "refused": "desk-signin-required",
+                              "detail": "sign in at /signin.html"}, 401)
+        target = self.path if self.path.startswith("/") and not self.path.startswith("//") \
+            else "/toast.html"
+        self.send_response(302)
+        self.send_header("Location", "/signin.html?next=" + quote(target, safe=""))
+        self.send_header("Content-Length", "0")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+
     def do_GET(self):  # noqa: N802
         path = urlsplit(self.path).path
         toast: Toast = self.server.toast
         if not self.archive_allowed(path):
             return self.json({"ok": False, "refused": "archive-token"}, 403)
+        if not self.remote_allowed(path):
+            return self.remote_refusal(path)
         if path.startswith("/api/toast/prose/stage/"):
             # The prose program's staging bundle: the driver pulls a project's prose over the
             # shell's own origin, so the transfer names the shell instead of a second server.
@@ -1475,6 +1652,14 @@ class Handler(BaseHTTPRequestHandler):
                     or not target.is_file():
                 return self.json({"ok": False, "refused": "prose-doc-absent", "detail": project[:60]}, 404)
             return self.send_body(target.read_bytes(), "text/html; charset=utf-8", 200, "index.html")
+        if path == "/api/toast/session":
+            return self.json(session_archive.state())
+        if path == "/api/toast/session/files":
+            query = parse_qs(urlsplit(self.path).query)
+            try:
+                return self.json(session_archive.files((query.get("slug") or [""])[0]))
+            except session_archive.Refused as error:
+                return self.json({"ok": False, "refused": error.as_dict()}, 409)
         if path == "/api/toast/window/report":
             if not WINDOW_REPORT:
                 return self.json({"ok": False, "refused": "window-report-absent"}, 404)
@@ -1491,6 +1676,18 @@ class Handler(BaseHTTPRequestHandler):
             if result.get("state") != "measured":
                 return self.json({"ok": False, "state": result.get("state")}, 202)
             return self.json({"ok": True, "state": "measured", "value": result.get("value")})
+        if path == "/api/toast/signin/state":
+            session = desk_auth.session_for(DESK_STORE, self.headers.get("Cookie") or "")
+            return self.json({"ok": True, "signed_in": bool(session),
+                              "caller": (session or {}).get("caller", ""),
+                              "expires": (session or {}).get("expires", ""),
+                              "remote": bool(getattr(self.server, "remote", False))})
+        if path == "/signin.html":
+            return self.file("signin.html", "text/html; charset=utf-8")
+        if path == "/signin.js":
+            return self.file("signin.js", "text/javascript; charset=utf-8")
+        if path == "/signin.css":
+            return self.file("signin.css", "text/css; charset=utf-8")
         if path == "/":
             # The home is never a page of its own: it is the signed SpringBoard app delivered in
             # the agent window. A bare home is the fake surface, so the bare route is the desk.
@@ -1582,12 +1779,6 @@ class Handler(BaseHTTPRequestHandler):
             return self.file("bridge.html", "text/html; charset=utf-8")
         if path == "/bridge.js":
             return self.file("bridge.js", "text/javascript; charset=utf-8")
-        if path in ("/archive", "/archive.html"):
-            return self.file("archive.html", "text/html; charset=utf-8")
-        if path == "/archive.js":
-            return self.file("archive.js", "text/javascript; charset=utf-8")
-        if path == "/archive.css":
-            return self.file("archive.css", "text/css; charset=utf-8")
         if path == "/contour.js":
             return self.file("contour.js", "text/javascript; charset=utf-8")
         if path == "/package.js":
@@ -1697,6 +1888,40 @@ class Handler(BaseHTTPRequestHandler):
         toast: Toast = self.server.toast
         if not self.archive_allowed(path):
             return self.json({"ok": False, "refused": "archive-token"}, 403)
+        if not self.remote_allowed(path):
+            return self.remote_refusal(path)
+        if path == "/api/toast/signin":
+            # The one route a remote browser reaches without a session: it spends a signed
+            # desk package or a one-time desk code, and answers with the session cookie.
+            body = self.read_json()
+            mode = str(body.get("mode") or "envelope")
+            try:
+                if mode == "code":
+                    token, row, session = desk_auth.admit_code(DESK_STORE,
+                                                               str(body.get("code") or ""))
+                    detail = {"mode": "code", "caller": row.get("caller", "")}
+                else:
+                    token, admission, session = desk_auth.admit_envelope(
+                        DESK_STORE, body.get("envelope"),
+                        trust_path=toast.envelope_trust, nonce_path=toast.envelope_nonces)
+                    detail = {"mode": "envelope", "caller": admission["caller"],
+                              "agent": admission["agent"],
+                              "fingerprint": admission["fingerprint"]}
+            except desk_auth.Refused as error:
+                return self.json({"ok": False, "refused": error.as_dict()}, 403)
+            self._desk_cookie = desk_auth.cookie_for(token)
+            print(f"popit desk sign-in · {detail.get('caller', '')} · {detail['mode']}", flush=True)
+            # The session row is returned without its token hash: a browser gets the cookie,
+            # never the stored form of it.
+            public = {key: value for key, value in session.items() if key != "token"}
+            return self.json({"ok": True, "signed_in": True, "session": public, **detail})
+        if path == "/api/toast/signout":
+            token = desk_auth.token_from(self.headers.get("Cookie") or "")
+            session = DESK_STORE.lookup(token) if token else None
+            removed = DESK_STORE.revoke(session["id"]) if session else 0
+            self._desk_cookie = desk_auth.cookie_clear()
+            print("popit desk sign-out", flush=True)
+            return self.json({"ok": True, "signed_out": True, "revoked": removed})
         if path == "/api/toast/bridge/run":
             try:
                 length = int(self.headers.get("Content-Length") or 0)
@@ -1824,6 +2049,46 @@ class Handler(BaseHTTPRequestHandler):
                 if not getattr(self.server, "tls", False) and not loopback:
                     return self.json({"ok": False, "refused": "secure-origin-required"}, 403)
                 return self.json(toast.apps.document(str(body.get("app") or "")))
+            if path.startswith("/api/toast/session/"):
+                # The two desk apps act through the shell, never through a second server: a
+                # mutation is loopback or TLS, and Explorer only opens from this machine.
+                if not getattr(self.server, "tls", False) and not loopback:
+                    return self.json({"ok": False, "refused": "secure-origin-required"}, 403)
+                try:
+                    if path == "/api/toast/session/backup":
+                        slugs = body.get("slugs")
+                        result = session_archive.start_backup(
+                            [str(item) for item in slugs] if isinstance(slugs, list)
+                            else ([str(body["slug"])] if body.get("slug") else []),
+                            all_projects=bool(body.get("all")),
+                            mode=str(body.get("mode") or "evidence"))
+                        return self.json({"ok": True, "result": result})
+                    if path == "/api/toast/session/clean":
+                        if not body.get("apply"):
+                            return self.json({"ok": False, "refused": {
+                                "code": "archive-clean-confirm",
+                                "detail": "a clean lists the cache trees first; apply removes them"
+                            }}, 409)
+                        result = session_archive.clean(str(body.get("slug") or ""), True)
+                        return self.json({"ok": True, "result": result})
+                    if path == "/api/toast/session/rescan":
+                        index = session_archive.ensure_index(force=True)
+                        return self.json({"ok": True, "result": {
+                            "index": index.get("state") or "ready",
+                            "building": bool(index.get("building")),
+                            "roots": index.get("roots") or []}})
+                    if path == "/api/toast/session/show":
+                        if not loopback:
+                            return self.json({"ok": False,
+                                              "refused": "archive-show-loopback"}, 403)
+                        result = session_archive.show(
+                            str(body.get("slug") or ""),
+                            str(body.get("which") or "project"),
+                            str(body.get("path") or ""))
+                        return self.json({"ok": True, "result": result})
+                except session_archive.Refused as error:
+                    return self.json({"ok": False, "refused": error.as_dict()}, 409)
+                return self.json({"ok": False, "refused": "session-route-unknown"}, 404)
             if path == "/api/toast/external/enrollment":
                 if not getattr(self.server, "tls", False) and not loopback:
                     return self.json({"ok": False, "refused": "secure-origin-required"}, 403)
@@ -1896,6 +2161,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.json({"ok": True,
                                   "voice": toast.voice.say(str(body.get("profile") or "assistant"),
                                                           str(body.get("text") or ""))})
+            if path == "/api/toast/wish":
+                return self.json({"ok": True, "wish": toast.place_wish(
+                    str(body.get("request") or body.get("text") or ""),
+                    intent=str(body.get("intent") or "read"),
+                    agent=str(body.get("agent") or ""))})
             if path == "/api/toast/ask":
                 targets = body.get("targets")
                 return self.json({"ok": True,
@@ -2488,19 +2758,23 @@ class PopitHTTPServer(ThreadingHTTPServer):
 
 
 def serve(toast: Toast, port: int = PORT, *, bind: str = "127.0.0.1",
-          archive: bool = False, tls: bool = False) -> ThreadingHTTPServer:
+          archive: bool = False, tls: bool = False,
+          remote: bool = False) -> ThreadingHTTPServer:
     server = PopitHTTPServer((bind, port), Handler)
     server.toast = toast
     server.archive = archive
     server.archive_token = toast.window_token
     server.tls = tls
+    # The remote listener is the one a tunnel exposes: it answers only a signed-in browser.
+    server.remote = remote
     # The first listener is the loopback app server; the IDE window is told to load from it.
     if not getattr(toast, "port", 0):
         toast.port = server.server_port
     if tls:
         context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         context.load_cert_chain(str(PHONE_CERT), str(PHONE_KEY))
-        server.socket = context.wrap_socket(server.socket, server_side=True)
+        # The handshake belongs to the connection, not the listener: see Handler.setup.
+        server.ssl_context = context
     threading.Thread(target=server.serve_forever, daemon=True).start()
     return server
 
@@ -2525,6 +2799,14 @@ def main() -> int:
     parser.add_argument("--lan-bind", default="")
     parser.add_argument("--no-lan", action="store_true")
     parser.add_argument("--no-https", action="store_true")
+    # The internet-facing surface: its own TLS listener, answered only after sign-in.
+    parser.add_argument("--remote-port", type=int, default=5222)
+    parser.add_argument("--remote-bind", default="127.0.0.1")
+    parser.add_argument("--no-remote", action="store_true")
+    # A launch may open the desk's own window at an app's audit route. The window the owner
+    # opens is the app window, so the measurement that signs it is taken there, in the desk's
+    # one view, over the origin it pins — never in a page opened beside the app.
+    parser.add_argument("--window-route", default="")
     args = parser.parse_args()
 
     toast = Toast(probe_seconds=args.probe_seconds)
@@ -2554,6 +2836,19 @@ def main() -> int:
             except (OSError, ssl.SSLError) as error:
                 print(f"popit window https refused · 127.0.0.1:{args.window_https_port} · {error}",
                       flush=True)
+    remote_server = None
+    if not args.no_remote:
+        # A tunnel connects to this listener, not to the phone's own LAN origin: the surface
+        # that leaves the network is the one that asks for a signed session.
+        if ensure_phone_cert(lan_bind):
+            try:
+                remote_server = serve(toast, args.remote_port, bind=args.remote_bind,
+                                      tls=True, remote=True)
+            except (OSError, ssl.SSLError) as error:
+                print(f"popit remote refused · {args.remote_bind}:{args.remote_port} · {error}",
+                      flush=True)
+        else:
+            print("popit remote refused · a local certificate could not be generated", flush=True)
     toast.start()
     print(f"popit toast http://127.0.0.1:{server.server_port}/", flush=True)
     if lan_server is not None:
@@ -2561,6 +2856,9 @@ def main() -> int:
     if https_server is not None:
         print(f"popit phone https://{lan_bind}:{args.https_port}/phone.html", flush=True)
         print(f"popit certificate https://{lan_bind}:{args.https_port}/popit-cert.cer", flush=True)
+    if remote_server is not None:
+        print(f"popit remote https://{args.remote_bind}:{remote_server.server_port}/signin.html",
+              flush=True)
     if args.no_window:
         try:
             while True:
@@ -2732,14 +3030,32 @@ def main() -> int:
         print(f"toast-cert=pin-unavailable {unavailable}", flush=True)
 
     secure_loaded = False
+    retries = {"count": 0, "max": 3}
+
+    def retry() -> None:
+        retries["count"] += 1
+        print(f"toast-view retry={retries['count']}/{retries['max']} · {origin}", flush=True)
+        view.load(QUrl(origin))
 
     def loaded(ok: bool) -> None:
         nonlocal secure_loaded
         print(f"toast-view loaded={ok}", flush=True)
-        if not ok and origin.startswith("https") and not secure_loaded:
+        if ok:
+            if origin.startswith("https"):
+                secure_loaded = True
+            retries["count"] = 0
+        elif retries["count"] < retries["max"]:
+            # A failed load does not end the desk. It is retried with a backoff and the attempt
+            # is in the log; a transient network or renderer failure is not a reason to stop
+            # being the window, and a client storming the origin used to end it exactly here.
+            QTimer.singleShot(1200 * (retries["count"] + 1), retry)
+            print("toast-view retry-scheduled", flush=True)
+            return
+        elif not secure_loaded and origin.startswith("https"):
             # A window that cannot be delivered over TLS is not shown over bare http: the
             # loopback twin is the refusal shape, so the window says what refused instead.
-            print("toast-origin=refused window-not-secure after a refused secure load", flush=True)
+            print("toast-origin=refused window-not-secure after three refused secure loads",
+                  flush=True)
             WINDOW_ORIGIN["note"] = "https-refused"
             view.setHtml(
                 "<!doctype html><meta charset='utf-8'>"
@@ -2816,6 +3132,22 @@ def main() -> int:
     # phone reads, on the origin whose certificate is pinned above.
     origin, origin_note = app_window_origin(https_server, lan_bind, args.https_port,
                                             server.server_port, window_https)
+    if args.window_route and origin:
+        wanted = str(args.window_route).strip()
+        allowed = set(WINDOW_AUDIT_ROUTES.values())
+        if wanted not in allowed:
+            # Only a route the family itself names for a surface is a launch; anything else is
+            # a page this shell would be loading as if it were an app.
+            print(f"toast-window route-refused {wanted} not-a-window-route", flush=True)
+        else:
+            base, _, query = origin.partition("?")
+            # The base already names a page; the route names its own, so the page is replaced
+            # rather than appended to (a route appended to /toast.html read /toast.html/toast.html).
+            base = base.rsplit("/", 1)[0]
+            path, _, extra = wanted.partition("?")
+            merged = "&".join(part for part in (query, extra) if part)
+            origin = f"{base}{path}?{merged}"
+            print(f"toast-window route={wanted}", flush=True)
     print(f"toast-origin={origin} ({origin_note})", flush=True)
     # The window's origin carries its build token (`?v=…`), so the base is its scheme and host,
     # not the origin minus a path suffix: comparing the whole string left the base empty and
@@ -2906,7 +3238,12 @@ def main() -> int:
     try:
         return app.exec()
     finally:
-        toast.stop()
+        # The desk is already closing; a shutdown that cannot reach the Debian box must not
+        # replace the exit with a traceback about the tunnel.
+        try:
+            toast.stop()
+        except Exception as error:
+            print(f"toast-stop refused · {error.__class__.__name__}: {error}", flush=True)
         server.shutdown()
         archive_server.shutdown()
         if lan_server is not None:

@@ -1,0 +1,164 @@
+/* The remote desk sign-in. Family web-dark: ground, one gold attention colour, square data
+   surfaces, mono for identities. No radius: the family contour is the only shape. A button
+   here is the family's button — its padding, border, motion and states come from the pinned
+   baseline (/controls.css), never from this sheet. */
+
+:root {
+  --ground: #0b0d10;
+  --panel: #12161a;
+  --raised: #171c21;
+  --line: #2a3238;
+  --ink: #e8e2d4;
+  --muted: #8b8778;
+  --gold: #f0c454;
+  --brass: #b08d57;
+  --danger: #d98a6a;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--ground);
+  color: var(--ink);
+  font: 14px/1.5 "Archivo", "Segoe UI", system-ui, sans-serif;
+}
+
+body {
+  display: flex;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: calc(var(--safe-top) + 20px) 16px calc(var(--safe-bottom) + 20px);
+}
+
+.sheet {
+  width: min(560px, 100%);
+  align-self: flex-start;
+  display: grid;
+  gap: 16px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 14px;
+}
+
+.mark {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--brass);
+  display: grid;
+  place-items: center;
+  color: var(--gold);
+  font-size: 12px;
+  flex: none;
+}
+
+.head h1 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.state {
+  margin-left: auto;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", "Cascadia Mono", ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.state[data-state="signed-in"] { color: var(--gold); }
+.state[data-state="refused"] { color: var(--danger); }
+
+.body {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  padding: 16px 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.result { min-height: 17px; color: var(--gold); }
+.result[data-state="refused"] { color: var(--danger); }
+
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.tabs button { font: inherit; font-size: 11px; letter-spacing: 0.07em; text-transform: uppercase; }
+.tabs button[aria-selected="true"] {
+  color: var(--gold);
+  border-color: var(--brass);
+  background: rgba(240, 196, 84, 0.10);
+}
+
+.pane { display: grid; gap: 9px; }
+.pane[hidden] { display: none; }
+
+label {
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+textarea, input[type="text"] {
+  width: 100%;
+  font-family: "IBM Plex Mono", "Cascadia Mono", ui-monospace, monospace;
+  font-size: 12px;
+  color: var(--ink);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  padding: 9px 10px;
+  resize: vertical;
+}
+
+input[type="text"] { letter-spacing: 0.22em; text-transform: uppercase; }
+
+.file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: 11px;
+}
+
+.file input { color: var(--muted); font-size: 11px; }
+
+button { font: inherit; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; }
+
+/* A link that goes on to the desk is the same family control as a button: it takes the
+   pinned baseline and adds only the fact that it is a link. */
+a.popit-button { text-decoration: none; display: inline-grid; place-items: center; }
+a.popit-button:hover { color: var(--gold); }
+
+.signed { display: grid; gap: 12px; }
+.signed[hidden] { display: none; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", "Cascadia Mono", ui-monospace, monospace;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.foot a { color: var(--gold); text-decoration: none; }

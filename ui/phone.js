@@ -90,6 +90,8 @@ loadContour("/contour.json")
     dialin: { label: "DialIn", glyph: "◉" },
     settings: { label: "Settings", glyph: "⚙" },
     prose: { label: "Prose", glyph: "¶" },
+    archive: { label: "Archive", glyph: "▦" },
+    evidence: { label: "Evidence", glyph: "⧉" },
     bridge: { label: "Bridge", glyph: "⇄" },
   };
   // The settings tile opens the settings app package's window — the panel the desk draws —
@@ -97,7 +99,9 @@ loadContour("/contour.json")
   // The settings tile opens the settings package window itself — the desk's own page in its
   // settings-window mode — never the package document page, and never a copy of the panel.
   const APP_ROUTE = { settings: "/toast.html?window=settings", dialin: "/toast.html",
-                      prose: "/toast.html?window=prose", bridge: "/bridge.html" };
+                      prose: "/toast.html?window=prose",
+                      archive: "/toast.html?window=archive",
+                      evidence: "/toast.html?window=evidence", bridge: "/bridge.html" };
 
   // Every app is delivered the way the settings window is delivered: its own signed page in
   // the window that delivered the SpringBoard, not a second OS window rendering a copy.
@@ -504,6 +508,15 @@ loadContour("/contour.json")
       $("voice-status").textContent = "Voice is disabled on plain HTTP. Open the HTTPS certificate URL to use the microphone.";
     }
     $("home-key").addEventListener("click", home);
+    // The desk's bar carries this page's home key. Its press is this page's home button, so
+    // the frame returns to its home screen (an open app, chat or voice screen included)
+    // instead of being raised on whatever screen it had been left on.
+    window.addEventListener("message", (event) => {
+      if (event.origin !== location.origin) return;
+      const data = event.data;
+      if (!data || data.source !== "popit-desk" || data.intent !== "home") return;
+      home();
+    });
     document.querySelectorAll("[data-home]").forEach((node) => node.addEventListener("click", home));
     $("owner-form").addEventListener("submit", (event) => {
       event.preventDefault();
@@ -533,8 +546,16 @@ loadContour("/contour.json")
       events.onmessage = scheduleRefresh;
       events.onerror = () => undefined;
     }
-    if ("serviceWorker" in navigator && secure) {
-      navigator.serviceWorker.register("/phone-sw.js").catch(() => undefined);
+    // The home is delivered inside the window that owns this origin, and that window registers
+    // the family's shell worker at scope `/`. A second worker at the same scope replaces it
+    // and the window's own page then arrives through a worker that does not know its routes,
+    // which is how the home opened onto an empty frame. The window owns offline; the home
+    // does not register a worker of its own.
+    if (window.parent === window && "serviceWorker" in navigator && secure) {
+      navigator.serviceWorker.getRegistrations()
+        .then((rows) => rows.filter((row) => row.scope === new URL("/", location.origin).href)
+          .forEach((row) => row.unregister()))
+        .catch(() => undefined);
     }
   }
 
@@ -545,13 +566,20 @@ loadContour("/contour.json")
 // package published, rather than painting a private copy of the family look. The same
 // document supplies the layout each app's window is opened with.
 let settingsPublished = {};
+// A home that never finished attaching must not hold the window on a blank frame: the ready
+// message is sent once, by whichever happens first, and the window paints what it has.
+let homeReady = false;
+function tellReady() {
+  if (homeReady || window.parent === window) return;
+  homeReady = true;
+  window.parent.postMessage({ source: "popit-springboard", ready: true }, location.origin);
+}
+window.setTimeout(tellReady, 4000);
 attach("springboard", { identitySelector: "#package-identity" }).then((doc) => {
   settingsPublished = (doc && doc.theme) || {};
 }).finally(() => {
   // The home tells the window that delivered it when it has painted its own package, so the
   // window shows a finished SpringBoard instead of a page that has not applied its theme,
   // layout and scale yet.
-  if (window.parent !== window) {
-    window.parent.postMessage({ source: "popit-springboard", ready: true }, location.origin);
-  }
+  tellReady();
 });

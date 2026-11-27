@@ -548,6 +548,8 @@ function closePackageWindow() {
   if (panel) panel.hidden = true;
   try { window.popitProse && window.popitProse.close && window.popitProse.close(); }
   catch (error) { /* this window carries no prose body */ }
+  try { window.popitSession && window.popitSession.close && window.popitSession.close(); }
+  catch (error) { /* this window carries no archive body */ }
   delete document.body.dataset.windowMode;
   const back = window.__popitReturnSurface === "springboard" ? "springboard" : "desk";
   window.__popitReturnSurface = "desk";
@@ -565,7 +567,8 @@ function nameSurface() {
     if (brand && brand.textContent.trim()) node.textContent = brand.textContent.trim();
     return;
   }
-  const key = document.body.dataset.windowMode === "prose" ? "prose" : "dialin";
+  const mode = document.body.dataset.windowMode || "";
+  const key = ["prose", "archive", "evidence"].includes(mode) ? mode : "dialin";
   const title = (window.__popitTitles || {})[key];
   if (title) node.textContent = title;
 }
@@ -579,6 +582,18 @@ function styleMatchesPackage() {
   return (!want.frame || root.contourFrame === want.frame)
     && (!want.material || root.material === want.material)
     && (!want.motion || root.motionProfile === want.motion);
+}
+
+// The home button's one act, shared by the bar and the measurement: the SpringBoard's own
+// frame returns to its home screen, and the desk raises that frame in the same turn.
+function goHomeSurface() {
+  const frame = $("#springboard-frame");
+  try {
+    frame?.contentWindow?.postMessage({ source: "popit-desk", intent: "home" }, location.origin);
+  } catch (error) {
+    // A frame that has not painted has no screen to reset; the board is still raised.
+  }
+  setSurface("springboard");
 }
 
 function setSurface(name) {
@@ -2432,6 +2447,33 @@ function wirePaletteForge() {
   }
 }
 
+// The desk is an app package too: it reads the same signed identity the SpringBoard
+// and the settings window read, and takes its theme from the settings package.
+// The window's name is the delivered package's name, never a word this page carries: a name
+// that is not in the signed document is not the window.
+function nameWindow(doc, fallback, app) {
+  const authored = (doc && doc.authored) || {};
+  const title = String(authored.title || fallback || "");
+  window.__popitTitles = window.__popitTitles || {};
+  if (app) window.__popitTitles[app] = title;
+  setText("#window-name", title);
+}
+
+// A window draws only after its package and the settings theme verify: an unverified package
+// leaves the bar and the refusal, never a plain page wearing the app's name.
+window.__popitRefuse = refuseWindow;
+
+function refuseWindow(app) {
+  const code = document.documentElement.dataset.packageRefusal || "app-refused";
+  document.body.dataset.packageRefused = `${app}-${code}`;
+  const node = document.querySelector("#refusal");
+  if (node) node.textContent = `${app} · ${code}`;
+  // The fallback is the home, never a themed bar with an empty body: the window keeps the
+  // controls and the resize it is framed by only when a surface that owns them is showing.
+  if (app !== "springboard") setSurface("springboard");
+}
+
+
 function wire() {
   attachWindowChannel();
   $(".bar").addEventListener("mousedown", (event) => {
@@ -2470,6 +2512,13 @@ function wire() {
   });
   $("#prose-run")?.addEventListener("click", () => popitProse.run());
   $("#prose-close")?.addEventListener("click", () => closePackageWindow());
+  $("#archive-rescan")?.addEventListener("click", () => popitSession.rescan());
+  $("#archive-backup")?.addEventListener("click", () => popitSession.backup(true));
+  $("#archive-clean")?.addEventListener("click", () => popitSession.clean());
+  $("#archive-close")?.addEventListener("click", () => closePackageWindow());
+  $("#evidence-run")?.addEventListener("click", () => popitSession.backup(true));
+  $("#evidence-open")?.addEventListener("click", () => popitSession.open("", "evidence"));
+  $("#evidence-close")?.addEventListener("click", () => closePackageWindow());
 
   // The SpringBoard is the phone page, so an app on it hands control back by name rather
   // than by navigating the shell away.
@@ -2506,6 +2555,19 @@ function wire() {
       document.body.dataset.windowMode = "prose";
       popitProse.boot();
     }
+    // The session archive and the evidence backup hand back by name too: the window that
+    // delivered the SpringBoard shows them, and no second window holds a copy. The board is
+    // lowered in the same turn: booting the panel while the home still owns the surface left
+    // the owner looking at the tile they had pressed.
+    if (data.app === "archive" || data.app === "evidence") {
+      returnSurface = activeSurface;
+      window.__popitReturnSurface = activeSurface;
+      setSurface("desk");
+      // A window that cannot boot names what stopped it: the refusal is the report, not a blank
+      // desk where the tile used to be.
+      popitSession.boot(data.app)
+        .catch((error) => popitSession.say(`${data.app}-refused · ${(error && error.message) || "no report"}`));
+    }
     if (data.app === "bridge") {
       // The bridge's page is a re-creation of the window, and a re-creation is refused by
       // name. It opens again when it is the settings window with the bridge's body.
@@ -2514,32 +2576,6 @@ function wire() {
   });
 
   try { setSurface(localStorage.getItem(SURFACE_KEY) || "desk"); } catch (error) { setSurface("desk"); }
-
-  // The desk is an app package too: it reads the same signed identity the SpringBoard
-  // and the settings window read, and takes its theme from the settings package.
-  // The window's name is the delivered package's name, never a word this page carries: a name
-  // that is not in the signed document is not the window.
-  function nameWindow(doc, fallback, app) {
-    const authored = (doc && doc.authored) || {};
-    const title = String(authored.title || fallback || "");
-    window.__popitTitles = window.__popitTitles || {};
-    if (app) window.__popitTitles[app] = title;
-    setText("#window-name", title);
-  }
-
-  // A window draws only after its package and the settings theme verify: an unverified package
-  // leaves the bar and the refusal, never a plain page wearing the app's name.
-  window.__popitRefuse = refuseWindow;
-
-  function refuseWindow(app) {
-    const code = document.documentElement.dataset.packageRefusal || "app-refused";
-    document.body.dataset.packageRefused = `${app}-${code}`;
-    const node = document.querySelector("#refusal");
-    if (node) node.textContent = `${app} · ${code}`;
-    // The fallback is the home, never a themed bar with an empty body: the window keeps the
-    // controls and the resize it is framed by only when a surface that owns them is showing.
-    if (app !== "springboard") setSurface("springboard");
-  }
 
   // A window paints only after the settings package's own document has been applied; until then
   // it is hidden, and it stays hidden with only a refusal if that never happens.
@@ -2724,9 +2760,10 @@ function wire() {
   });
 
   $("#hide").addEventListener("click", () => post("/api/toast/hide"));
-  // The home is in the desk's own bar: the SpringBoard is a surface of this window, so its
-  // control is the desk's, not a fallback that only answers when the script did not run.
-  $("#home")?.addEventListener("click", () => setSurface("springboard"));
+  // The home is in the desk's own bar and carries the SpringBoard's own key. Its press is
+  // the home button's act: the frame is told to return to its home screen (an open app,
+  // chat or voice screen included) and the desk raises the board in the same turn.
+  $("#home")?.addEventListener("click", goHomeSurface);
   $("#close").addEventListener("click", () => post("/api/toast/close"));
   $("#pin").addEventListener("click", async () => {
     const on = $("#pin").dataset.pinned !== "true";
@@ -2738,7 +2775,18 @@ function wire() {
 
 async function main() {
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/popit-sw.js").catch(() => undefined);
+    // One worker at scope `/` on this origin, and it is the window's own. A worker another
+    // page registered there (the home did) replaces this one and then answers the window's
+    // routes, which is how the home opened onto an empty frame; any other script is removed
+    // before the shell's worker is registered again.
+    const scope = new URL("/", location.origin).href;
+    navigator.serviceWorker.getRegistrations().then((rows) => {
+      const foreign = rows.filter((row) => row.scope === scope
+        && !String(row.active && row.active.scriptURL || "").endsWith("/popit-sw.js"));
+      return Promise.all(foreign.map((row) => row.unregister()));
+    }).catch(() => undefined).finally(() => {
+      navigator.serviceWorker.register("/popit-sw.js").catch(() => undefined);
+    });
   }
   // The desk does not publish its own paint into the settings package: the settings package is
   // the author every window subscribes to, and a boot-time push made the desk's local default
@@ -2912,12 +2960,221 @@ async function main() {
   };
   window.popitProse = popitProse;
 
+  // The session archive and the evidence backup are one controller for two windows: both read
+  // the shell's own state, and the window mode is the app. The panel is its body; the rows are
+  // the machine's, never a table this page typed.
+  const popitSession = {
+    mode: "",
+    base: "",
+    selected: "",
+    pendingClean: "",
+    last: { state: {}, rows: [], index: {}, evidence: { rows: [] } },
+    timer: 0,
+    panel() { return $(this.mode === "evidence" ? "#evidence-panel" : "#archive-panel"); },
+    note() { return $(this.mode === "evidence" ? "#evidence-note" : "#session-note"); },
+    statusNode() { return $(this.mode === "evidence" ? "#evidence-state" : "#archive-state"); },
+    say(text) {
+      const node = this.note();
+      if (node) node.textContent = String(text);
+    },
+    size(bytes) {
+      const value = Number(bytes) || 0;
+      if (value >= 1e9) return `${(value / 1e9).toFixed(1)} GB`;
+      if (value >= 1e6) return `${(value / 1e6).toFixed(1)} MB`;
+      if (value >= 1e3) return `${Math.round(value / 1e3)} KB`;
+      return `${value} B`;
+    },
+    cut() {
+      // A drive the walk cut short is named on the surface, not hidden behind a project count.
+      const cut = (this.last.index.roots_detail || []).filter((item) => item.refusal);
+      return cut.length ? cut.map((item) => `${item.root}:${item.refusal}`).join(" · ") : "";
+    },
+    line(cells, refused = false) {
+      const row = document.createElement("div");
+      row.className = "session-row";
+      if (refused) row.dataset.refused = "true";
+      for (const value of cells) {
+        const cell = document.createElement("span");
+        cell.textContent = String(value);
+        row.append(cell);
+      }
+      return row;
+    },
+    async load() {
+      let body = null;
+      try {
+        const reply = await fetch("/api/toast/session", { cache: "no-store" });
+        body = reply.ok ? await reply.json() : null;
+      } catch (error) {
+        body = null;
+      }
+      if (!body || body.schema !== "popit.session-archive/1") {
+        const status = this.statusNode();
+        if (status) status.textContent = "refused";
+        this.say("session-archive-unreadable · the shell did not answer");
+        return;
+      }
+      this.last = { state: body, rows: body.rows || [], index: body.index || {},
+                    evidence: body.evidence || { rows: [] }, ledger: body.ledger || [] };
+      this.paint();
+    },
+    paint() {
+      const { rows, index, evidence } = this.last;
+      const status = this.statusNode();
+      if (status) {
+        status.textContent = index.state === "indexing" ? "walking the drives"
+          : `${index.projects || 0} projects${index.truncated || index.timed_out ? " · walk cut short" : ""}`;
+      }
+      if (this.mode === "evidence") {
+        const table = $("#evidence-table");
+        if (!table) return;
+        table.textContent = "";
+        const copies = evidence.rows || [];
+        if (!copies.length) {
+          table.append(this.line(["no copy has been recorded", "—", "—", "—", "—",
+                                  evidence.exists ? "empty root" : "root absent"],
+                                 !evidence.exists));
+        }
+        for (const copy of copies.slice(0, 220)) {
+          table.append(this.line([copy.slug || "—", copy.copied || 0, copy.recorded || 0,
+                                  this.size(copy.bytes), String(copy.at || "").slice(0, 10) || "—",
+                                  copy.state || "none"], copy.state === "refused"));
+        }
+      } else {
+        const table = $("#session-table");
+        if (!table) return;
+        table.textContent = "";
+        if (!rows.length) {
+          table.append(this.line([index.state === "indexing" ? "walking the drives…"
+                                  : "no project was found", "—", "—", "—", "—", "—"]));
+        }
+        for (const row of rows.slice(0, 220)) {
+          const line = this.line([row.name || "—", row.files || 0, this.size(row.bytes),
+                                  row.cache_bytes ? this.size(row.cache_bytes) : "—",
+                                  row.refusal ? row.refusal.code : row.evidence || "none",
+                                  row.root || "—"], Boolean(row.refusal));
+          if (row.slug) {
+            line.dataset.slug = row.slug;
+            line.dataset.root = row.root || "";
+            line.title = "double click opens the project; Clean removes its cache trees";
+            line.addEventListener("click", () => { this.selected = row.slug; });
+            line.addEventListener("dblclick", () => this.open(row.slug, "project"));
+          }
+          table.append(line);
+        }
+      }
+      const root = evidence.root || "—";
+      const free = this.size(evidence.free_bytes || 0);
+      const last = (this.last.ledger || [])[(this.last.ledger || []).length - 1] || {};
+      this.say(`${this.mode === "evidence" ? "root" : "index"} · ${root} · ${free} free · `
+        + `${rows.length} rows · ${this.cut() || last.code || last.kind || "no row"}`);
+    },
+    async act(path, body, note) {
+      try {
+        const reply = await fetch(path, { method: "POST",
+          headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+        const answer = await reply.json().catch(() => null);
+        if (!reply.ok || !answer || answer.ok === false) {
+          const refused = (answer && (answer.refused || answer.detail)) || `http ${reply.status}`;
+          this.say(`${note} · ${refused}`);
+          return null;
+        }
+        this.say(`${note} · ${answer.result ? JSON.stringify(answer.result).slice(0, 90) : "done"}`);
+        await this.load();
+        return answer;
+      } catch (error) {
+        this.say(`${note} · ${error.message}`);
+        return null;
+      }
+    },
+    backup(all) {
+      return this.act("/api/toast/session/backup",
+                       all ? { all: true } : { slug: this.selected }, "backup");
+    },
+    clean() {
+      if (!this.selected) { this.say("select a project first"); return null; }
+      if (this.pendingClean !== this.selected) {
+        this.pendingClean = this.selected;
+        this.say(`press Clean again to remove only the four cache trees of ${this.selected}`);
+        return null;
+      }
+      this.pendingClean = "";
+      return this.act("/api/toast/session/clean", { slug: this.selected, apply: true }, "clean");
+    },
+    rescan() { return this.act("/api/toast/session/rescan", {}, "rescan"); },
+    open(slug, which) {
+      return this.act("/api/toast/session/show", { slug: slug || this.selected,
+                                                   which: which || "project" }, "open");
+    },
+    async boot(mode) {
+      this.mode = mode;
+      this.base = document.documentElement.dataset.packageApp || "";
+      document.body.dataset.windowMode = mode;
+      document.documentElement.dataset.packageApp = mode;
+      // The window this app opens is the desk's own surface: a tile press and a signed launch
+      // route reach the same window, whichever one raised it. The panel itself is un-hidden
+      // here: the page ships it hidden, and a window mode that never removed it showed a bar
+      // with an empty body where the app should be.
+      setSurface("desk");
+      const panel = this.panel();
+      if (panel) panel.hidden = false;
+      try {
+        // The subscription is literal per app: the signer reads the script for `attach("name")`,
+        // so a mode passed as a variable would be a package that never subscribed.
+        const doc = mode === "archive"
+          ? await attach("archive", { identitySelector: "#package-identity" })
+          : await attach("evidence", { identitySelector: "#package-identity" });
+        if (!doc) { refuseWindow(mode); return; }
+        nameWindow(doc, mode, mode);
+        await this.load();
+        this.timer = window.setInterval(() => this.load(), 1500);
+      } catch (error) {
+        this.say(`${mode} · ${error.message}`);
+        refuseWindow(mode);
+      }
+    },
+    close() {
+      if (this.timer) window.clearInterval(this.timer);
+      this.timer = 0;
+      // Closing returns the page the shape it shipped in: the panel is hidden again, so the
+      // desk behind the closed window is not wearing the app's body.
+      const panel = this.panel();
+      if (panel) panel.hidden = true;
+    },
+    state() {
+      const rows = this.last.rows || [];
+      return JSON.stringify({
+        window: document.body.dataset.windowMode || "",
+        package: document.documentElement.dataset.packageApp || "",
+        base: this.base || "",
+        mode: this.mode,
+        index: this.last.index.state || "",
+        projects: rows.filter((row) => row.kind === "project").length,
+        rows: rows.length,
+        evidence: (this.last.evidence.rows || []).length,
+        evidenceRoot: this.last.evidence.root || "",
+        free: this.last.evidence.free_bytes || 0,
+        refused: rows.filter((row) => row.refusal)
+          .map((row) => `${row.slug}:${row.refusal.code}`).slice(0, 12),
+        note: (this.note() || {}).textContent || "",
+      });
+    },
+  };
+  window.popitSession = popitSession;
+
   // The shell's harness probe: named acts the delivered window performs and reports back, so
   // a check reads the window instead of a browser tab beside it.
   window.popitProbe = {
     // The prose app's own measurement: what its window shows, read from the window.
     prose() {
       return popitProse.state();
+    },
+    // The two archive windows report their own rows, index state and evidence root.
+    archive() {
+      return popitSession.state();
+    },
+    evidence() {
+      return popitSession.state();
     },
     // The act a tile performs: the home hands the app to this window by name, so the probe hands
     // it the same message the frame posts rather than reaching into the frame.
@@ -3106,7 +3363,7 @@ async function main() {
     // The surface switch the Home control performs, called through the window itself so the
     // behaviour is measured rather than asserted from the source.
     goHome() {
-      setSurface("springboard");
+      goHomeSurface();
       const board = document.querySelector("#springboard");
       return JSON.stringify({ surface: activeSurface, board: !!board && !board.hidden });
     },
@@ -3129,6 +3386,14 @@ async function main() {
       const state = $("#prose-state");
       if (state) state.textContent = `prose · ${error.message}`;
     });
+  }
+  // The two desk apps are this page in their own window: the launch the icon frame signs is
+  // the launch that boots the panel here, never a page beside the window.
+  if (new URLSearchParams(location.search).get("window") === "archive") {
+    popitSession.boot("archive").catch(() => popitSession.say("archive-refused"));
+  }
+  if (new URLSearchParams(location.search).get("window") === "evidence") {
+    popitSession.boot("evidence").catch(() => popitSession.say("evidence-refused"));
   }
   await poll();
   if (typeof EventSource !== "undefined") {

@@ -14,9 +14,11 @@ from __future__ import annotations
 import datetime
 import json
 import pathlib
+import secrets
 import shlex
 import socket
 import subprocess
+import tempfile
 import threading
 import time
 import urllib.error
@@ -30,6 +32,16 @@ HOST = hosts.debian_host()
 KEY = "m0/id_ed25519"
 LOCAL_PORT = 18777
 REMOTE_PORT = 8766
+LOOP_URL = "http://127.0.0.1:8766"
+DRIVER_URL = "http://127.0.0.1:8765"
+# The box-side helper the desk runs over ssh; see `tools/remote_http.py`.
+REMOTE_HELPER = "/srv/scratch/popit-remote-http.py"
+# The machine's wish queue is a second loopback service on the same box. It has its own
+# port and its own token, so it gets its own tunnel rather than sharing the answer loop's.
+# Outside the answer loop's own range (18777..18793): those ports are already bound by the
+# loop's forwards, and a wish tunnel that cannot bind is a wish that never reaches the queue.
+WISH_LOCAL_PORT = 18900
+WISH_REMOTE_PORT = 8765
 SCHEMA = "popit.axis-bridge/1"
 
 
@@ -48,16 +60,45 @@ class Refused(Exception):
 
 
 def _wsl(remote: str, timeout: float = 15.0) -> subprocess.CompletedProcess:
-    """Run one command on the Debian host through the WSL restore key."""
+    """Run one command on the Debian host through the WSL restore key.
+
+    Routed through `_wsl_pipe` so no Debian read can be held open by a grandchild's pipes.
+    """
+    return _wsl_pipe(remote, "", timeout)
+
+
+def _wsl_pipe(remote: str, payload: str, timeout: float = 90.0) -> subprocess.CompletedProcess:
+    """Run one command on the Debian host with stdin, through the WSL restore key.
+
+    Pipes are deliberately not used. `subprocess.run(timeout=…)` kills `wsl.exe` but then waits
+    for the output pipes to close, and a grandchild inside WSL can hold them open forever; the
+    desk stopped answering entirely behind one such call. Temp files have no reader to wait for,
+    so the timeout is a real ceiling and a refusal instead of a frozen turn.
+    """
     script = (
         "cd /root; PATH=/usr/bin:/bin /usr/bin/ssh -o BatchMode=yes "
         f"-o ConnectTimeout=5 -i {KEY} root@{HOST} {shlex.quote(remote)}"
     )
-    return subprocess.run(
-        ["wsl.exe", "-d", DISTRO, "-u", "root", "--", "sh", "-c", script],
-        capture_output=True, text=True, encoding="utf-8", errors="replace",
-        timeout=timeout, creationflags=0x08000000,
-    )
+    command = ["wsl.exe", "-d", DISTRO, "-u", "root", "--", "sh", "-c", script]
+    with tempfile.TemporaryFile() as stdin_file, tempfile.TemporaryFile() as out_file, \
+            tempfile.TemporaryFile() as err_file:
+        stdin_file.write(payload.encode("utf-8"))
+        stdin_file.seek(0)
+        try:
+            finished = subprocess.run(
+                command, stdin=stdin_file, stdout=out_file, stderr=err_file,
+                timeout=timeout, creationflags=0x08000000,
+            )
+        except subprocess.TimeoutExpired as error:
+            raise Refused("remote-timeout",
+                          f"the box did not answer within {timeout:.0f}s") from error
+        out_file.seek(0)
+        err_file.seek(0)
+        return subprocess.CompletedProcess(
+            command, finished.returncode,
+            out_file.read().decode("utf-8", "replace"),
+            err_file.read().decode("utf-8", "replace"),
+        )
 
 
 class AxisBridge:
@@ -65,8 +106,17 @@ class AxisBridge:
         self.port = port
         self.lock = threading.RLock()
         self._ensure_lock = threading.Lock()
+        self._prepare_lock = threading.Lock()
+        self._helper_ready = False
         self.token = ""
         self.process: subprocess.Popen | None = None
+        self.wish_port = WISH_LOCAL_PORT
+        self.wish_process: subprocess.Popen | None = None
+        self.driver_token = ""
+        self.wish_health: dict = {}
+        self.wishes: list[dict] = []
+        self.tasks: list[dict] = []
+        self.tools: list[dict] = []
         self.state = "idle"
         self.detail = ""
         self.health: dict = {}
@@ -80,21 +130,57 @@ class AxisBridge:
     def _endpoint(self, path: str) -> str:
         return f"http://127.0.0.1:{self.port}{path}"
 
-    def _reachable(self, port: int | None = None, timeout: float = 1.5) -> bool:
+    def _upload_helper(self) -> None:
+        """Put the box-side HTTP helper in place, once per process."""
+        with self._prepare_lock:
+            if self._helper_ready:
+                return
+            source = (pathlib.Path(__file__).resolve().parent / "tools" / "remote_http.py")
+            try:
+                text = source.read_text(encoding="utf-8")
+            except OSError as error:
+                raise Refused("remote-helper-absent", str(error)) from error
+            result = _wsl_pipe(f"cat > {REMOTE_HELPER}", text, timeout=30)
+            if result.returncode != 0:
+                raise Refused("remote-helper-upload", (result.stderr or "").strip()[:200])
+            self._helper_ready = True
+
+    def _remote(self, url: str, body: dict | None, token: str, method: str = "POST",
+                timeout: float = 90.0) -> dict:
+        """One loopback HTTP exchange executed on the box itself, over ssh.
+
+        A WSL local-forward was the first transport here, and it failed the same way twice:
+        orphans kept every candidate port bound while a dead forward answered nothing, so the
+        loop looked unreachable and the desk lost its axis. Running the request on the box
+        removes the forward, the port range and the relay from the path.
+        """
+        self._upload_helper()
+        payload = json.dumps({"url": url, "token": token, "body": body, "method": method})
+        result = _wsl_pipe(f"python3 {REMOTE_HELPER}", payload, timeout=timeout)
+        if result.returncode != 0:
+            raise Refused("remote-failed", (result.stderr or "").strip()[:200])
         try:
-            endpoint = f"http://127.0.0.1:{port or self.port}/health"
-            with urllib.request.urlopen(endpoint, timeout=timeout) as reply:
-                payload = json.loads(reply.read().decode("utf-8"))
-            self.health = {
-                "ticks": payload.get("ticks"),
-                "utterances": payload.get("utterances"),
-                "documents": payload.get("documents"),
-                "wishes_accepted": payload.get("wishes_accepted"),
-                "refusals": payload.get("refusals"),
-            }
-            return True
-        except (OSError, ValueError, urllib.error.URLError):
+            answer = json.loads((result.stdout or "").strip().splitlines()[-1])
+        except (ValueError, IndexError) as error:
+            raise Refused("remote-bad-json", (result.stdout or "").strip()[:200]) from error
+        return answer
+
+    def _reachable(self, port: int | None = None, timeout: float = 25.0) -> bool:
+        try:
+            answer = self._remote(f"{LOOP_URL}/health", None, self.token, "GET", timeout)
+        except Refused:
             return False
+        if not answer.get("ok"):
+            return False
+        payload = answer.get("body") or {}
+        self.health = {
+            "ticks": payload.get("ticks"),
+            "utterances": payload.get("utterances"),
+            "documents": payload.get("documents"),
+            "wishes_accepted": payload.get("wishes_accepted"),
+            "refusals": payload.get("refusals"),
+        }
+        return True
 
     @staticmethod
     def _port_free(port: int) -> bool:
@@ -128,7 +214,9 @@ class AxisBridge:
         )
 
     def _read_token(self) -> str:
-        result = _wsl("cat /etc/agent/loop.env")
+        # Cold WSL takes tens of seconds to start a distribution; 15s read as `remote-timeout`
+        # and left the wish queue refused on the first turn after the desk's restart.
+        result = _wsl("cat /etc/agent/loop.env", timeout=60)
         if result.returncode != 0:
             raise Refused("axis-token-unreadable", (result.stderr or "").strip()[:200])
         for line in result.stdout.splitlines():
@@ -138,37 +226,178 @@ class AxisBridge:
                     return token
         raise Refused("axis-token-absent", "/etc/agent/loop.env has no CUA_LOOP_TOKEN")
 
+    # -- the machine's wish queue -------------------------------------------
+    def _read_driver_token(self) -> str:
+        """The wish node's peer token, read on the box and kept in memory only."""
+        result = _wsl("cat /etc/agent/driver.env", timeout=60)
+        if result.returncode != 0:
+            raise Refused("wish-token-unreadable", (result.stderr or "").strip()[:200])
+        for line in result.stdout.splitlines():
+            if line.startswith("CUA_DRIVER_TOKEN="):
+                token = line.split("=", 1)[1].strip().strip('"')
+                if token:
+                    return token
+        raise Refused("wish-token-absent", "/etc/agent/driver.env has no CUA_DRIVER_TOKEN")
+
+    def _wish_reachable(self, port: int | None = None, timeout: float = 25.0) -> bool:
+        try:
+            answer = self._remote(f"{DRIVER_URL}/health", None, self.driver_token, "GET", timeout)
+        except Refused:
+            return False
+        if not answer.get("ok"):
+            return False
+        payload = answer.get("body") or {}
+        self.wish_health = {key: payload[key] for key in
+                            ("ok", "status", "ticks", "utterances", "wishes_made",
+                             "wishes_accepted", "wishes_declined", "refusals", "tasks")
+                            if key in payload}
+        return True
+
+    def _stop_wish_tunnel(self) -> None:
+        process, self.wish_process = self.wish_process, None
+        if process and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                process.kill()
+        # Stopping the Windows client does not stop the ssh it launched inside WSL. Left
+        # alone, those orphans keep every candidate port bound, so the next try cannot open
+        # one and the queue looks unreachable. This names the exact forward it opened.
+        try:
+            _wsl(f"/usr/bin/pkill -f 'ssh -N .*-L {self.wish_port}:'", timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            pass
+
+    def _start_wish_tunnel(self, port: int | None = None) -> None:
+        if self.wish_process and self.wish_process.poll() is None:
+            return
+        port = port or self.wish_port
+        self.wish_port = port
+        script = (
+            "cd /root; PATH=/usr/bin:/bin exec /usr/bin/ssh -N "
+            "-o ExitOnForwardFailure=yes -o ServerAliveInterval=20 "
+            f"-L {port}:127.0.0.1:{WISH_REMOTE_PORT} -i {KEY} root@{HOST}"
+        )
+        self.wish_process = subprocess.Popen(
+            ["wsl.exe", "-d", DISTRO, "-u", "root", "--", "sh", "-c", script],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            creationflags=0x08000000,
+        )
+
+    def ensure_wish(self) -> dict:
+        """The wish queue's own tunnel, refused by name instead of answering an empty page."""
+        with self._ensure_lock:
+            # The token is read before the reachability check, not after it: a live tunnel
+            # from an earlier call used to skip the read, so the next request went out with
+            # an empty bearer and the driver refused it 401 while the queue looked healthy.
+            if not self.driver_token:
+                self.driver_token = self._read_driver_token()
+            if self._wish_reachable():
+                return self.wish_health
+            raise Refused("wish-unreachable",
+                          "the machine's wish queue did not answer on its own loopback")
+
+    def wish(self, intent: str, request: str, extra: dict | None = None) -> dict:
+        """Place one wish on the machine's queue and return the queue's own answer.
+
+        An answer is not a request the machine can process. This is the envelope its driver
+        already adopts: the owner's words, the lane that heard them, and where the wish came
+        from. It carries no authority, so the driver's own receipt decides what happens next.
+        """
+        text = " ".join(str(request or "").split())
+        if not text:
+            raise Refused("wish-empty", "a wish needs a request")
+        if len(text) > 2000:
+            raise Refused("wish-too-long", str(len(text)))
+        self.ensure_wish()
+        now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+        content = {"intent": " ".join(str(intent or "read").split())[:40], "request": text}
+        content.update({key: value for key, value in (extra or {}).items()
+                        if value not in (None, "", [])})
+        envelope = {
+            "schema": "popit.wish/1",
+            "sender": "popit desk",
+            "scope": "popit-shell/desk",
+            "speech_act": "request",
+            "content": content,
+            "expiry": (now + datetime.timedelta(hours=4)).isoformat(),
+            "provenance": {"source": "desk", "project": "popit-shell",
+                           "session": "desk", "authority": "none"},
+        }
+        reply = self._remote(f"{DRIVER_URL}/v1/wishes", envelope, self.driver_token, timeout=45)
+        if not reply.get("ok"):
+            raise Refused("wish-http", f"{reply.get('status')} {reply.get('body')}")
+        answer = reply.get("body") or {}
+        row = {"schema": SCHEMA, "at": iso(), "sent": envelope, "answer": answer}
+        with self.lock:
+            self.wishes = (self.wishes + [row])[-8:]
+        return row
+
+    def task(self, tool: str, task: dict, call_id: str = "", timeout: float = 45.0) -> dict:
+        """Run one declared driver tool on the Debian box and return its own receipt.
+
+        This is the box's CUA driver (`/opt/cua-driver/tools/driver_surface.py`), not the
+        Windows desk fleet: a model running on Debian acts on Debian's own screen, windows
+        and input, and never clicks the owner's Windows desktop.
+        """
+        name = " ".join(str(tool or "").split())
+        if not name:
+            raise Refused("task-tool-empty", "a driver task needs a declared tool")
+        self.ensure_wish()
+        call = call_id or "desk-" + secrets.token_hex(8)
+        request = {"call_id": call, "tool": name, "task": dict(task or {})}
+        reply = self._remote(f"{DRIVER_URL}/v1/tasks", request, self.driver_token,
+                             timeout=timeout + 30)
+        if not reply.get("ok"):
+            raise Refused("task-refused", f"{reply.get('status')} {reply.get('body')}")
+        answer = reply.get("body") or {}
+        row = {"schema": SCHEMA, "at": iso(), "tool": name, "task": dict(task or {}),
+               "call_id": call, "id": str(answer.get("task_id") or call),
+               "status": str(answer.get("status") or ""), "code": str(answer.get("code") or ""),
+               "answer": answer}
+        with self.lock:
+            self.tasks = (self.tasks + [row])[-8:]
+        return row
+
+    def tool(self, name: str, args: dict | None = None, timeout: float = 60.0) -> dict:
+        """Call one declared tool on the Debian loop, which is the box's real X11 body.
+
+        The loop executes with the host's own `xdotool` and reads the world back. Its
+        exposed acts are `input.pointer` (move), `screen.capture`, and the task tools; a
+        click is not among them, so a click is refused here by name rather than simulated
+        by the driver surface or sent to the Windows fleet.
+        """
+        tool_name = " ".join(str(name or "").split())
+        if not tool_name:
+            raise Refused("tool-empty", "a tool call needs a name")
+        self.ensure()
+        request = {"tool": tool_name, "args": dict(args or {})}
+        reply = self._remote(f"{LOOP_URL}/v1/tools/call", request, self.token,
+                             timeout=timeout + 30)
+        if not reply.get("ok"):
+            raise Refused("tool-refused", f"{reply.get('status')} {reply.get('body')}")
+        answer = reply.get("body") or {}
+        row = {"schema": SCHEMA, "at": iso(), "tool": tool_name, "args": dict(args or {}),
+               "ok": bool(answer.get("ok")), "result": answer.get("result") or {},
+               "answer": answer}
+        with self.lock:
+            self.tools = (self.tools + [row])[-8:]
+        return row
+
     def ensure(self) -> dict:
         # Network and tunnel waits must never hold the state lock: the toast polls state every
         # second and a 90-second tunnel search would make the whole surface look down.
         with self._ensure_lock:
-            if self.state == "live" and self._reachable():
-                return self.health
+            # Same order as the wish queue: a live tunnel must not skip the token read, or
+            # the next answer request carries an empty bearer.
             if not self.token:
                 self.token = self._read_token()
             if self._reachable():
                 self.state, self.detail = "live", ""
                 return self.health
-            # A stale tunnel can hold the old port without carrying traffic. Take the first
-            # free local port instead of killing an unidentified process, then keep retrying.
-            for candidate in range(self.port, self.port + 16):
-                if self._reachable(candidate):
-                    self.port = candidate
-                    self.state, self.detail = "live", ""
-                    return self.health
-                if not self._port_free(candidate):
-                    continue
-                self._stop_tunnel()
-                self._start_tunnel(candidate)
-                deadline = time.monotonic() + 6
-                while time.monotonic() < deadline:
-                    if self._reachable():
-                        self.state, self.detail = "live", ""
-                        return self.health
-                    time.sleep(0.3)
-                self._stop_tunnel()
             self.state = "refused"
-            self.detail = "axis-unreachable: the Debian loop did not answer through any tunnel port"
+            self.detail = "axis-unreachable: the Debian loop did not answer on its own loopback"
             raise Refused("axis-unreachable", self.detail)
 
     def start(self) -> None:
@@ -199,23 +428,13 @@ class AxisBridge:
         if len(text) > 600:
             raise Refused("axis-question-too-long", str(len(text)))
         self.ensure()
-        body = json.dumps({
-            "model": "cua-system1",
-            "messages": [{"role": "user", "content": text}],
-        }).encode("utf-8")
-        request = urllib.request.Request(
-            self._endpoint("/v1/chat/completions"),
-            data=body, method="POST",
-            headers={"Authorization": f"Bearer {self.token}",
-                     "Content-Type": "application/json"},
-        )
-        try:
-            with urllib.request.urlopen(request, timeout=60) as reply:
-                payload = json.loads(reply.read().decode("utf-8"))
-        except urllib.error.HTTPError as error:
-            raise Refused("axis-http", f"{error.code} {error.read()[:200]!r}") from error
-        except (OSError, ValueError, urllib.error.URLError) as error:
-            raise Refused("axis-unreachable", str(error)) from error
+        request = {"model": "cua-system1",
+                   "messages": [{"role": "user", "content": text}]}
+        reply = self._remote(f"{LOOP_URL}/v1/chat/completions", request, self.token,
+                             timeout=120)
+        if not reply.get("ok"):
+            raise Refused("axis-http", f"{reply.get('status')} {reply.get('body')}")
+        payload = reply.get("body") or {}
         choices = payload.get("choices") or []
         message = (choices[0] or {}).get("message", {}) if choices else {}
         answer = str(message.get("content") or "").strip()
@@ -245,6 +464,10 @@ class AxisBridge:
                 "health": self.health,
                 "last": dict(self.last) if self.last else None,
                 "history": list(self.history),
+                "wish": {"port": self.wish_port, "health": dict(self.wish_health),
+                         "last": dict(self.wishes[-1]) if self.wishes else None},
+                "tasks": list(self.tasks[-4:]),
+                "tools": list(self.tools[-4:]),
             }
 
     def stop(self) -> None:
@@ -258,3 +481,4 @@ class AxisBridge:
                 process.wait(timeout=3)
             except subprocess.TimeoutExpired:
                 process.kill()
+        self._stop_wish_tunnel()

@@ -48,17 +48,13 @@ TOOLS = [{
     "type": "function",
     "function": {
         "name": "cua_task",
-        "description": "Hand one small capture or input action to a CUA driver on the Windows side. Use it when the owner asks a civilian to look at or drive the live computer, then report the task id; do not claim the task finished before its receipt says so.",
+        "description": "Hand one small act to the CUA body on this Debian box: screen.capture or input.pointer (move). It acts on Debian's own display only, never on the owner's Windows machine. That body has no click act, so a click is refused by name and must be reported as a refusal, not as a click. Report the act and the receipt the driver returned.",
         "parameters": {
             "type": "object",
             "properties": {
-                "action": {"type": "string", "description": "capture, click, type or key"},
-                "window": {"type": "string", "description": "Window title fragment for capture."},
-                "x": {"type": "integer", "description": "Click x."},
-                "y": {"type": "integer", "description": "Click y."},
-                "text": {"type": "string", "description": "Text to type."},
-                "key": {"type": "string", "description": "Key to press."},
-                "driver": {"type": "string", "description": "Optional driver id."},
+                "action": {"type": "string", "description": "capture or move"},
+                "x": {"type": "integer", "description": "Pointer x on the Debian screen."},
+                "y": {"type": "integer", "description": "Pointer y on the Debian screen."},
             },
             "required": ["action"],
         },
@@ -69,7 +65,9 @@ SYSTEM = """You are the language and tool layer of the Popit CUA system on Debia
 Rules:
 - A civilian is an autonomous, ensouled individual, not a handpicked assistant. Keep your own lane and memory; do not repeat another lane's answer. You may refuse an impossible task with a named blocker, and that refusal is a real result.
 - The owner's speech does not force-cut you. Finish your answer or choose to yield in your own words; never treat their voice as a command to stop another agent.
-- Work is a task with evidence. For a live computer request, inspect or delegate a CUA task and report what actually happened; never puppet another being or claim an act you did not observe.
+- Work is a task with evidence. For a live computer request, inspect or delegate a CUA task on this Debian box and report what actually happened; never puppet another being or claim an act you did not observe.
+- You act on the Debian box only, through its own CUA body (screen.capture, input.pointer move). You never click, type or capture on the owner's Windows machine; a request about a Windows window is a request for the desk or the Windows fleet, not for you.
+- The Debian body has no click act. If the owner asks for a click on Debian, say that the click act is absent and name it; never describe a move or a simulation as a click.
 - Do not expose private reasoning. Answer only, in natural spoken language.
 - Inspect before answering. Use run_debian when the question depends on the actual machine.
 - Use read_archive when the owner refers to earlier chat or asks what was already done.
@@ -171,7 +169,10 @@ class DebianMind:
                         "refused": {"code": "cua-refused", "detail": str(error)[:240]}}
             if self.archive is not None:
                 self.archive.add("tool", f"cua_task {action.get('action', '')}", role="cua",
-                                 ok=True, task=(row or {}).get("id", ""))
+                                 ok=str((row or {}).get("status") or "") in ("ok", "done"),
+                                 task=(row or {}).get("id", ""),
+                                 driver_tool=(row or {}).get("tool", ""),
+                                 status=(row or {}).get("status", ""))
             return {"ok": True, "tool": "cua_task", "task": row}
         if name == "read_archive":
             if self.archive is None:

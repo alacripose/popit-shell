@@ -1,7 +1,7 @@
 {
   "schema": "popit-shell.landing-copy/1",
   "machine": "9948063f04e72d875fbe6c74f8d06e2aef3cfd545ea1c86b327b74bd7e579669",
-  "prose": "b02a0e0ad2c16a99dc4308b71fc41df8d7997ec7bd293648920dc708c69ff0ca",
+  "prose": "c32a698cd75ce91e1e1774b20c09e6e4e23d2d119dbaa444075eaee2d5664ac4",
   "reading": {
     "host": "Debian 13",
     "version": "CUA v2.7.3",
@@ -26,7 +26,7 @@
     "card2_title": "The stars",
     "card2_body": "6 stars run from presence to continuity",
     "card3_title": "The gate",
-    "card3_body": "The gate runs 77 checks, first is family-look-pinned",
+    "card3_body": "The gate runs 82 checks, first is family-look-pinned",
     "numbers_title": "Pinned numbers",
     "numbers_note": "The reading is 9948063f04e7 over three routes",
     "run_title": "Run it",

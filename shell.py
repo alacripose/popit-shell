@@ -8,7 +8,9 @@ no window hides under it.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import ssl
 import sys
 import threading
 import time
@@ -182,17 +184,59 @@ def main() -> int:
     desktop.remove_frame(int(tray_panel.winId()))
     tray_panel.hide()
 
-    # The session archive is its own window: a file and evidence audit is wider than the
-    # strip, and it reads the same loopback server as the bar. It is created and hidden at
-    # startup so the first open is a show, not a cold load over the owner's screen.
+    # The session archive is a desk app window: the desk delivers it as
+    # `/toast.html?window=archive` over its pinned TLS origin, and this window is the client
+    # that shows it. The legacy loopback page is retired, and a window that cannot reach the
+    # desk names that refusal instead of drawing a page beside the app.
+    desk_window = "https://127.0.0.1:5211/toast.html?window=archive"
     archive_panel = make_window(
         "Popit session archive", ARCHIVE_W, ARCHIVE_H,
         Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool | Qt.NoDropShadowWindowHint,
     )
     archive_loaded = {"ok": False}
+    desk_cert = ROOT / "runlogs" / "toast" / "phone-cert.pem"
+    try:
+        der = ssl.PEM_cert_to_DER_cert(desk_cert.read_text(encoding="ascii"))
+        pinned_desk = hashlib.sha256(bytes(der)).hexdigest() if isinstance(der, bytes) \
+            else hashlib.sha256(der.encode("latin-1")).hexdigest()
+    except (OSError, ValueError):
+        pinned_desk = ""
+
+    def pin_desk_certificate(error) -> None:
+        # The desk's window origin is self-signed: the certificate this machine generated is
+        # accepted and any other is refused, which is narrower than the platform trust, never
+        # wider. No window is loaded over bare http as a fallback.
+        digest = ""
+        try:
+            chain = error.certificateChain()
+            digest = hashlib.sha256(bytes(chain[0].toDer())).hexdigest() if chain else ""
+        except (AttributeError, TypeError, ValueError):
+            digest = ""
+        if pinned_desk and digest == pinned_desk:
+            try:
+                error.acceptCertificate()
+            except (AttributeError, RuntimeError):
+                pass
+            return
+        try:
+            error.rejectCertificate()
+        except (AttributeError, RuntimeError):
+            pass
+
+    try:
+        archive_panel.centralWidget().page().certificateError.connect(pin_desk_certificate)
+    except (AttributeError, TypeError):
+        pass
 
     def archive_finished(ok: bool) -> None:
         archive_loaded["ok"] = bool(ok)
+        if not ok:
+            archive_panel.centralWidget().setHtml(
+                "<!doctype html><meta charset='utf-8'><body style='background:#0c0e11;"
+                "color:#e9e2d0;font:14px/1.5 monospace;padding:24px'>"
+                "<p>session-archive-unreachable</p>"
+                "<p>The desk does not answer on the secure window origin.</p>"
+                "<p>python tools/desk_launcher.py</p></body>")
 
     archive_panel.centralWidget().loadFinished.connect(archive_finished)
 
@@ -204,7 +248,7 @@ def main() -> int:
         )
 
     place_archive()
-    archive_panel.centralWidget().load(QUrl(f"http://127.0.0.1:{port}/archive.html"))
+    archive_panel.centralWidget().load(QUrl(desk_window))
     archive_panel.show()
     desktop.remove_frame(int(archive_panel.winId()))
     archive_panel.hide()
@@ -317,7 +361,7 @@ def main() -> int:
                 archive_panel.show()
                 archive_panel.raise_()
                 if not archive_loaded["ok"]:
-                    archive_panel.centralWidget().load(QUrl(f"http://127.0.0.1:{port}/archive.html"))
+                    archive_panel.centralWidget().load(QUrl(desk_window))
                 archive_panel.centralWidget().setFocus()
         for view in server.take_tray_request():
             if tray_panel.isVisible() and tray_shown["view"] == view:

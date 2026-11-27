@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#071113" />
+<title>Popit desk sign-in</title>
+<link rel="icon" href="/popit-icon-512.png" type="image/png" />
+<link rel="stylesheet" href="/contour-theme.css" />
+<link rel="stylesheet" href="/controls.css" />
+<link rel="stylesheet" href="/signin.css" />
+</head>
+<body data-window="popit-desk-signin">
+<main class="sheet" data-contour="window" data-chrome="popit-signin">
+  <header class="head" data-contour="card" data-region="bar">
+    <span class="mark" aria-hidden="true">◆</span>
+    <h1>Desk sign-in</h1>
+    <span id="state" class="state" data-state="waiting">checking</span>
+  </header>
+
+  <section class="body" data-region="body">
+    <p class="note" id="note">This listener is the one reachable from outside the network. It answers only a signed-in browser: present a signed package this machine minted, or a one-time desk code.</p>
+
+    <div class="tabs" role="tablist" aria-label="How to sign in">
+      <button type="button" class="popit-button" role="tab" id="tab-envelope" aria-selected="true" data-mode="envelope" data-contour="card">Signed package</button>
+      <button type="button" class="popit-button" role="tab" id="tab-code" aria-selected="false" data-mode="code" data-contour="card">Desk code</button>
+    </div>
+
+    <form id="form-envelope" class="pane" data-pane="envelope" autocomplete="off">
+      <label for="package">Package</label>
+      <textarea id="package" spellcheck="false" rows="6" data-contour="card"
+                placeholder='{"schema":"popit.call-envelope/1","capabilities":["desk.access"]}'></textarea>
+      <label class="file" for="package-file">Read a file
+        <input id="package-file" type="file" accept="application/json,.json,.txt" />
+      </label>
+      <button type="submit" class="popit-button" data-contour="card">Sign in</button>
+    </form>
+
+    <form id="form-code" class="pane" data-pane="code" autocomplete="off" hidden>
+      <label for="code">Desk code</label>
+      <input id="code" type="text" inputmode="latin" autocomplete="one-time-code"
+             maxlength="9" placeholder="ABCD-EFGH" data-contour="card" />
+      <button type="submit" class="popit-button" data-contour="card">Sign in</button>
+    </form>
+
+    <p class="note result" id="result" role="status"></p>
+
+    <div class="signed" id="signed-in" hidden>
+      <p class="note" id="signed-note"></p>
+      <div class="row">
+        <a class="popit-button" id="continue" href="/toast.html" data-contour="card">Continue to the desk</a>
+        <button type="button" class="popit-button" id="signout" data-contour="card">Sign out</button>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot" data-region="foot">
+    <span id="origin"></span>
+    <a href="/signin.html">Sign-in</a>
+  </footer>
+</main>
+<script src="/signin.js"></script>
+</body>
+</html>

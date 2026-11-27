@@ -1,0 +1,77 @@
+{
+  "schema": "popit.session-archive-probe/1",
+  "at": "2026-11-27T18:14:26Z",
+  "started": "2026-11-27T18:14:26Z",
+  "shell": "http://127.0.0.1:5207",
+  "roots": {
+    "fixture": "~/AppData/Local/Temp/popit-archive-4405r_8p",
+    "evidence": "~/AppData/Local/Temp/popit-archive-4405r_8p/evidence"
+  },
+  "checks": [
+    {
+      "check": "fixture-project-indexed",
+      "state": "passed",
+      "ok": true,
+      "detail": "1 project row(s) · 2 dirs"
+    },
+    {
+      "check": "fixture-cache-measured",
+      "state": "passed",
+      "ok": true,
+      "detail": "1 cache dir(s), 64 B"
+    },
+    {
+      "check": "clean-lists-before-removing",
+      "state": "passed",
+      "ok": true,
+      "detail": "1 dir(s), removed 0"
+    },
+    {
+      "check": "clean-removes-only-the-family-cache-rule",
+      "state": "passed",
+      "ok": true,
+      "detail": "removed 1, source kept True"
+    },
+    {
+      "check": "backup-copies-and-records",
+      "state": "passed",
+      "ok": true,
+      "detail": "3 copied, 1 recorded"
+    },
+    {
+      "check": "unknown-project-is-refused",
+      "state": "passed",
+      "ok": true,
+      "detail": "archive-unknown-project"
+    },
+    {
+      "check": "a-path-outside-the-project-is-refused",
+      "state": "passed",
+      "ok": true,
+      "detail": "archive-path-outside"
+    },
+    {
+      "check": "an-empty-backup-is-refused",
+      "state": "passed",
+      "ok": true,
+      "detail": "archive-backup-none"
+    },
+    {
+      "check": "the-program-wrote-its-own-rows",
+      "state": "passed",
+      "ok": true,
+      "detail": "20 row(s) in ledger.jsonl"
+    },
+    {
+      "check": "its-refusals-are-readable-by-the-family-sweep",
+      "state": "passed",
+      "ok": true,
+      "detail": "2 named row(s), all `result: refused`"
+    }
+  ],
+  "passed": 10,
+  "failed": 0,
+  "blocked": 0,
+  "state": "passed",
+  "act": ""
+}

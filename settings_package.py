@@ -31,8 +31,8 @@ import datetime
 import json
 import os
 import pathlib
-import platform
 import re
+import sys
 import threading
 
 from blake3 import blake3
@@ -122,9 +122,12 @@ def device_report() -> dict:
     """What this machine will actually tell us, and `null` where it will not."""
     report: dict = {
         "reported_at": iso(),
-        "platform": platform.system() or None,
-        "machine": platform.machine() or None,
-        "python": platform.python_version(),
+        # `platform.system()` is not used: on this host it blocks past every timeout, and the
+        # desk's boot called this function before it could answer, so the window never opened
+        # and 5207/5211 stayed bound and silent. These are the same facts without that call.
+        "platform": ("Windows" if sys.platform.startswith("win") else sys.platform) or None,
+        "machine": os.environ.get("PROCESSOR_ARCHITECTURE") or None,
+        "python": "%d.%d.%d" % sys.version_info[:3],
         "screen": None,
         "virtual_screen": None,
         "monitors": None,

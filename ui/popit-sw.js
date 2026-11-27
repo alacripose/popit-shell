@@ -1,6 +1,6 @@
 // Bumped when the window's own script changes: the window now refuses to draw until its package
 // verifies, and a cached page would keep drawing the old way.
-const CACHE = "popit-shell-v10";
+const CACHE = "popit-shell-v14";
 const SHELL = ["/", "/toast.html", "/toast.css", "/toast.js", "/contour.js", "/contour.json", "/manifest.webmanifest", "/popit-icon.svg"];
 
 self.addEventListener("install", (event) => {

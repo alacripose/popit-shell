@@ -18,8 +18,8 @@
       "entry": "toast.html",
       "pages": 4,
       "regions": 4,
-      "identity": "app-dialin@108+blake3:41e27959d75ce7542a46f72d73f0d07c4619527189cd1be0ffea764cbec18a1a",
-      "revision": 108,
+      "identity": "app-dialin@173+blake3:f56ec30af2a91304e2be3c65ee0fe49406d61a9cf38a5398a977394ab693c3cd",
+      "revision": 173,
       "ui_audit": "passed",
       "verified": true,
       "driver": "cua-chat",
@@ -37,8 +37,8 @@
       "entry": "toast.html",
       "pages": 7,
       "regions": 4,
-      "identity": "app-settings@99+blake3:a1a51a78e5d884cf9091e3411ce3aa8511f039923e8295b1039d374fd5bdd8c5",
-      "revision": 99,
+      "identity": "app-settings@161+blake3:694921b330f439b34f7556cad3d80fb94cc49672c8a98309db681d0a5cef2a9f",
+      "revision": 161,
       "ui_audit": "passed",
       "verified": true,
       "driver": "cua-chat",
@@ -53,13 +53,30 @@
       ]
     },
     {
+      "name": "prose",
+      "kind": "window",
+      "entry": "toast.html",
+      "pages": 1,
+      "regions": 4,
+      "identity": "app-prose@83+blake3:71a49ae596b50b7c92eb3c6e0ea25a54dbddc1d5f24e6cb6970cdc8113ed8ffc",
+      "revision": 83,
+      "ui_audit": "passed",
+      "verified": true,
+      "driver": "cua-chat",
+      "added_to_the_family": [
+        "prose inventory",
+        "per-project progress",
+        "external document links"
+      ]
+    },
+    {
       "name": "springboard",
       "kind": "phone",
       "entry": "phone.html",
       "pages": 3,
       "regions": 4,
-      "identity": "app-springboard@85+blake3:00fdf25e6405e24a89bd55ae450bfbbccc7d3455056b2ef02817a6d0d31a34e1",
-      "revision": 85,
+      "identity": "app-springboard@106+blake3:8d494f4c7588d178d74d712b5aa0e7a3a6e6932b054f5a771e07c407a09256e9",
+      "revision": 106,
       "ui_audit": "passed",
       "verified": true,
       "driver": "cua-chat",
@@ -67,6 +84,42 @@
         "signed tiles",
         "app launch",
         "offline shell"
+      ]
+    },
+    {
+      "name": "archive",
+      "kind": "window",
+      "entry": "toast.html",
+      "pages": 3,
+      "regions": 4,
+      "identity": "app-archive@16+blake3:9cdc12b8c0d7d76c9798ad6b284f479c9ec51582eb058c93ca270a0383fb48c1",
+      "revision": 16,
+      "ui_audit": "passed",
+      "verified": true,
+      "driver": "cua-chat",
+      "added_to_the_family": [
+        "project index",
+        "per-project files",
+        "evidence state",
+        "cache clean"
+      ]
+    },
+    {
+      "name": "evidence",
+      "kind": "window",
+      "entry": "toast.html",
+      "pages": 3,
+      "regions": 4,
+      "identity": "app-evidence@15+blake3:4222d4c7c53cfe71697be4af4ce660cc1e635c57ee9e9ef29a17bcbcfbe89895",
+      "revision": 15,
+      "ui_audit": "passed",
+      "verified": true,
+      "driver": "cua-chat",
+      "added_to_the_family": [
+        "evidence root state",
+        "copy receipts",
+        "recorded assets",
+        "backup act"
       ]
     }
   ],

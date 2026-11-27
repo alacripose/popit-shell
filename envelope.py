@@ -289,7 +289,8 @@ def trust_key(public_key: str, name: str, trust_path: pathlib.Path) -> dict:
         return row
 
 
-def _check_envelope(envelope: dict, now: datetime.datetime) -> None:
+def _check_envelope(envelope: dict, now: datetime.datetime,
+                   capability: str = "call.join") -> None:
     if not isinstance(envelope, dict):
         raise Refused("envelope-shape", "an envelope must be a JSON object")
     if len(_canonical(envelope)) > MAX_ENVELOPE_BYTES:
@@ -310,8 +311,8 @@ def _check_envelope(envelope: dict, now: datetime.datetime) -> None:
     capabilities = envelope.get("capabilities")
     if not isinstance(capabilities, list) or not all(isinstance(item, str) for item in capabilities):
         raise Refused("envelope-capabilities", "capabilities must be a list of strings")
-    if "call.join" not in capabilities:
-        raise Refused("envelope-capability", "call.join is required")
+    if capability not in capabilities:
+        raise Refused("envelope-capability", f"{capability} is required")
     if not NONCE_RE.fullmatch(str(envelope.get("nonce") or "")):
         raise Refused("envelope-nonce", "nonce must be 32-64 lowercase hex characters")
     issued = parse_iso(str(envelope.get("issued_at") or ""))
@@ -355,7 +356,8 @@ def _nonces(nonce_path: pathlib.Path) -> dict:
 
 def admit(envelope: dict, *, trust_path: pathlib.Path | None = None,
           nonce_path: pathlib.Path | None = None,
-          now: datetime.datetime | None = None) -> dict:
+          now: datetime.datetime | None = None,
+          capability: str = "call.join") -> dict:
     """Verify a signed package and reserve its nonce; return the caller facts."""
     current = (now or utc_now()).astimezone(datetime.timezone.utc)
     trust_file = pathlib.Path(trust_path or TRUST_PATH_DEFAULT)
@@ -374,7 +376,7 @@ def admit(envelope: dict, *, trust_path: pathlib.Path | None = None,
     if not _verify_bytes(payload_bytes(signed), signature, str(signed["public_key"])):
         raise Refused("envelope-signature", "the signature does not verify")
     # Re-run the field, time and algorithm checks now that the bytes are known good.
-    _check_envelope(envelope, current)
+    _check_envelope(envelope, current, capability)
     digest = fingerprint(str(signed["public_key"]))
     if not any(row["fingerprint"] == digest for row in _trust(trust_file)):
         raise Refused("envelope-untrusted", digest)
@@ -397,7 +399,8 @@ def admit(envelope: dict, *, trust_path: pathlib.Path | None = None,
     }
 
 
-def verify(envelope: dict, *, trust_path: pathlib.Path | None = None) -> dict:
+def verify(envelope: dict, *, trust_path: pathlib.Path | None = None,
+           capability: str = "call.join") -> dict:
     """Read-only verification: no nonce is consumed."""
     current = utc_now()
     trust_file = pathlib.Path(trust_path or TRUST_PATH_DEFAULT)
@@ -410,7 +413,7 @@ def verify(envelope: dict, *, trust_path: pathlib.Path | None = None) -> dict:
     signature = _signature_bytes(str(envelope.get("signature") or ""))
     if not _verify_bytes(payload_bytes(signed), signature, str(signed["public_key"])):
         raise Refused("envelope-signature", "the signature does not verify")
-    _check_envelope(envelope, current)
+    _check_envelope(envelope, current, capability)
     digest = fingerprint(str(signed["public_key"]))
     if not any(row["fingerprint"] == digest for row in _trust(trust_file)):
         raise Refused("envelope-untrusted", digest)

@@ -1,13 +1,13 @@
 # Family failures, swept from the ledgers and the hypergrilling documents
 
-`popit.family-failures/1` · 2026-11-25T18:13:06+00:00 · 168 rows · 49 named codes · 4 projects
+`popit.family-failures/1` · 2026-11-26T06:26:42+00:00 · 189 rows · 56 named codes · 4 projects
 
 ## Sources read
 
 | root | state | files | rows |
 |---|---|---|---|
 | `~\Documents\deadlock-model-forge` | present | 83 | 102 |
-| `F:\Documents\popit-shell` | present | 10 | 9 |
+| `F:\Documents\popit-shell` | present | 26 | 30 |
 | `F:\Documents\mc3-client13` | present | 3 | 4 |
 | `F:\Documents\db-mc-indev` | absent | 0 | 0 |
 | `F:\Documents\ala-system` | present | 0 | 0 |
@@ -21,9 +21,10 @@
 | code | rows | projects | first example |
 |---|---|---|---|
 | `fail:gate` | 51 | deadlock-model-forge |  |
-| `unknown` | 16 | deadlock-model-forge, popit-shell | the old scanner used substring matching, so a_hair_braid, ponytail, coattail, cloak_tail, brow_detail and detail bones became tails; Hornet and Gen Man were fal |
+| `unknown` | 21 | deadlock-model-forge, popit-shell | the old scanner used substring matching, so a_hair_braid, ponytail, coattail, cloak_tail, brow_detail and detail bones became tails; Hornet and Gen Man were fal |
 | `refused` | 14 | hypergrilling | Still refused, unchanged: **non-commercial** licences (CC-BY-NC, ARR-with-NC), **all |
 | `blocked` | 11 | hypergrilling | 7. **§7.3 — empty, blocked, and refused are three distinct states**, and a refusal names the missing artefact. |
+| `archive-unknown-project` | 9 | popit-shell |  |
 | `refusal` | 9 | hypergrilling | \| Refusal \| **Requests advisory, matter binding.** A refusal to a request is advisory everywhere; a physical intervention is always binding because it is matt |
 | `fails` | 6 | hypergrilling | - Missing required texture **fails closed** or falls back to a **named solid**. |
 | `fail:compile` | 4 | deadlock-model-forge |  |
@@ -35,6 +36,7 @@
 | `fail:rg` | 2 | deadlock-model-forge | shell mounted from base_hud; bar chain Taskbar:0x0 < OpenlockStandaloneHost:0x0 < CitadelHudRoot:0x0, so the bar has no box in game |
 | `fail:cd` | 2 | deadlock-model-forge | pre-existing refusal reproduced without this pass's changes: title height 36 != 30, control WindowButton is 20x20 expected 26x22; the probe's expected numbers p |
 | `fail:<<'PY'` | 2 | deadlock-model-forge | bash: here-document at line 1 delimited by end-of-file; python: SyntaxError unterminated triple-quoted string literal at section; nothing written. A tmp_append_ |
+| `archive-backup-none` | 2 | popit-shell | no project was selected |
 | `blocked:client13.py` | 2 | mc3-client13 | client started from the stripped root and exited 1 in 3.5s with a breakpad minidump and no window; the same binary from the SDK root reached a window (pid 20996 |
 | `blocked:witness.py` | 2 | mc3-client13 | substring match captured '#general \| Deadlock Modding - Discord' 1936x1048 and was rejected as a witness; exact matching is now the default, with candidate tit |
 | `failures` | 2 | hypergrilling | ## Failures and anomalies |
@@ -67,5 +69,10 @@
 | `harness-folder-boundary: a working direc` | 1 | deadlock-model-forge |  |
 | `surface-not-nine-slice` | 1 | popit-shell | a painted surface was drawn without the contour nine-slice, so it was removed instead of shown |
 | `taskbar-pinned refuses a change; a raised CORNER_UNITS from 27.8 to 24.0 was ref` | 1 | popit-shell | bar cells and the strip unchanged; tools/bar_pin.json records BAR_HEIGHT, FRAME_PAD, CLIP_PAD, CORNER_PX and the drawn cells at 120x36, 190x40, 265x40 |
+| `corpus-write-permission` | 1 | popit-shell | PermissionError: /opt/cua-driver/artifacts/corpus/corpus.jsonl |
+| `10 passed, 0 failed` | 1 | popit-shell |  |
+| `0 stale of 14 rows; 69 checks, 0 refusals` | 1 | popit-shell |  |
+| `The earlier draft of this fix returned early for every non-navigation request, w` | 1 | popit-shell | The settings window's preview drew no contour. Cause measured in the browser: `phone-sw.js` is registered at scope `/` and its fetch fallback answered every fai |
+| `archive-legacy-retired, archive-unknown-project` | 1 | popit-shell | the legacy loopback archive page polled a route the shell's own server never answered, and /api/archive/* pointed at dropped functions; the subject is rebuilt a |
 | `failing` | 1 | hypergrilling | publishing, and failing their marble to grey because they did not write a provenance |
 | `refuse` | 1 | hypergrilling | The session must now derive the **basic gameplay feature set in the engine** through extensive, layer-by-layer grilling. Mod projects are reference evidence for |

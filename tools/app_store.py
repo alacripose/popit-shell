@@ -22,7 +22,7 @@ import urllib.request
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 TARGET = ROOT / "docs" / "app-store.json"
 KINDS = ("window", "phone")
-NAMES = ("dialin", "settings", "springboard")
+NAMES = ("dialin", "settings", "prose", "springboard", "archive", "evidence")
 
 
 def fetch(path: str, port: int) -> tuple[int, dict]:
@@ -84,7 +84,12 @@ def main() -> int:
                            "the bridge surface"],
                 "settings": ["appearance", "motion", "layout", "apps", "functions", "device",
                              "package"],
+                "prose": ["prose inventory", "per-project progress", "external document links"],
                 "springboard": ["signed tiles", "app launch", "offline shell"],
+                "archive": ["project index", "per-project files", "evidence state",
+                            "cache clean"],
+                "evidence": ["evidence root state", "copy receipts", "recorded assets",
+                             "backup act"],
             }[name],
         })
     for name, row in (registry.get("foreign") or {}).items():

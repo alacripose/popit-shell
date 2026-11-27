@@ -173,6 +173,14 @@ class Tunnel:
                 process.wait(timeout=3)
             except subprocess.TimeoutExpired:
                 process.kill()
+        # Ending the Windows client does not end the ssh it started inside WSL. Two orphans
+        # per flap accumulated into 232 forwards and exhausted the Windows paging file, so
+        # package signing failed with `WinError 1455`. This names this tunnel's own forward.
+        try:
+            _wsl(f"/usr/bin/pkill -f 'ssh -N .*-R 0:{self.target_host}:{self.target_port}'",
+                 timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            pass
 
     def alive(self) -> bool:
         return bool(self.process and self.process.poll() is None and self.port)

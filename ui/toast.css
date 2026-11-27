@@ -53,6 +53,26 @@
   clip-path: var(--clip, none);
 }
 
+/* A phone home-screen window draws under its status bar and home indicator. Safari and Chrome
+   report both through env() when the browser reserves them, and on the phone this page was
+   read on the browser reserved nothing while the status bar still drew over the page. The
+   window therefore reserves its own margin: env() when it says more, a measured allowance when
+   it says nothing. On the desk every inset resolves to zero. */
+:root {
+  --popit-safe-top: env(safe-area-inset-top, 0px);
+  --popit-safe-right: env(safe-area-inset-right, 0px);
+  --popit-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --popit-safe-left: env(safe-area-inset-left, 0px);
+}
+@media (display-mode: standalone) and (pointer: coarse) {
+  :root {
+    --popit-safe-top: max(env(safe-area-inset-top, 0px), 48px);
+    --popit-safe-right: max(env(safe-area-inset-right, 0px), 0px);
+    --popit-safe-bottom: max(env(safe-area-inset-bottom, 0px), 28px);
+    --popit-safe-left: max(env(safe-area-inset-left, 0px), 0px);
+  }
+}
+
 html, body {
   margin: 0;
   height: 100%;
@@ -69,10 +89,17 @@ html[data-host="browser"], html[data-host="browser"] body {
   min-height: 100dvh;
   overflow: auto;
 }
+/* A phone reads the browser rule, below. Its status bar and home bar are margins of the page:
+   the body carries them, so the window keeps its own width and nothing is pushed sideways. */
+html[data-host="browser"] body {
+  padding: var(--popit-safe-top) var(--popit-safe-right)
+    var(--popit-safe-bottom) var(--popit-safe-left);
+  background: #0a1418;
+}
 html[data-host="browser"] .toast {
   position: relative;
   inset: auto;
-  min-height: 100dvh;
+  min-height: calc(100dvh - var(--popit-safe-top) - var(--popit-safe-bottom));
 }
 html[data-host="browser"] .body { overflow-y: auto; }
 
@@ -84,7 +111,11 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 
 .toast {
   position: absolute;
-  inset: 0;
+  /* The same window is read on a phone, where the browser draws over the page. The notch and
+     the home bar inset the whole drawn window, not only its contents: padding moved the text
+     and left the frame's own top edge under the status bar. On the desk every inset is zero. */
+  inset: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
   display: flex;
   flex-direction: column;
   padding: calc(var(--u) * 2.4) calc(var(--u) * 3) calc(var(--u) * 2.2);
@@ -170,6 +201,19 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
   line-height: 18px;
 }
 .icon:hover { color: var(--brass-lit); border-color: var(--line); }
+
+/* The home control is the SpringBoard's own key, not a word that only resembles it: the same
+   outlined diamond the home page paints, inside the pinned control's own padding and hit
+   area, so the bar's buttons still move, size and press as one family. */
+.bar .home-key { display: inline-flex; align-items: center; justify-content: center; }
+.bar .home-key .diamond {
+  display: block;
+  width: 12px;
+  height: 12px;
+  transform: rotate(45deg);
+  border: 1.5px solid currentColor;
+  box-shadow: 0 0 12px rgba(240, 196, 120, 0.32);
+}
 
 .tabs {
   display: flex;
@@ -1119,11 +1163,14 @@ html[data-motion-profile="sweep"] .settings { animation-name: settings-sweep; }
 @media (max-width: 460px) {
   .settings {
     position: fixed !important;
-    inset: 0 !important;
+    /* A fixed panel ignores the page's margin, so it names the phone's own insets itself: at
+       inset 0 its tabs sat under the status bar and could not be pressed. */
+    inset: var(--popit-safe-top) var(--popit-safe-right)
+      var(--popit-safe-bottom) var(--popit-safe-left) !important;
     width: auto;
-    max-height: 100dvh;
+    max-height: calc(100dvh - var(--popit-safe-top) - var(--popit-safe-bottom));
     overflow: auto;
-    padding: 12px 14px calc(18px + env(safe-area-inset-bottom));
+    padding: 12px 14px calc(18px + var(--popit-safe-bottom));
   }
   .settings-head { flex-wrap: wrap; row-gap: 6px; }
   .settings-head > * { min-width: 0; }
@@ -1207,6 +1254,58 @@ body[data-window-mode="prose"] #prose-panel {
 }
 @keyframes prose-spin { to { transform: rotate(360deg); } }
 .prose-row a { color: var(--brass-lit, #f0c454); }
+
+/* The session archive and the evidence backup are this page in their own window modes: the
+   same bar and frame, and one panel as the body. The panels paint with the baseline tokens
+   only, so a window that changes its material changes them too. */
+body[data-window-mode="archive"] .tabs,
+body[data-window-mode="archive"] .body,
+body[data-window-mode="archive"] .live,
+body[data-window-mode="archive"] .settings,
+body[data-window-mode="archive"] .springboard,
+body[data-window-mode="archive"] .prose,
+body[data-window-mode="evidence"] .tabs,
+body[data-window-mode="evidence"] .body,
+body[data-window-mode="evidence"] .live,
+body[data-window-mode="evidence"] .settings,
+body[data-window-mode="evidence"] .springboard,
+body[data-window-mode="evidence"] .prose {
+  display: none;
+}
+body[data-window-mode="archive"] .toast > *:not(.bar):not(#archive-panel),
+body[data-window-mode="evidence"] .toast > *:not(.bar):not(#evidence-panel) {
+  display: none;
+}
+body[data-window-mode="archive"] #archive-panel,
+body[data-window-mode="evidence"] #evidence-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 14px 16px 16px;
+  overflow: auto;
+}
+.session-head, .session-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 1.4fr) 64px 78px 78px 74px minmax(110px, 1.5fr);
+  gap: 6px;
+  align-items: center;
+  font: 12px/1.4 "IBM Plex Mono", monospace;
+}
+.session-head {
+  color: var(--muted, #8d8a80);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.session-row { padding: 4px 0; border-bottom: 1px solid var(--rule, rgba(255,255,255,.08)); }
+.session-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.session-root { color: var(--muted, #8d8a80); overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; }
+.session-table { flex: 1 1 auto; min-height: 0; overflow: auto; }
+.session-row[data-refused="true"] .session-evidence { color: var(--bad, #e2765f); }
+.session-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+.session-actions button { min-height: 24px; padding: 0 8px; }
 
 /* Narrow windows: the bar and the tab strip wrap before they clip a control, and the signed
    identity names its own truncation instead of pushing the window wider than its frame. These

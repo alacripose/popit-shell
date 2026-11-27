@@ -27,10 +27,15 @@ jobs:
         run: python tools/gate.py
       - name: Selftest
         run: python tools/gate.py --selftest
+      - name: Session archive probe
+        # The two rebuilt archive apps are measured on a fixture project: the index, the
+        # family cache rule, the copy and its named refusals. A live window check is the
+        # desk's own act and runs on the machine, not on a runner with no desk.
+        run: python tools/session_archive_probe.py --fixture
       - name: Package
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
-          Compress-Archive -Path shell.py,desktop.py,server.py,window.py,contour.json,requirements.txt,README.md,ui,tools,docs -DestinationPath dist/popit-shell.zip
+          Compress-Archive -Path shell.py,desktop.py,server.py,window.py,session_archive.py,contour.json,requirements.txt,README.md,ui,tools,docs -DestinationPath dist/popit-shell.zip
       - uses: actions/upload-artifact@v4
         with:
           name: popit-shell

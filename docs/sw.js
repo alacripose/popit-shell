@@ -1,7 +1,7 @@
 // A returning visitor must never be shown an older landing page than the one this deployment serves.
 // The document and the contour files are network-first and never read from the HTTP cache, the cache
 // is only the offline fallback, and a new build takes over immediately and drops the old caches.
-const BUILD = "2812867c13";
+const BUILD = "62c1460b2e";
 const CACHE = `popit-landing-${BUILD}`;
 
 self.addEventListener("install", () => {

@@ -1,8 +1,8 @@
 # App packages
 
-Every surface the shell serves is an app package: `dialin`, `settings`, `springboard` and
-`ide`. The shape comes from the settings package and the phone's security work, applied once
-rather than per page.
+Every surface the shell serves is an app package: `dialin`, `settings`, `prose`, `archive`,
+`evidence` and the `springboard`. The shape comes from the settings package and the phone's
+security work, applied once rather than per page.
 
 ## What an app package is
 
@@ -32,8 +32,8 @@ IDE page carries its host's identity and theme.
 Every republish is a mutation and is attributed to the CUA driver that carried it: with a
 fleet attached, a mutation without a live driver is refused `app-no-driver`, and the driver
 is written into the signed record. `tools/app_store.py` builds `docs/app-store.json` for the
-landing pages from the signed registry — three packages, their identities, their driver, and
-the IDE's refusal — and refuses to write if a package is unverified or a foreign kind is
+landing pages from the signed registry — five packages, their identities, their driver, and
+the bridge's refusal — and refuses to write if a package is unverified or a foreign kind is
 listed (`store-no-driver`, `store-unverified`, `store-foreign-package`).
 
 A window package is also furniture. Every app declares four regions — `bar`, `status`,
@@ -64,6 +64,46 @@ Refusals are named: `app-unknown`, `app-unsigned`, `app-tampered`, `app-identity
 
 `POST /api/toast/apps/verify` keeps the phone's posture: a signed identity is read over a
 secure origin, and loopback is the machine itself.
+
+## The two archive apps
+
+`archive` and `evidence` are the legacy shell's session archive and evidence backup, rebuilt
+as desk windows. Their old page was `ui/archive.html`; it polled a route the loopback server
+never answered, and `/api/archive/*` pointed at dropped functions. Both files and routes are
+retired, and the shell's server answers the old paths `archive-legacy-retired`.
+
+Each app is kind `window`, entry `toast.html`, delivered in `popit-settings-package`, and
+launched at `/toast.html?window=archive` or `?window=evidence`. Each carries the four
+regions, a tile on the SpringBoard, a route in the window audit, and a launch proof read
+from the bytes its payload signs. Both are built from two pinned baselines: the settings
+window's signed delivery, and `app_base.PROJECT_SETUP`.
+
+The project setup is the second baseline. It pins what every family project owes: a ticket
+before the change, a named refusal, its own failure row, a ledger, a CI job, a landing page
+rendered from its pins, a live driver on each republish, and copy read by the family
+checker. The digest travels in the signed base, so a package built against another setup is
+refused `app-project-baseline-stale`.
+
+The rows come from `session_archive.py`. The index walks every local fixed or removable
+drive in the background and caches under `runlogs/session-archive/` for an hour. A copy
+writes source and record files to the evidence root and records a large asset by size and
+time. A clean lists the four family cache trees and removes them only on the second
+confirmation. Every act appends a row to `runlogs/session-archive/ledger.jsonl`.
+
+| Route | Answer |
+|---|---|
+| `GET /api/toast/session` | the index, the evidence root and the recent rows |
+| `GET /api/toast/session/files?slug=` | one project's files, up to the limit |
+| `POST /api/toast/session/backup` | copy the selected project or all of them |
+| `POST /api/toast/session/clean` | list the cache trees, or remove them with `apply` |
+| `POST /api/toast/session/rescan` | start a fresh walk of every drive |
+| `POST /api/toast/session/show` | open a project or the evidence root, loopback only |
+
+A mutation is loopback or TLS, the same posture as `/api/toast/apps/ensure`. An act that
+cannot be shown is refused by code: `archive-unknown-project`, `archive-backup-none`,
+`archive-path-outside`, `archive-clean-confirm`, `archive-evidence-absent` and the rest.
+`tools/session_archive_probe.py` measures the copy, the cache rule and the refusals on a
+fixture project, and reads the live windows when the desk answers.
 
 ## The theme an app runs
 
@@ -139,7 +179,11 @@ CI row visible with the driver act that clears it.
 - `tools/toast_probe.py`: `app-packages-signed`, `springboard-theme-from-settings`,
   `app-package-client-served`, `app-package-unknown-refused`.
 - `tools/gate.py`: `app-packages-use-the-family-signature`, `app-package-probe`,
-  `springboard-is-the-phone-home`.
+  `springboard-is-the-phone-home`, `session-archive-apps-are-desk-windows`,
+  `archive-apps-sign-their-icon-frame`, `archive-apps-carry-the-project-baseline`,
+  `session-archive-refusals-are-named`, `legacy-archive-page-is-retired`.
+- `tools/session_archive_probe.py`: the fixture copy, the cache rule and the named
+  refusals; receipt `artifacts/receipts/session-archive.json`.
 
 The desk proves the wiring in the footer: `app-dialin@<rev>+blake3:<digest> · theme
 popit-settings@<rev>` in green when verified, `package refused · <code>` in red when not.
