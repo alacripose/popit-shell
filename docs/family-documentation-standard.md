@@ -108,9 +108,16 @@ These skills have separate jobs. They do not replace the source-comment gate.
 |---|---|---|
 | `declauding` | Load for external docs, README files, tickets, issue/PR text, changelogs, reports and other prose authored for people. Apply its factual-preservation and register workflow before publication. | Its own scope excludes code and quoted text. Never use it to justify explanatory source comments. |
 | `stop-slop` | Load when drafting or reviewing prose and user-facing copy. Apply its directness, specificity, rhythm and anti-pattern checks. | Prose quality pass; it is not a parser, API-doc generator or source-comment detector. |
-| `impeccable` | Load for frontend design work on Popit apps, client windows, landing pages and other user interfaces. Use it for UX critique, layout, typography, accessibility, responsive behavior, motion and design-system documentation. | Settings remains the only Popit design-system authority. Impeccable does not authorize an app to replace Settings, invent a theme or bypass the shared controls. Not required for backend-only code. |
+| `impeccable` | Load for frontend design, redesign, critique, audit, polish, accessibility, responsive behavior, motion and design-system work. | Settings remains the only Popit visual authority. Impeccable improves a Settings-derived client; it does not authorize a private theme, motion system, contour, component library or renderer. Not used for backend-only work. |
+
+The source pins inspected for this audit are:
+- Declauding 0.17.0, `oaustegard/claude-skills/declauding/SKILL.md`, source blob `9750e65daa294478158e06daa0d04875966e4746`.
+- Stop Slop, `hardikpandya/stop-slop/SKILL.md`, source blob `83f2032fde406e97492ec48ee05ebe46f6403109`. Its current SKILL.md does not declare a version; pin the source revision instead of inventing one.
+- Impeccable 4.11.1, `pbakaus/impeccable/plugin/skills/impeccable/SKILL.md`, source blob `3b8f11f8499e7c1412a930d0ebadb2429d3e4df9`.
 
 The family skill registry records source URL, version/revision, content digest, compatibility, installation path and the invocation receipt for each task. Drivers load the skills from the managed family skill directory, currently `<home>/.agents/skills/`, or the registered agent-specific path. A missing, stale or unverifiable required skill is named before the relevant prose/UI task starts.
+
+For Impeccable, the driver loads the project's actual design context before design work. The current skill's setup requires its context command, the task's relevant playbook and its craft-floor guidance immediately before a UI edit. It also requires review of the rendered result at the sizes where the interface ships. The Popit implementation must reconcile that process with the owner's Settings authority: project context and design critique are inputs to the Settings-derived app, not permission to replace its tokens, motion, contour or controls.
 
 For documentation work, the driver records:
 - the loaded Declauding and Stop Slop versions/digests;
@@ -119,7 +126,7 @@ For documentation work, the driver records:
 - the independent structural/newcomer review result where required by the skill;
 - a factual-preservation diff for names, numbers, dates, quotations, claims and links.
 
-For frontend work, record the Impeccable version/digest and the resulting UI audit/visual witness. Do not paste skill prompts, verbose skill checklists or skill commentary into source code.
+For frontend work, record the Impeccable version/digest, the loaded project/design context, relevant playbook/craft-floor receipts, and the resulting UI audit/visual witness. Do not paste skill prompts, verbose skill checklists or skill commentary into source code.
 
 UI strings still live in their appropriate source/data files as executable content, but they are extracted as copy, reviewed through the prose skills and the shared family copy checker, and inserted by the CUA driver. They are not comments or API documentation.
 
